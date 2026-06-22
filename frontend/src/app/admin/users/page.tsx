@@ -5,10 +5,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
+} from "@/components/ui/table";
 
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 const users = [
   {
@@ -35,15 +35,12 @@ const users = [
     warnings: 2,
     banned: true,
   },
-]
+];
 
 export default function UsersPage() {
   return (
     <main className="p-8 space-y-6">
-
-      <h1 className="text-2xl font-bold">
-        Utilisateurs
-      </h1>
+      <h1 className="text-2xl font-bold">Utilisateurs</h1>
 
       <Table>
         <TableHeader>
@@ -60,34 +57,21 @@ export default function UsersPage() {
         <TableBody>
           {users.map((u) => (
             <TableRow key={u.id}>
+              <TableCell className="font-medium">{u.name}</TableCell>
 
-              <TableCell className="font-medium">
-                {u.name}
-              </TableCell>
-
-              <TableCell>
-                {u.email}
-              </TableCell>
+              <TableCell>{u.email}</TableCell>
 
               <TableCell>
-                <Badge variant="secondary">
-                  {u.role}
-                </Badge>
+                <Badge variant="secondary">{u.role}</Badge>
               </TableCell>
 
-              <TableCell>
-                {u.warnings}
-              </TableCell>
+              <TableCell>{u.warnings}</TableCell>
 
               <TableCell>
                 {u.banned ? (
-                  <Badge variant="destructive">
-                    Banni
-                  </Badge>
+                  <Badge variant="destructive">Banni</Badge>
                 ) : (
-                  <Badge variant="default">
-                    Actif
-                  </Badge>
+                  <Badge variant="default">Actif</Badge>
                 )}
               </TableCell>
 
@@ -100,12 +84,10 @@ export default function UsersPage() {
                   Ban
                 </Button>
               </TableCell>
-
             </TableRow>
           ))}
         </TableBody>
       </Table>
-
     </main>
-  )
+  );
 }

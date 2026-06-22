@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import AuthForm from "@/components/auth/AuthForm"
+import Link from "next/link";
+import AuthForm from "@/components/auth/AuthForm";
 
 export default function LoginPage() {
   return (
@@ -11,15 +11,20 @@ export default function LoginPage() {
           <h1 id="login-title" className="text-3xl font-bold">
             Connexion
           </h1>
-          <p className="text-sm text-muted-foreground">Connectez-vous pour gérer vos inscriptions</p>
+          <p className="text-sm text-muted-foreground">
+            Connectez-vous pour gérer vos inscriptions
+          </p>
         </div>
 
         <AuthForm mode="login" />
 
         <div className="mt-6 text-sm text-muted-foreground">
-          Pas de compte ? <Link href="/auth/register" className="text-primary">Créer un compte</Link>
+          Pas de compte ?{" "}
+          <Link href="/auth/register" className="text-primary">
+            Créer un compte
+          </Link>
         </div>
       </section>
     </main>
-  )
+  );
 }

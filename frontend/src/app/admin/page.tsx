@@ -1,24 +1,20 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 const lastParty = {
   title: "CQB Night Session",
   date: "2026-06-12",
   players: 24,
   pafTotal: 240,
-}
+};
 
 export default function AdminDashboard() {
   return (
     <main className="p-8 space-y-8">
-
-      <h1 className="text-3xl font-bold">
-        Admin Dashboard
-      </h1>
+      <h1 className="text-3xl font-bold">Admin Dashboard</h1>
 
       {/* STATS QUICK VIEW */}
       <div className="grid md:grid-cols-3 gap-4">
-
         <Card>
           <CardContent className="p-6">
             <p className="text-sm text-muted-foreground">Parties ce mois</p>
@@ -39,7 +35,6 @@ export default function AdminDashboard() {
             <p className="text-2xl font-bold">1 240€</p>
           </CardContent>
         </Card>
-
       </div>
 
       {/* DERNIÈRE PARTIE */}
@@ -54,12 +49,9 @@ export default function AdminDashboard() {
           <p>👥 {lastParty.players} joueurs</p>
           <p>💸 Gain PAF : {lastParty.pafTotal}€</p>
 
-          <Button className="mt-3">
-            Voir détails
-          </Button>
+          <Button className="mt-3">Voir détails</Button>
         </CardContent>
       </Card>
-
     </main>
-  )
+  );
 }

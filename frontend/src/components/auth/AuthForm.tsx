@@ -1,104 +1,136 @@
-"use client"
+"use client";
 
-import { useEffect, useMemo, useRef, useState } from "react"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { Button } from "@/components/ui/button"
-import { loginSchema, registerSchema, guardianSchema, RegisterInput, LoginInput, GuardianInput } from "@/lib/schemas/auth"
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Button } from "@/components/ui/button";
+import {
+  loginSchema,
+  registerSchema,
+  guardianSchema,
+  RegisterInput,
+  LoginInput,
+  GuardianInput,
+} from "@/lib/schemas/auth";
 
-type Mode = "login" | "register"
+type Mode = "login" | "register";
 
 interface Props {
-  mode?: Mode
+  mode?: Mode;
 }
 
 export default function AuthForm({ mode = "login" }: Props) {
-  const [showGuardian, setShowGuardian] = useState(false)
-  const [pendingRegister, setPendingRegister] = useState<RegisterInput | null>(null)
-  const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null)
-  const dialogRef = useRef<HTMLDivElement | null>(null)
+  const [showGuardian, setShowGuardian] = useState(false);
+  const [pendingRegister, setPendingRegister] = useState<RegisterInput | null>(
+    null,
+  );
+  const [status, setStatus] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
 
-  const resolver = zodResolver(mode === "login" ? loginSchema : registerSchema)
+  const resolver = zodResolver(mode === "login" ? loginSchema : registerSchema);
 
   const {
     register,
     handleSubmit,
     formState: { errors },
     reset,
-  } = useForm<Record<string, any>>({ resolver, mode: "onTouched" })
+  } = useForm<Record<string, unknown>>({ resolver, mode: "onTouched" });
 
   const validationMessages = useMemo(() => {
-    const messages: string[] = []
+    const messages: string[] = [];
 
     const collect = (value: unknown) => {
-      if (!value || typeof value !== "object") return
+      if (!value || typeof value !== "object") return;
 
-      if (value && typeof (value as any).message === "string") {
-        messages.push((value as any).message)
+      if (
+        value &&
+        typeof (value as Record<string, unknown>).message === "string"
+      ) {
+        messages.push((value as Record<string, unknown>).message);
       }
 
       for (const item of Object.values(value as Record<string, unknown>)) {
         if (item && typeof item === "object") {
-          collect(item)
+          collect(item);
         }
       }
-    }
+    };
 
-    collect(errors)
-    return Array.from(new Set(messages))
-  }, [errors])
+    collect(errors);
+    return Array.from(new Set(messages));
+  }, [errors]);
 
   function onError() {
-    setStatus({ type: "error", message: "Veuillez corriger les erreurs du formulaire." })
+    setStatus({
+      type: "error",
+      message: "Veuillez corriger les erreurs du formulaire.",
+    });
   }
 
   useEffect(() => {
     if (showGuardian) {
-      dialogRef.current?.querySelector<HTMLInputElement>("input")?.focus()
+      dialogRef.current?.querySelector<HTMLInputElement>("input")?.focus();
     }
-  }, [showGuardian])
+  }, [showGuardian]);
 
   function onSubmit(data: LoginInput | RegisterInput) {
-    setStatus(null)
+    setStatus(null);
 
     if (mode === "register") {
-      const reg = data as RegisterInput
+      const reg = data as RegisterInput;
       if (reg.age < 18) {
-        setPendingRegister(reg)
-        setShowGuardian(true)
-        return
+        setPendingRegister(reg);
+        setShowGuardian(true);
+        return;
       }
 
       // TODO: call API /register
-      console.log("register payload", reg)
-      setStatus({ type: "success", message: "Inscription réussie (simulée)" })
-      reset()
-      return
+      console.log("register payload", reg);
+      setStatus({ type: "success", message: "Inscription réussie (simulée)" });
+      reset();
+      return;
     }
 
-    console.log("login payload", data as LoginInput)
-    setStatus({ type: "success", message: "Connexion réussie (simulée)" })
-    reset()
+    console.log("login payload", data as LoginInput);
+    setStatus({ type: "success", message: "Connexion réussie (simulée)" });
+    reset();
   }
 
   function onGuardianSubmit(values: GuardianInput) {
-    if (!pendingRegister) return
+    if (!pendingRegister) return;
 
-    const payload = { ...pendingRegister, guardian: values }
+    const payload = { ...pendingRegister, guardian: values };
     // TODO: call API /register with guardian
-    console.log("register minor payload", payload)
-    setShowGuardian(false)
-    setPendingRegister(null)
-    setStatus({ type: "success", message: "Inscription mineur enregistrée (simulée). Email de récapitulatif prêt à être envoyé." })
-    reset()
+    console.log("register minor payload", payload);
+    setShowGuardian(false);
+    setPendingRegister(null);
+    setStatus({
+      type: "success",
+      message:
+        "Inscription mineur enregistrée (simulée). Email de récapitulatif prêt à être envoyé.",
+    });
+    reset();
   }
 
   return (
     <div className="max-w-md">
-      <form onSubmit={handleSubmit(onSubmit, onError)} className="space-y-4" noValidate>
+      <form
+        onSubmit={handleSubmit(onSubmit, onError)}
+        className="space-y-4"
+        noValidate
+      >
         {validationMessages.length > 0 && (
-          <div role="alert" aria-live="assertive" className="rounded border border-destructive/70 bg-destructive/10 p-3 text-sm text-destructive">
-            <p className="font-semibold">Veuillez corriger les erreurs suivantes :</p>
+          <div
+            role="alert"
+            aria-live="assertive"
+            className="rounded border border-destructive/70 bg-destructive/10 p-3 text-sm text-destructive"
+          >
+            <p className="font-semibold">
+              Veuillez corriger les erreurs suivantes :
+            </p>
             <ul className="mt-2 list-disc space-y-1 pl-5">
               {validationMessages.map((message, index) => (
                 <li key={index}>{message}</li>
@@ -109,7 +141,10 @@ export default function AuthForm({ mode = "login" }: Props) {
 
         {mode === "register" && (
           <div>
-            <label htmlFor="name" className="block text-sm text-muted-foreground">
+            <label
+              htmlFor="name"
+              className="block text-sm text-muted-foreground"
+            >
               Nom
             </label>
             <input
@@ -122,7 +157,11 @@ export default function AuthForm({ mode = "login" }: Props) {
               aria-describedby={errors.name ? "name-error" : undefined}
             />
             {errors.name && (
-              <div id="name-error" role="alert" className="text-sm text-destructive">
+              <div
+                id="name-error"
+                role="alert"
+                className="text-sm text-destructive"
+              >
                 {errors.name.message}
               </div>
             )}
@@ -130,7 +169,10 @@ export default function AuthForm({ mode = "login" }: Props) {
         )}
 
         <div>
-          <label htmlFor="email" className="block text-sm text-muted-foreground">
+          <label
+            htmlFor="email"
+            className="block text-sm text-muted-foreground"
+          >
             Email
           </label>
           <input
@@ -144,14 +186,21 @@ export default function AuthForm({ mode = "login" }: Props) {
             aria-describedby={errors.email ? "email-error" : undefined}
           />
           {errors.email && (
-            <div id="email-error" role="alert" className="text-sm text-destructive">
+            <div
+              id="email-error"
+              role="alert"
+              className="text-sm text-destructive"
+            >
               {errors.email.message}
             </div>
           )}
         </div>
 
         <div>
-          <label htmlFor="password" className="block text-sm text-muted-foreground">
+          <label
+            htmlFor="password"
+            className="block text-sm text-muted-foreground"
+          >
             Mot de passe
           </label>
           <input
@@ -160,12 +209,18 @@ export default function AuthForm({ mode = "login" }: Props) {
             className="mt-1 w-full rounded border border-border bg-transparent px-3 py-2"
             type="password"
             placeholder="••••••••"
-            autoComplete={mode === "login" ? "current-password" : "new-password"}
+            autoComplete={
+              mode === "login" ? "current-password" : "new-password"
+            }
             aria-invalid={!!errors.password}
             aria-describedby={errors.password ? "password-error" : undefined}
           />
           {errors.password && (
-            <div id="password-error" role="alert" className="text-sm text-destructive">
+            <div
+              id="password-error"
+              role="alert"
+              className="text-sm text-destructive"
+            >
               {errors.password.message}
             </div>
           )}
@@ -174,7 +229,10 @@ export default function AuthForm({ mode = "login" }: Props) {
         {mode === "register" && (
           <>
             <div>
-              <label htmlFor="confirm" className="block text-sm text-muted-foreground">
+              <label
+                htmlFor="confirm"
+                className="block text-sm text-muted-foreground"
+              >
                 Confirmer
               </label>
               <input
@@ -188,14 +246,21 @@ export default function AuthForm({ mode = "login" }: Props) {
                 aria-describedby={errors.confirm ? "confirm-error" : undefined}
               />
               {errors.confirm && (
-                <div id="confirm-error" role="alert" className="text-sm text-destructive">
+                <div
+                  id="confirm-error"
+                  role="alert"
+                  className="text-sm text-destructive"
+                >
                   {errors.confirm.message}
                 </div>
               )}
             </div>
 
             <div>
-              <label htmlFor="age" className="block text-sm text-muted-foreground">
+              <label
+                htmlFor="age"
+                className="block text-sm text-muted-foreground"
+              >
                 Âge
               </label>
               <input
@@ -209,7 +274,11 @@ export default function AuthForm({ mode = "login" }: Props) {
                 aria-describedby={errors.age ? "age-error" : undefined}
               />
               {errors.age && (
-                <div id="age-error" role="alert" className="text-sm text-destructive">
+                <div
+                  id="age-error"
+                  role="alert"
+                  className="text-sm text-destructive"
+                >
                   {errors.age.message}
                 </div>
               )}
@@ -218,45 +287,73 @@ export default function AuthForm({ mode = "login" }: Props) {
         )}
 
         {status && (
-          <div role="status" aria-live="polite" className={`text-sm ${status.type === "success" ? "text-success" : "text-destructive"}`}>
+          <div
+            role="status"
+            aria-live="polite"
+            className={`text-sm ${status.type === "success" ? "text-success" : "text-destructive"}`}
+          >
             {status.message}
           </div>
         )}
 
         <div className="flex items-center gap-2">
-          <Button type="submit">{mode === "login" ? "Connexion" : "Créer un compte"}</Button>
+          <Button type="submit">
+            {mode === "login" ? "Connexion" : "Créer un compte"}
+          </Button>
         </div>
       </form>
 
       {showGuardian && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="guardian-title" className="w-full max-w-lg rounded bg-card p-6 shadow-xl">
+          <div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="guardian-title"
+            className="w-full max-w-lg rounded bg-card p-6 shadow-xl"
+          >
             <h3 id="guardian-title" className="mb-2 text-lg font-semibold">
               Consentement responsable légal
             </h3>
             <p className="mb-4 text-sm text-muted-foreground">
-              L'utilisateur est mineur. Veuillez remplir les informations du responsable légal et cocher l'accord pour poursuivre.
+              L&apos;utilisateur est mineur. Veuillez remplir les informations
+              du responsable légal et cocher l&apos;accord pour poursuivre.
             </p>
 
-            <GuardianForm onSubmit={onGuardianSubmit} onCancel={() => { setShowGuardian(false); setPendingRegister(null) }} />
+            <GuardianForm
+              onSubmit={onGuardianSubmit}
+              onCancel={() => {
+                setShowGuardian(false);
+                setPendingRegister(null);
+              }}
+            />
           </div>
         </div>
       )}
     </div>
-  )
+  );
 }
 
-function GuardianForm({ onSubmit, onCancel }: { onSubmit: (v: GuardianInput) => void; onCancel: () => void }) {
+function GuardianForm({
+  onSubmit,
+  onCancel,
+}: {
+  onSubmit: (v: GuardianInput) => void;
+  onCancel: () => void;
+}) {
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<GuardianInput>({ resolver: zodResolver(guardianSchema) })
+  } = useForm<GuardianInput>({ resolver: zodResolver(guardianSchema) });
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
       <div>
-        <label htmlFor="guardianName" className="block text-sm text-muted-foreground">
+        <label
+          htmlFor="guardianName"
+          className="block text-sm text-muted-foreground"
+        >
           Nom du responsable
         </label>
         <input
@@ -265,17 +362,26 @@ function GuardianForm({ onSubmit, onCancel }: { onSubmit: (v: GuardianInput) => 
           className="mt-1 w-full rounded border border-border bg-transparent px-3 py-2"
           autoComplete="name"
           aria-invalid={!!errors.guardianName}
-          aria-describedby={errors.guardianName ? "guardianName-error" : undefined}
+          aria-describedby={
+            errors.guardianName ? "guardianName-error" : undefined
+          }
         />
         {errors.guardianName && (
-          <div id="guardianName-error" role="alert" className="text-sm text-destructive">
+          <div
+            id="guardianName-error"
+            role="alert"
+            className="text-sm text-destructive"
+          >
             {errors.guardianName.message}
           </div>
         )}
       </div>
 
       <div>
-        <label htmlFor="guardianEmail" className="block text-sm text-muted-foreground">
+        <label
+          htmlFor="guardianEmail"
+          className="block text-sm text-muted-foreground"
+        >
           Email du responsable
         </label>
         <input
@@ -285,17 +391,26 @@ function GuardianForm({ onSubmit, onCancel }: { onSubmit: (v: GuardianInput) => 
           type="email"
           autoComplete="email"
           aria-invalid={!!errors.guardianEmail}
-          aria-describedby={errors.guardianEmail ? "guardianEmail-error" : undefined}
+          aria-describedby={
+            errors.guardianEmail ? "guardianEmail-error" : undefined
+          }
         />
         {errors.guardianEmail && (
-          <div id="guardianEmail-error" role="alert" className="text-sm text-destructive">
+          <div
+            id="guardianEmail-error"
+            role="alert"
+            className="text-sm text-destructive"
+          >
             {errors.guardianEmail.message}
           </div>
         )}
       </div>
 
       <div>
-        <label htmlFor="guardianPhone" className="block text-sm text-muted-foreground">
+        <label
+          htmlFor="guardianPhone"
+          className="block text-sm text-muted-foreground"
+        >
           Téléphone
         </label>
         <input
@@ -305,10 +420,16 @@ function GuardianForm({ onSubmit, onCancel }: { onSubmit: (v: GuardianInput) => 
           autoComplete="tel"
           inputMode="tel"
           aria-invalid={!!errors.guardianPhone}
-          aria-describedby={errors.guardianPhone ? "guardianPhone-error" : undefined}
+          aria-describedby={
+            errors.guardianPhone ? "guardianPhone-error" : undefined
+          }
         />
         {errors.guardianPhone && (
-          <div id="guardianPhone-error" role="alert" className="text-sm text-destructive">
+          <div
+            id="guardianPhone-error"
+            role="alert"
+            className="text-sm text-destructive"
+          >
             {errors.guardianPhone.message}
           </div>
         )}
@@ -320,14 +441,23 @@ function GuardianForm({ onSubmit, onCancel }: { onSubmit: (v: GuardianInput) => 
           {...register("guardianConsent")}
           type="checkbox"
           aria-invalid={!!errors.guardianConsent}
-          aria-describedby={errors.guardianConsent ? "guardianConsent-error" : undefined}
+          aria-describedby={
+            errors.guardianConsent ? "guardianConsent-error" : undefined
+          }
         />
-        <label htmlFor="guardianConsent" className="text-sm text-muted-foreground">
-          J'autorise le responsable légal
+        <label
+          htmlFor="guardianConsent"
+          className="text-sm text-muted-foreground"
+        >
+          J&apos;autorise le responsable légal
         </label>
       </div>
       {errors.guardianConsent && (
-        <div id="guardianConsent-error" role="alert" className="text-sm text-destructive">
+        <div
+          id="guardianConsent-error"
+          role="alert"
+          className="text-sm text-destructive"
+        >
           {errors.guardianConsent.message}
         </div>
       )}
@@ -339,5 +469,5 @@ function GuardianForm({ onSubmit, onCancel }: { onSubmit: (v: GuardianInput) => 
         <Button type="submit">Valider et enregistrer</Button>
       </div>
     </form>
-  )
+  );
 }

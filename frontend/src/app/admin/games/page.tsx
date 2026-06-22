@@ -5,9 +5,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
+} from "@/components/ui/table";
 
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/button";
 
 const parties = [
   {
@@ -26,15 +26,12 @@ const parties = [
     max: 40,
     paf: 15,
   },
-]
+];
 
 export default function PartiesPage() {
   return (
     <main className="p-8 space-y-6">
-
-      <h1 className="text-2xl font-bold">
-        Parties
-      </h1>
+      <h1 className="text-2xl font-bold">Parties</h1>
 
       <Table>
         <TableHeader>
@@ -52,22 +49,20 @@ export default function PartiesPage() {
             <TableRow key={p.id}>
               <TableCell>{p.title}</TableCell>
               <TableCell>{p.date}</TableCell>
-              <TableCell>{p.players}/{p.max}</TableCell>
+              <TableCell>
+                {p.players}/{p.max}
+              </TableCell>
               <TableCell>{p.paf}€</TableCell>
               <TableCell className="space-x-2">
                 <Button size="sm" variant="secondary">
                   Voir
                 </Button>
-                <Button size="sm">
-                  Edit
-                </Button>
+                <Button size="sm">Edit</Button>
               </TableCell>
             </TableRow>
           ))}
         </TableBody>
-
       </Table>
-
     </main>
-  )
+  );
 }

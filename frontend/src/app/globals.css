@@ -105,11 +105,11 @@
   --ring: oklch(0.55 0.03 60);
 
   /* CHARTS */
-  --chart-1: oklch(0.55 0.03 60);   /* primary */
-  --chart-2: oklch(0.72 0.04 135);  /* secondary */
-  --chart-3: oklch(0.55 0.15 250);  /* info */
-  --chart-4: oklch(0.75 0.15 85);   /* warning */
-  --chart-5: oklch(0.55 0.18 25);   /* error */
+  --chart-1: oklch(0.55 0.03 60); /* primary */
+  --chart-2: oklch(0.72 0.04 135); /* secondary */
+  --chart-3: oklch(0.55 0.15 250); /* info */
+  --chart-4: oklch(0.75 0.15 85); /* warning */
+  --chart-5: oklch(0.55 0.18 25); /* error */
 
   --radius: 0.6rem;
 

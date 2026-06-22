@@ -1,13 +1,12 @@
-'use client'
+"use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 export default function UIPage() {
   return (
     <div className="min-h-screen bg-background text-foreground p-8 space-y-10">
-
       {/* HEADER */}
       <div>
         <h1 className="text-3xl font-bold">UI System Lab</h1>
@@ -18,16 +17,13 @@ export default function UIPage() {
 
       {/* PRIMARY / SECONDARY */}
       <section className="grid md:grid-cols-3 gap-4">
-
         <Card>
           <CardHeader>
             <CardTitle>Primary (terre de France)</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-12 rounded-md bg-primary" />
-            <p className="mt-2 text-sm text-muted-foreground">
-              #7C6D66
-            </p>
+            <p className="mt-2 text-sm text-muted-foreground">#7C6D66</p>
           </CardContent>
         </Card>
 
@@ -37,9 +33,7 @@ export default function UIPage() {
           </CardHeader>
           <CardContent>
             <div className="h-12 rounded-md bg-secondary" />
-            <p className="mt-2 text-sm text-muted-foreground">
-              #949c81
-            </p>
+            <p className="mt-2 text-sm text-muted-foreground">#949c81</p>
           </CardContent>
         </Card>
 
@@ -49,19 +43,17 @@ export default function UIPage() {
           </CardHeader>
           <CardContent>
             <div className="h-12 rounded-md bg-accent" />
-            <p className="mt-2 text-sm text-muted-foreground">
-              brown tactical
-            </p>
+            <p className="mt-2 text-sm text-muted-foreground">brown tactical</p>
           </CardContent>
         </Card>
-
       </section>
 
       {/* SEMANTIC COLORS */}
       <section className="grid md:grid-cols-4 gap-4">
-
         <Card>
-          <CardHeader><CardTitle>Success</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle>Success</CardTitle>
+          </CardHeader>
           <CardContent className="space-y-2">
             <div className="h-10 rounded bg-success" />
             <Badge className="bg-success text-white">SUCCESS</Badge>
@@ -69,7 +61,9 @@ export default function UIPage() {
         </Card>
 
         <Card>
-          <CardHeader><CardTitle>Info</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle>Info</CardTitle>
+          </CardHeader>
           <CardContent className="space-y-2">
             <div className="h-10 rounded bg-info" />
             <Badge className="bg-info text-white">INFO</Badge>
@@ -77,7 +71,9 @@ export default function UIPage() {
         </Card>
 
         <Card>
-          <CardHeader><CardTitle>Warning</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle>Warning</CardTitle>
+          </CardHeader>
           <CardContent className="space-y-2">
             <div className="h-10 rounded bg-warning" />
             <Badge className="bg-warning text-black">WARNING</Badge>
@@ -85,13 +81,14 @@ export default function UIPage() {
         </Card>
 
         <Card>
-          <CardHeader><CardTitle>Error</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle>Error</CardTitle>
+          </CardHeader>
           <CardContent className="space-y-2">
             <div className="h-10 rounded bg-destructive" />
             <Badge className="bg-destructive text-white">ERROR</Badge>
           </CardContent>
         </Card>
-
       </section>
 
       {/* BUTTONS */}
@@ -99,7 +96,6 @@ export default function UIPage() {
         <h2 className="text-xl font-semibold">Buttons</h2>
 
         <div className="flex flex-wrap gap-3">
-
           <Button>Primary</Button>
 
           <Button variant="secondary">Secondary</Button>
@@ -109,7 +105,6 @@ export default function UIPage() {
           <Button variant="ghost">Ghost</Button>
 
           <Button variant="destructive">Destructive</Button>
-
         </div>
       </section>
 
@@ -118,7 +113,6 @@ export default function UIPage() {
         <h2 className="text-xl font-semibold">Status system (métier)</h2>
 
         <div className="flex flex-wrap gap-3">
-
           <Button className="bg-success text-white hover:bg-success/90">
             Success action
           </Button>
@@ -134,24 +128,18 @@ export default function UIPage() {
           <Button className="bg-destructive text-white hover:bg-destructive/90">
             Error action
           </Button>
-
         </div>
       </section>
 
       {/* CARDS */}
       <section className="grid md:grid-cols-3 gap-4">
-
         <Card>
           <CardHeader>
             <CardTitle>Party OK</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-muted-foreground">
-              Inscription active
-            </p>
-            <Badge className="mt-3 bg-success text-white">
-              ACTIVE
-            </Badge>
+            <p className="text-muted-foreground">Inscription active</p>
+            <Badge className="mt-3 bg-success text-white">ACTIVE</Badge>
           </CardContent>
         </Card>
 
@@ -161,11 +149,9 @@ export default function UIPage() {
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground">
-              Liste d'attente activée
+              Liste d&apos;attente activée
             </p>
-            <Badge className="mt-3 bg-warning text-black">
-              FULL
-            </Badge>
+            <Badge className="mt-3 bg-warning text-black">FULL</Badge>
           </CardContent>
         </Card>
 
@@ -174,17 +160,11 @@ export default function UIPage() {
             <CardTitle>Blocked User</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-muted-foreground">
-              Accès refusé
-            </p>
-            <Badge className="mt-3 bg-destructive text-white">
-              BANNED
-            </Badge>
+            <p className="text-muted-foreground">Accès refusé</p>
+            <Badge className="mt-3 bg-destructive text-white">BANNED</Badge>
           </CardContent>
         </Card>
-
       </section>
-
     </div>
-  )
+  );
 }

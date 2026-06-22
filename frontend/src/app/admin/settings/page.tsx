@@ -1,15 +1,12 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 
 export default function SettingsPage() {
   return (
     <main className="p-8 space-y-6">
-
-      <h1 className="text-2xl font-bold">
-        Paramètres de l’application
-      </h1>
+      <h1 className="text-2xl font-bold">Paramètres de l’application</h1>
 
       <Card>
         <CardHeader>
@@ -17,7 +14,6 @@ export default function SettingsPage() {
         </CardHeader>
 
         <CardContent className="space-y-4">
-
           {/* AGE MINIMUM */}
           <div className="space-y-2">
             <Label>Âge minimum</Label>
@@ -42,13 +38,9 @@ export default function SettingsPage() {
             <Input defaultValue="Terrain principal" />
           </div>
 
-          <Button className="mt-4">
-            Sauvegarder
-          </Button>
-
+          <Button className="mt-4">Sauvegarder</Button>
         </CardContent>
       </Card>
-
     </main>
-  )
+  );
 }

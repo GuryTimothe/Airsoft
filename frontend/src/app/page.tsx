@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import {
   Calendar,
   MapPin,
-  Users,
   Clock,
   Lock,
   ArrowRight,
@@ -109,7 +108,7 @@ function Header() {
           </Link>
 
           <Link href="/auth/register">
-            <Button>S'inscrire</Button>
+            <Button>S&apos;inscrire</Button>
           </Link>
         </div>
 
@@ -154,14 +153,14 @@ function Header() {
 
             <div className="flex gap-2 pt-2">
               <Link href="/auth/login" className="flex-1">
-              <Button variant="outline" className="w-full text-sm">
-                Connexion
-              </Button>
-            </Link>
+                <Button variant="outline" className="w-full text-sm">
+                  Connexion
+                </Button>
+              </Link>
 
-            <Link href="/auth/register" className="flex-1">
-              <Button className="w-full text-sm">S'inscrire</Button>
-            </Link>
+              <Link href="/auth/register" className="flex-1">
+                <Button className="w-full text-sm">S&apos;inscrire</Button>
+              </Link>
             </div>
           </div>
         </div>
@@ -194,9 +193,9 @@ function Hero() {
           </h1>
 
           <p className="mb-6 max-w-xl text-lg leading-relaxed text-white/80">
-            Découvrez une communauté passionnée d'airsoft. Inscrivez-vous à nos
-            événements, gérez votre liste d'attente et trouvez vos équipes
-            idéales.
+            Découvrez une communauté passionnée d&apos;airsoft. Inscrivez-vous à
+            nos événements, gérez votre liste d&apos;attente et trouvez vos
+            équipes idéales.
           </p>
 
           <Button className="h-12 px-6 text-base">
