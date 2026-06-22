@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+  pull_request: {}
+
+jobs:
+  frontend:
+    uses: ./.github/workflows/frontend-ci.yml
+    with:
+      node-version: 20
+      working-directory: frontend
+
+  backend:
+    uses: ./.github/workflows/backend-ci.yml
+    with:
+      php-version: 8.4
+      working-directory: backend
+
+  deploy:
+    if: github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main'
+    needs: [frontend, backend]
+    uses: ./.github/workflows/deploy.yml

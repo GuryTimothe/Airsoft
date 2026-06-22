@@ -1,0 +1,13 @@
+parameters:
+  level: 7
+  paths:
+    - src
+  excludePaths:
+    - tests
+  inferPrivatePropertyTypeFromConstructor: true
+  # The following options were removed or renamed in newer PHPStan versions.
+  # Keep equivalent checks if needed; for now they are disabled to ensure CI compatibility.
+  # checkMissingIterableValueType: false
+  # checkGenericClassInNonGenericObjectType: false
+  checkMissingVarTagTypehint: false
+  # checkExtraEmptyLines: false

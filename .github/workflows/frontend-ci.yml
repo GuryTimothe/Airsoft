@@ -1,0 +1,53 @@
+name: Frontend CI
+
+description: "Run frontend linting and formatting checks for pull requests and pushes."
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        required: true
+        type: string
+      working-directory:
+        required: true
+        type: string
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - name: Install dependencies
+        working-directory: ${{ inputs.working-directory }}
+        run: npm install
+
+      - name: Run ESLint
+        working-directory: ${{ inputs.working-directory }}
+        run: npm run lint
+
+  prettier:
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - name: Install dependencies
+        working-directory: ${{ inputs.working-directory }}
+        run: npm install
+
+      - name: Run Prettier check
+        working-directory: ${{ inputs.working-directory }}
+        run: npm run format:check

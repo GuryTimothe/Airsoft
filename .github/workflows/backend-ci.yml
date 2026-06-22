@@ -1,0 +1,83 @@
+name: Backend CI
+
+description: "Run backend PHP CS Fixer checks for pull requests and pushes."
+
+on:
+  workflow_call:
+    inputs:
+      php-version:
+        required: true
+        type: string
+      working-directory:
+        required: true
+        type: string
+
+jobs:
+  php-cs-fixer:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ inputs.php-version }}
+          extensions: mbstring, intl, pdo, pdo_mysql
+
+      - name: Install Composer dependencies
+        working-directory: ${{ inputs.working-directory }}
+        run: composer install --no-progress --no-interaction --prefer-dist
+      - name: Install PHP CS Fixer as project dev dependency
+        working-directory: ${{ inputs.working-directory }}
+        run: composer require --dev friendsofphp/php-cs-fixer --no-interaction --prefer-dist
+
+      - name: Run PHP CS Fixer check
+        working-directory: ${{ inputs.working-directory }}
+        run: composer fix:check
+
+  phpstan:
+    needs: php-cs-fixer
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ inputs.php-version }}
+          extensions: mbstring, intl, pdo, pdo_mysql
+
+      - name: Install Composer dependencies
+        working-directory: ${{ inputs.working-directory }}
+        run: composer install --no-progress --no-interaction --prefer-dist
+
+      - name: Install PHPStan as project dev dependency
+        working-directory: ${{ inputs.working-directory }}
+        run: composer require --dev phpstan/phpstan --no-interaction --prefer-dist
+
+      - name: Run PHPStan analysis
+        working-directory: ${{ inputs.working-directory }}
+        run: vendor/bin/phpstan analyse -c phpstan.neon.dist || vendor/bin/phpstan analyse
+
+  phpunit:
+    needs: phpstan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ inputs.php-version }}
+          extensions: mbstring, intl, pdo, pdo_mysql
+
+      - name: Install Composer dependencies
+        working-directory: ${{ inputs.working-directory }}
+        run: composer install --no-progress --no-interaction --prefer-dist
+
+      - name: Run PHPUnit tests
+        working-directory: ${{ inputs.working-directory }}
+        run: vendor/bin/phpunit
