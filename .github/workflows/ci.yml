@@ -25,5 +25,5 @@ jobs:
 
   deploy:
     if: github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main'
-    needs: [frontend, backend]
+    needs: [frontend, backend, scanner]
     uses: ./.github/workflows/deploy.yml
