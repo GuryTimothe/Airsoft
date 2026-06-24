@@ -20,11 +20,21 @@ jobs:
       php-version: 8.4
       working-directory: backend
 
-  scanner:
-    uses: ./.github/workflows/security-scanner.yml
+  release:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     needs: [frontend, backend]
+    uses: ./.github/workflows/release.yml
+    with:
+      node-version: 20
+    secrets:
+      RELEASE_GITHUB_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN }}
 
-  deploy:
-    if: github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main'
-    needs: [frontend, backend, scanner]
-    uses: ./.github/workflows/deploy.yml
+  # deploy-dev:
+  #   if: github.ref == 'refs/heads/dev' && github.event_name == 'push'
+  #   needs: [frontend, backend]
+  #   uses: ./.github/workflows/deploy.yml
+
+  # deploy-prod:
+  #   if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+  #   needs: [frontend, backend, release]
+  #   uses: ./.github/workflows/deploy.yml

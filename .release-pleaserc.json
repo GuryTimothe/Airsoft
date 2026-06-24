@@ -1,0 +1,49 @@
+{
+  "packages": {
+    ".": {
+      "release-type": "simple",
+      "bump-minor-pre-major": true,
+      "changelog-sections": [
+        { "type": "feat", "section": "New Features" },
+        { "type": "fix", "section": "Bug Fixes" },
+        { "type": "refactor", "section": "Refactoring" },
+        { "type": "perf", "section": "Performance" },
+        { "type": "docs", "section": "Documentation" },
+        { "type": "test", "section": "Tests", "hidden": true },
+        { "type": "ci", "section": "CI/CD", "hidden": true },
+        { "type": "chore", "section": "Maintenance", "hidden": true },
+        { "type": "style", "section": "Style", "hidden": true }
+      ]
+    },
+    "backend": {
+      "release-type": "simple",
+      "bump-minor-pre-major": true,
+      "changelog-sections": [
+        { "type": "feat", "section": "New Features" },
+        { "type": "fix", "section": "Bug Fixes" },
+        { "type": "refactor", "section": "Refactoring" },
+        { "type": "perf", "section": "Performance" },
+        { "type": "docs", "section": "Documentation" },
+        { "type": "test", "section": "Tests", "hidden": true },
+        { "type": "ci", "section": "CI/CD", "hidden": true },
+        { "type": "chore", "section": "Maintenance", "hidden": true },
+        { "type": "style", "section": "Style", "hidden": true }
+      ]
+    },
+    "frontend": {
+      "release-type": "simple",
+      "bump-minor-pre-major": true,
+      "changelog-sections": [
+        { "type": "feat", "section": "New Features" },
+        { "type": "fix", "section": "Bug Fixes" },
+        { "type": "refactor", "section": "Refactoring" },
+        { "type": "perf", "section": "Performance" },
+        { "type": "docs", "section": "Documentation" },
+        { "type": "test", "section": "Tests", "hidden": true },
+        { "type": "ci", "section": "CI/CD", "hidden": true },
+        { "type": "chore", "section": "Maintenance", "hidden": true },
+        { "type": "style", "section": "Style", "hidden": true }
+      ]
+    }
+  }
+}
