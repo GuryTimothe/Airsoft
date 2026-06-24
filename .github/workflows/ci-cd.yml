@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+  pull_request: {}
+
+jobs:
+  frontend:
+    uses: ./.github/workflows/frontend-ci.yml
+    with:
+      node-version: 20
+      working-directory: frontend
+
+  backend:
+    uses: ./.github/workflows/backend-ci.yml
+    with:
+      php-version: 8.4
+      working-directory: backend
+
+  release:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [frontend, backend]
+    uses: ./.github/workflows/release.yml
+    with:
+      node-version: 20
+    secrets:
+      RELEASE_GITHUB_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN }}
+
+  # deploy-dev:
+  #   if: github.ref == 'refs/heads/dev' && github.event_name == 'push'
+  #   needs: [frontend, backend]
+  #   uses: ./.github/workflows/deploy.yml
+
+  # deploy-prod:
+  #   if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+  #   needs: [frontend, backend, release]
+  #   uses: ./.github/workflows/deploy.yml

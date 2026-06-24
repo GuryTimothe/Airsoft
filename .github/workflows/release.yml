@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        required: true
+        type: string
+    secrets:
+      RELEASE_GITHUB_TOKEN:
+        required: true
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.RELEASE_GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - name: Install Prettier
+        run: npm install -g prettier
+
+      - name: Run release-please
+        uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          target-branch: main
+          manifest-file: .release-please-manifest.json
+          config-file: .release-pleaserc.json
+          token: ${{ secrets.RELEASE_GITHUB_TOKEN }}
+
+      - name: Format generated changelogs and push if changed
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN }}
+        run: |
+          prettier --write CHANGELOG.md "**/CHANGELOG.md" || true
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git config --global --add safe.directory "$GITHUB_WORKSPACE" || true
+            git add .
+            git commit -m "chore: format changelogs"
+            git push https://x-access-token:${GITHUB_TOKEN}@github.com/$GITHUB_REPOSITORY HEAD:main
+          fi
+        shell: bash

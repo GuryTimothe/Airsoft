@@ -1,11 +1,7 @@
-on:
-  push:
-    branches:
-      - dev
-      - main
-  workflow_call: {}
-
 name: Deploy website on push
+
+on:
+  workflow_call:
 
 jobs:
   deploy:
