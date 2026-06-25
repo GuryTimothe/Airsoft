@@ -163,7 +163,7 @@ export function GameListCard() {
               </span>
             </Button>
           </Link>
-        </CardContent> 
+        </CardContent>
       </Card>
     </div>
   );

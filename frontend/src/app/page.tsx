@@ -1,7 +1,5 @@
 "use client";
 
-import { Footer } from "../components/Footer";
-import { Header } from "../components/Header";
 import { Hero } from "../components/Hero";
 
 interface Party {
@@ -55,14 +53,10 @@ const parties: Party[] = [
 export default function HomePage() {
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
-      <Header />
       <Hero />
-
       <main className="flex-1">
         <p> Hello world </p>
       </main>
-
-      <Footer />
     </div>
   );
 }

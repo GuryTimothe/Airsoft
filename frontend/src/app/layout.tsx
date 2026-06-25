@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { Footer } from "../components/Footer";
+import { Header } from "../components/Header";
 import { Roboto, Montserrat } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
@@ -31,7 +33,11 @@ export default function RootLayout({
         montserratHeading.variable,
       )}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <Header />
+        <main>{children}</main>
+        <Footer />
+      </body>
     </html>
   );
 }

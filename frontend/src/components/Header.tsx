@@ -20,21 +20,21 @@ export function Header() {
         <div className="hidden items-center gap-8 md:flex">
           <Link
             href="#"
-            className="text-sm font-medium text-primary-foreground transition-colors hover:text-primary"
+            className="text-sm font-medium text-primary-foreground transition-colors hover:text-foreground"
           >
             Parties
           </Link>
 
           <Link
             href="#"
-            className="text-sm font-medium text-primary-foreground transition-colors hover:text-primary"
+            className="text-sm font-medium text-primary-foreground transition-colors hover:text-foreground"
           >
             À propos
           </Link>
 
           <Link
             href="#"
-            className="text-sm font-medium text-primary-foreground transition-colors hover:text-primary"
+            className="text-sm font-medium text-primary-foreground transition-colors hover:text-foreground"
           >
             Contact
           </Link>
@@ -43,7 +43,10 @@ export function Header() {
         {/* Auth buttons */}
         <div className="hidden items-center gap-3 md:flex">
           <Link href="/auth/login">
-            <Button variant="ghost" className="text-sm font-medium text-primary-foreground">
+            <Button
+              variant="ghost"
+              className="text-sm font-medium text-primary-foreground"
+            >
               Connexion
             </Button>
           </Link>
