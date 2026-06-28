@@ -9,32 +9,34 @@ export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-50 bg-primary">
+    <header className="sticky top-0 z-50 bg-primary text-primary-foreground">
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
         {/* Logo */}
-        <Link href="/" className="text-2xl font-black text-primary-foreground">
-          Muret Airsoft
-        </Link>
-
+        <div className="flex items-center gap-2">
+          <img src="/images/logo.png" alt="Logo" className="h-20 w-15 ml-4" />
+          <Link href="/" className="text-2xl font-black">
+            Muret Airsoft
+          </Link>
+        </div>
         {/* Desktop menu */}
         <div className="hidden items-center gap-8 md:flex">
           <Link
             href="#"
-            className="text-sm font-medium text-primary-foreground transition-colors hover:text-foreground"
+            className="text-lg font-medium  transition-colors hover:text-foreground"
           >
             Parties
           </Link>
 
           <Link
             href="#"
-            className="text-sm font-medium text-primary-foreground transition-colors hover:text-foreground"
+            className="text-lg font-medium transition-colors hover:text-foreground"
           >
             À propos
           </Link>
 
           <Link
             href="#"
-            className="text-sm font-medium text-primary-foreground transition-colors hover:text-foreground"
+            className="text-lg font-medium  transition-colors hover:text-foreground"
           >
             Contact
           </Link>
@@ -43,10 +45,7 @@ export function Header() {
         {/* Auth buttons */}
         <div className="hidden items-center gap-3 md:flex">
           <Link href="/auth/login">
-            <Button
-              variant="ghost"
-              className="text-sm font-medium text-primary-foreground"
-            >
+            <Button variant="ghost" className="text-lg font-medium">
               Connexion
             </Button>
           </Link>
@@ -72,21 +71,21 @@ export function Header() {
           <div className="space-y-4 px-6 py-4">
             <Link
               href="#"
-              className="block text-sm font-medium transition-colors hover:text-primary"
+              className="block text-md font-medium transition-colors hover:text-primary"
             >
               Parties
             </Link>
 
             <Link
               href="#"
-              className="block text-sm font-medium transition-colors hover:text-primary"
+              className="block text-md font-medium transition-colors hover:text-primary"
             >
               À propos
             </Link>
 
             <Link
               href="#"
-              className="block text-sm font-medium transition-colors hover:text-primary"
+              className="block text-md font-medium transition-colors hover:text-primary"
             >
               Contact
             </Link>
