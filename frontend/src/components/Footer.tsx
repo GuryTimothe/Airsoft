@@ -6,7 +6,7 @@ export function Footer() {
   return (
     <footer className="border-t border-border bg-accent text-accent-foreground">
       <div className="mx-auto max-w-6xl px-6 py-10">
-        <div className="grid grid-cols-1 gap-10 md:grid-cols-2 items-start">
+        <div className="grid grid-cols-2 items-start">
           <div>
             <div className="mb-4">
               <img
@@ -24,7 +24,13 @@ export function Footer() {
                 hilière
               </p>
               <p>
-                <span className="font-bold">Email :</span> contact@aem.fr
+                <span className="font-bold">Email :</span>
+                <a
+                  href="mailto:contact@aem.fr"
+                  className="hover:underline transition-colors"
+                >
+                  contact@aem.fr
+                </a>
               </p>
               <p>
                 <span className="font-bold">Téléphone :</span> +33 6 00 00 00 00
@@ -38,19 +44,22 @@ export function Footer() {
 
             <div className="flex gap-4">
               <Link
-                href="#"
-                className="hover:text-foreground transition-colors"
+                href="/politique-confidentialite"
+                className="hover:underline transition-colors"
               >
-                Confidentialité
+                confidentialité
               </Link>
-              <Link href="#" className=" transition-colors">
-                Conditions
+              <Link
+                href="/conditions-utilisation"
+                className="hover:underline transition-colors"
+              >
+                Conditions d'utilisation
               </Link>
-              <Link href="#" className=" transition-colors">
-                Données
-              </Link>
-              <Link href="#" className="transition-colors">
-                Contact
+              <Link
+                href="/mentions-legales"
+                className="hover:underline transition-colors"
+              >
+                mentions légales
               </Link>
             </div>
           </div>

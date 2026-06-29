@@ -1,183 +1,219 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, MapPin, Clock, Lock, ArrowRight, Zap } from "lucide-react";
+import { Calendar, MapPin, Users, Euro, Lock } from "lucide-react";
 import Link from "next/link";
 
-export function GameListCard() {
-  interface Party {
-    id: number;
-    title: string;
-    date: string;
-    location: string;
-    paf: number;
-    maxPlayers: number;
-    players: number;
-    waitlist: number;
-    isPrivate: boolean;
+interface Party {
+  id: number;
+  title: string;
+  date: string;
+  location: string;
+  paf: number;
+  maxPlayers: number;
+  players: number;
+  waitlist: number;
+  isPrivate: boolean;
+  image?: string;
+  // État d'inscription de l'utilisateur courant
+  registrationStatus?: "registered" | "waitlisted" | null;
+}
+
+const parties: Party[] = [
+  {
+    id: 1,
+    title: "CQB Night Session",
+    date: "2026-06-12",
+    location: "Terrain Nord",
+    paf: 10,
+    maxPlayers: 24,
+    players: 24,
+    waitlist: 3,
+    isPrivate: false,
+    image: "/images/cqb-night.jpg",
+    registrationStatus: null,
+  },
+  {
+    id: 2,
+    title: "MilSim Weekend",
+    date: "2026-06-20",
+    location: "Forest Base Alpha",
+    paf: 15,
+    maxPlayers: 40,
+    players: 32,
+    waitlist: 0,
+    isPrivate: true,
+    image: "/images/milsim.jpg",
+    registrationStatus: "registered",
+  },
+  {
+    id: 3,
+    title: "Training Day",
+    date: "2026-06-28",
+    location: "CQB Indoor",
+    paf: 8,
+    maxPlayers: 16,
+    players: 10,
+    waitlist: 1,
+    isPrivate: false,
+    image: "/images/training.jpg",
+    registrationStatus: "waitlisted",
+  },
+];
+
+function RegistrationButton({ party }: { party: Party }) {
+  const { registrationStatus, title } = party;
+
+  if (registrationStatus === "registered") {
+    return (
+      <Button
+        variant="outline"
+        className="w-full"
+        aria-label={`Annuler l'inscription à ${title}`}
+      >
+        Annuler l'inscription
+      </Button>
+    );
   }
 
-  const parties: Party[] = [
-    {
-      id: 1,
-      title: "CQB Night Session",
-      date: "2026-06-12",
-      location: "Terrain Nord",
-      paf: 10,
-      maxPlayers: 24,
-      players: 24,
-      waitlist: 3,
-      isPrivate: false,
-    },
-    {
-      id: 2,
-      title: "MilSim Weekend",
-      date: "2026-06-20",
-      location: "Forest Base Alpha",
-      paf: 15,
-      maxPlayers: 40,
-      players: 32,
-      waitlist: 0,
-      isPrivate: true,
-    },
-    {
-      id: 3,
-      title: "Training Day",
-      date: "2026-06-28",
-      location: "CQB Indoor",
-      paf: 8,
-      maxPlayers: 16,
-      players: 10,
-      waitlist: 1,
-      isPrivate: false,
-    },
-  ];
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl">Prochaines parties</h2>
+  if (registrationStatus === "waitlisted") {
+    return (
+      <div className="space-y-2">
+        <p className="text-xs text-muted-foreground text-center">
+          Vous êtes en liste d'attente
+        </p>
+        <Button
+          variant="outline"
+          className="w-full"
+          aria-label={`Quitter la liste d'attente pour ${title}`}
+        >
+          Quitter la liste d'attente
+        </Button>
       </div>
-      {parties.map((party, index) => {
-        const isFull = party.players >= party.maxPlayers;
-        const fillPercentage = (party.players / party.maxPlayers) * 100;
+    );
+  }
 
-        return (
-          <div
-            key={party.id}
-            style={{
-              animation: `slideInUp 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) ${
-                index * 0.15
-              }s both`,
-            }}
-            className="relative h-full"
-          >
-            {/* Top accent line */}
-            <div
-              className={`absolute inset-x-0 top-0 h-1 ${
-                isFull
-                  ? "bg-gradient-to-r from-orange-400 via-red-400 to-orange-400"
-                  : "bg-gradient-to-r from-primary via-cyan-400 to-primary"
-              }`}
-            />
+  // Non inscrit ou non connecté
+  return (
+    <Link href="/auth/register" className="block">
+      <Button className="w-full" aria-label={`S'inscrire à ${title}`}>
+        S'inscrire
+      </Button>
+    </Link>
+  );
+}
 
-            <Card>
-              <CardHeader className="space-y-3 pb-3">
-                <div className="flex items-start justify-between gap-3">
-                  <CardTitle className="text-lg leading-tight">
-                    {party.title}
-                  </CardTitle>
+export function GameListCard() {
+  return (
+    <section aria-labelledby="upcoming-games-title" className="space-y-4">
+      <h2 id="upcoming-games-title" className="text-2xl font-semibold">
+        Prochaines parties
+      </h2>
 
-                  <div className="flex gap-2">
+      <ul className="space-y-4 list-none p-0 m-0" role="list">
+        {parties.map((party) => {
+          const isFull = party.players >= party.maxPlayers;
+          const spotsLeft = party.maxPlayers - party.players;
+
+          const formattedDate = new Date(party.date).toLocaleDateString(
+            "fr-FR",
+            { weekday: "long", day: "numeric", month: "long" },
+          );
+
+          return (
+            <li key={party.id}>
+              <Card className="overflow-hidden pt-0">
+                {/* Banner image — flush, pas de padding */}
+                <div className="relative h-40 bg-muted" aria-hidden="true">
+                  {party.image ? (
+                    <img
+                      src={party.image}
+                      alt="bannière de la partie"
+                      className="w-full h-full object-cover block"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-muted" />
+                  )}
+
+                  <div className="absolute top-3 right-3 flex gap-2">
                     {party.isPrivate && (
-                      <Badge variant="secondary">
-                        <Lock className="h-3 w-3" />
+                      <Badge variant="secondary" className="gap-1">
+                        <Lock className="h-3 w-3" aria-hidden="true" />
                         Privée
                       </Badge>
                     )}
-
                     {isFull && <Badge variant="destructive">Complet</Badge>}
                   </div>
                 </div>
 
-                {/* Progress */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between text-xs">
-                    <span>
-                      {party.players}/{party.maxPlayers} joueurs
-                    </span>
-                    <span>{Math.round(fillPercentage)}%</span>
-                  </div>
+                <CardContent className="pt-4 pb-5 space-y-4">
+                  <h3 className="text-lg font-semibold leading-snug">
+                    {party.title}
+                  </h3>
 
-                  <div className="h-2 rounded-full bg-muted overflow-hidden">
-                    <div
-                      className={`h-full ${
-                        isFull
-                          ? "bg-gradient-to-r from-orange-400 to-red-400"
-                          : "bg-gradient-to-r from-primary to-cyan-400"
-                      }`}
-                      style={{ width: `${fillPercentage}%` }}
-                    />
-                  </div>
-                </div>
-              </CardHeader>
-
-              <CardContent className="space-y-4 text-sm">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex gap-2">
-                    <Calendar className="h-4 w-4" />
-                    <div>
-                      <p>Date</p>
-                      <time className="font-semibold">
-                        {new Date(party.date).toLocaleDateString("fr-FR", {
-                          weekday: "short",
-                          month: "short",
-                          day: "numeric",
-                        })}
-                      </time>
+                  <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Calendar
+                        className="h-4 w-4 text-muted-foreground shrink-0"
+                        aria-hidden="true"
+                      />
+                      <div>
+                        <dt className="sr-only">Date</dt>
+                        <dd className="capitalize">{formattedDate}</dd>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="flex gap-2">
-                    <MapPin className="h-4 w-4" />
-                    <div>
-                      <p>Terrain</p>
-                      <p className="font-semibold">{party.location}</p>
+                    <div className="flex items-center gap-2">
+                      <MapPin
+                        className="h-4 w-4 text-muted-foreground shrink-0"
+                        aria-hidden="true"
+                      />
+                      <div>
+                        <dt className="sr-only">Terrain</dt>
+                        <dd>{party.location}</dd>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="flex gap-2">
-                    <Zap className="h-4 w-4" />
-                    <div>
-                      <p>PAF</p>
-                      <p className="font-semibold">{party.paf}€</p>
+                    <div className="flex items-center gap-2">
+                      <Users
+                        className="h-4 w-4 text-muted-foreground shrink-0"
+                        aria-hidden="true"
+                      />
+                      <div>
+                        <dt className="sr-only">Joueurs</dt>
+                        <dd>
+                          {party.players}/{party.maxPlayers} joueurs
+                          {!isFull && (
+                            <span className="text-muted-foreground">
+                              {" "}
+                              ({spotsLeft} place{spotsLeft > 1 ? "s" : ""})
+                            </span>
+                          )}
+                        </dd>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="flex gap-2">
-                    <Clock className="h-4 w-4" />
-                    <div>
-                      <p>Attente</p>
-                      <p className="font-semibold">
-                        {party.waitlist > 0 ? `+${party.waitlist}` : "—"}
-                      </p>
+                    <div className="flex items-center gap-2">
+                      <Euro
+                        className="h-4 w-4 text-muted-foreground shrink-0"
+                        aria-hidden="true"
+                      />
+                      <div>
+                        <dt className="sr-only">PAF</dt>
+                        <dd>{party.paf} €</dd>
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  </dl>
 
-                <Link href="/auth/register" className="block">
-                  <Button className="w-full">
-                    {isFull ? "Liste d'attente" : "S'inscrire"}
-                    <ArrowRight className="h-4 w-4 ml-2" />
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-          </div>
-        );
-      })}
-    </div>
+                  <RegistrationButton party={party} />
+                </CardContent>
+              </Card>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
