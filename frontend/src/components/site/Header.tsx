@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -13,7 +14,7 @@ export function Header() {
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
         {/* Logo */}
         <div className="flex items-center gap-2">
-          <img src="/images/logo.png" alt="Logo" className="h-20 w-15 ml-4" />
+          <Image src="/images/logo.png" alt="Logo" className="h-20 w-15 ml-4" />
           <Link href="/" className="text-2xl font-black">
             Muret Airsoft
           </Link>

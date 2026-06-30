@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, MapPin, Users, Euro, Lock } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 
 interface Party {
   id: number;
@@ -128,7 +129,7 @@ export function GameListCard() {
                 {/* Banner image — flush, pas de padding */}
                 <div className="relative h-40 bg-muted" aria-hidden="true">
                   {party.image ? (
-                    <img
+                    <Image
                       src={party.image}
                       alt="bannière de la partie"
                       className="w-full h-full object-cover block"

@@ -1,7 +1,5 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { ArrowRight } from "lucide-react";
 import hero from "@/assets/images/hero-banner.jpg";
 
 export function Hero() {

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 
 export function Footer() {
@@ -9,7 +10,7 @@ export function Footer() {
         <div className="grid grid-cols-2 items-start">
           <div>
             <div className="mb-4">
-              <img
+              <Image
                 src="/images/logo.png"
                 alt="Logo"
                 className="h-25 w-20 ml-4"
@@ -53,7 +54,7 @@ export function Footer() {
                 href="/conditions-utilisation"
                 className="hover:underline transition-colors"
               >
-                Conditions d'utilisation
+                {"Conditions d'utilisation"}
               </Link>
               <Link
                 href="/mentions-legales"
