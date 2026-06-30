@@ -1,7 +1,7 @@
 "use client";
 
-import { Hero } from "../components/Hero";
-import { GameListCard } from "../components/GameListCard";
+import { Hero } from "@/components/site/Hero";
+import { GameListCard } from "@/components/site/GameListCard";
 
 export default function HomePage() {
   return (
