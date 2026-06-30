@@ -8,8 +8,8 @@ use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Post;
 use ApiPlatform\Metadata\Put;
-use Doctrine\ORM\Mapping as ORM;
 use App\Repository\GameRepository;
+use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: GameRepository::class)]
@@ -186,7 +186,7 @@ class Game
     #[ORM\PrePersist]
     public function onPrePersist(): void
     {
-        $now = new \DateTimeImmutable();
+        $now             = new \DateTimeImmutable();
         $this->createdAt = $now;
         $this->updatedAt = $now;
     }
