@@ -41,7 +41,7 @@ export function Sidebar() {
         </Link>
 
         <Link
-          href="/admin/parties"
+          href="/admin/games"
           className="flex items-center gap-3 p-2 hover:bg-muted rounded"
         >
           <Calendar className="h-5 w-5" />

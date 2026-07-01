@@ -132,7 +132,10 @@ export function GameListCard() {
                     <Image
                       src={party.image}
                       alt="bannière de la partie"
-                      className="w-full h-full object-cover block"
+                      className="block h-full w-full object-cover"
+                      width={1200}
+                      height={640}
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                     />
                   ) : (
                     <div className="w-full h-full bg-muted" />
