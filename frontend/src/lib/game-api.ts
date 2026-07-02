@@ -1,3 +1,5 @@
+import { getAuthHeaders } from "@/lib/auth";
+
 export interface Game {
   id: number;
   title: string;
@@ -63,8 +65,10 @@ function normalizeGame(data: unknown): Game {
 }
 
 export async function getGames(): Promise<Game[]> {
+  const headers = await getAuthHeaders();
   const response = await fetch(buildUrl("/api/games"), {
     cache: "no-store",
+    headers,
   });
 
   if (!response.ok) {
@@ -91,8 +95,10 @@ export async function getGames(): Promise<Game[]> {
 }
 
 export async function getGame(id: number): Promise<Game> {
+  const headers = await getAuthHeaders();
   const response = await fetch(buildUrl(`/api/games/${id}`), {
     cache: "no-store",
+    headers,
   });
 
   if (!response.ok) {
@@ -103,11 +109,12 @@ export async function getGame(id: number): Promise<Game> {
 }
 
 export async function createGame(payload: GamePayload): Promise<Game> {
+  const headers = await getAuthHeaders({
+    "Content-Type": "application/ld+json",
+  });
   const response = await fetch(buildUrl("/api/games"), {
     method: "POST",
-    headers: {
-      "Content-Type": "application/ld+json",
-    },
+    headers,
     body: JSON.stringify(payload),
   });
 
@@ -123,11 +130,12 @@ export async function updateGame(
   id: number,
   payload: GamePayload,
 ): Promise<Game> {
+  const headers = await getAuthHeaders({
+    "Content-Type": "application/ld+json",
+  });
   const response = await fetch(buildUrl(`/api/games/${id}`), {
     method: "PUT",
-    headers: {
-      "Content-Type": "application/ld+json",
-    },
+    headers,
     body: JSON.stringify(payload),
   });
 
@@ -140,8 +148,10 @@ export async function updateGame(
 }
 
 export async function deleteGame(id: number): Promise<void> {
+  const headers = await getAuthHeaders();
   const response = await fetch(buildUrl(`/api/games/${id}`), {
     method: "DELETE",
+    headers,
   });
 
   if (!response.ok) {

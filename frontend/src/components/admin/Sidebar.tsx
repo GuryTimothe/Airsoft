@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
@@ -10,6 +11,7 @@ import {
   Menu,
   X,
 } from "lucide-react";
+import { clearAuthToken } from "@/lib/auth";
 
 type SidebarProps = {
   open: boolean;
@@ -17,6 +19,14 @@ type SidebarProps = {
 };
 
 export function Sidebar({ open, onToggle }: SidebarProps) {
+  const router = useRouter();
+
+  function onLogout() {
+    clearAuthToken();
+    router.push("/auth/login");
+    router.refresh();
+  }
+
   return (
     <aside
       className={`h-screen border-r bg-primary text-primary-foreground transition-all duration-300 ${
@@ -67,7 +77,10 @@ export function Sidebar({ open, onToggle }: SidebarProps) {
         </Link>
 
         {/* Logout */}
-        <button className="flex items-center gap-3 p-2 hover:bg-muted rounded text-red-500 mt-auto">
+        <button
+          onClick={onLogout}
+          className="flex items-center gap-3 p-2 hover:bg-muted rounded text-red-500 mt-auto"
+        >
           <LogOut className="h-5 w-5" />
           {open && <span>Déconnexion</span>}
         </button>

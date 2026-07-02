@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
+import { login, registerUser } from "@/lib/auth";
 import {
   loginSchema,
   registerSchema,
@@ -20,6 +22,8 @@ interface Props {
 }
 
 export default function AuthForm({ mode = "login" }: Props) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [showGuardian, setShowGuardian] = useState(false);
   const [pendingRegister, setPendingRegister] = useState<RegisterInput | null>(
     null,
@@ -35,8 +39,9 @@ export default function AuthForm({ mode = "login" }: Props) {
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isSubmitting },
     reset,
+    setValue,
   } = useForm<Record<string, unknown>>({ resolver, mode: "onTouched" });
 
   const validationMessages = useMemo(() => {
@@ -74,43 +79,108 @@ export default function AuthForm({ mode = "login" }: Props) {
     }
   }, [showGuardian]);
 
-  function onSubmit(data: LoginInput | RegisterInput) {
+  useEffect(() => {
+    if (mode !== "login") {
+      return;
+    }
+
+    const emailParam = searchParams.get("email");
+    if (emailParam) {
+      setValue("email", emailParam, { shouldValidate: true });
+    }
+  }, [mode, searchParams, setValue]);
+
+  function computeAge(dateOfBirth: string): number {
+    const birthDate = new Date(dateOfBirth);
+    const today = new Date();
+
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    const dayDiff = today.getDate() - birthDate.getDate();
+
+    if (monthDiff < 0 || (0 === monthDiff && dayDiff < 0)) {
+      age -= 1;
+    }
+
+    return age;
+  }
+
+  async function submitRegister(reg: RegisterInput) {
+    await registerUser({
+      firstname: reg.firstname.trim(),
+      lastname: reg.lastname.trim(),
+      email: reg.email,
+      password: reg.password,
+      dateOfBirth: reg.dateOfBirth,
+      pseudo: reg.pseudo?.trim() || undefined,
+      phone: reg.phone?.trim() || undefined,
+    });
+
+    setStatus({
+      type: "success",
+      message: "Compte créé. Connectez-vous pour continuer.",
+    });
+    reset();
+    router.push(`/auth/login?email=${encodeURIComponent(reg.email)}`);
+  }
+
+  async function onSubmit(data: Record<string, unknown>) {
     setStatus(null);
 
     if (mode === "register") {
       const reg = data as RegisterInput;
-      if (reg.age < 18) {
+      if (computeAge(reg.dateOfBirth) < 18) {
         setPendingRegister(reg);
         setShowGuardian(true);
         return;
       }
 
-      // TODO: call API /register
-      console.log("register payload", reg);
-      setStatus({ type: "success", message: "Inscription réussie (simulée)" });
-      reset();
+      try {
+        await submitRegister(reg);
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Impossible de créer le compte.";
+        setStatus({ type: "error", message });
+      }
       return;
     }
 
-    console.log("login payload", data as LoginInput);
-    setStatus({ type: "success", message: "Connexion réussie (simulée)" });
-    reset();
+    try {
+      const loginInput: LoginInput = {
+        email: String(data.email ?? ""),
+        password: String(data.password ?? ""),
+      };
+
+      await login(loginInput);
+      setStatus({ type: "success", message: "Connexion réussie." });
+      reset();
+      router.push("/admin");
+      router.refresh();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Impossible de se connecter.";
+      setStatus({ type: "error", message });
+    }
   }
 
-  function onGuardianSubmit(values: GuardianInput) {
+  async function onGuardianSubmit(values: GuardianInput) {
     if (!pendingRegister) return;
 
-    const payload = { ...pendingRegister, guardian: values };
-    // TODO: call API /register with guardian
-    console.log("register minor payload", payload);
-    setShowGuardian(false);
-    setPendingRegister(null);
-    setStatus({
-      type: "success",
-      message:
-        "Inscription mineur enregistrée (simulée). Email de récapitulatif prêt à être envoyé.",
-    });
-    reset();
+    try {
+      // Backend register endpoint currently ignores guardian details.
+      void values;
+      await submitRegister(pendingRegister);
+      setShowGuardian(false);
+      setPendingRegister(null);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Impossible de créer le compte.";
+      setStatus({ type: "error", message });
+    }
   }
 
   return (
@@ -138,32 +208,65 @@ export default function AuthForm({ mode = "login" }: Props) {
         )}
 
         {mode === "register" && (
-          <div>
-            <label
-              htmlFor="name"
-              className="block text-sm text-muted-foreground"
-            >
-              Nom
-            </label>
-            <input
-              id="name"
-              {...register("name")}
-              className="mt-1 w-full rounded border border-border bg-transparent px-3 py-2"
-              placeholder="Prénom Nom"
-              autoComplete="name"
-              aria-invalid={!!errors.name}
-              aria-describedby={errors.name ? "name-error" : undefined}
-            />
-            {errors.name && (
-              <div
-                id="name-error"
-                role="alert"
-                className="text-sm text-destructive"
+          <>
+            <div>
+              <label
+                htmlFor="lastname"
+                className="block text-sm text-muted-foreground"
               >
-                {errors.name.message}
-              </div>
-            )}
-          </div>
+                Nom
+              </label>
+              <input
+                id="lastname"
+                {...register("lastname")}
+                className="mt-1 w-full rounded border border-border bg-transparent px-3 py-2"
+                placeholder="Dupont"
+                autoComplete="family-name"
+                aria-invalid={!!errors.lastname}
+                aria-describedby={
+                  errors.lastname ? "lastname-error" : undefined
+                }
+              />
+              {errors.lastname && (
+                <div
+                  id="lastname-error"
+                  role="alert"
+                  className="text-sm text-destructive"
+                >
+                  {errors.lastname.message}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label
+                htmlFor="firstname"
+                className="block text-sm text-muted-foreground"
+              >
+                Prénom
+              </label>
+              <input
+                id="firstname"
+                {...register("firstname")}
+                className="mt-1 w-full rounded border border-border bg-transparent px-3 py-2"
+                placeholder="Jean"
+                autoComplete="given-name"
+                aria-invalid={!!errors.firstname}
+                aria-describedby={
+                  errors.firstname ? "firstname-error" : undefined
+                }
+              />
+              {errors.firstname && (
+                <div
+                  id="firstname-error"
+                  role="alert"
+                  className="text-sm text-destructive"
+                >
+                  {errors.firstname.message}
+                </div>
+              )}
+            </div>
+          </>
         )}
 
         <div>
@@ -256,28 +359,84 @@ export default function AuthForm({ mode = "login" }: Props) {
 
             <div>
               <label
-                htmlFor="age"
+                htmlFor="dateOfBirth"
                 className="block text-sm text-muted-foreground"
               >
-                Âge
+                Date de naissance
               </label>
               <input
-                id="age"
-                {...register("age", { valueAsNumber: true })}
+                id="dateOfBirth"
+                {...register("dateOfBirth")}
                 className="mt-1 w-full rounded border border-border bg-transparent px-3 py-2"
-                type="number"
-                min={0}
-                inputMode="numeric"
-                aria-invalid={!!errors.age}
-                aria-describedby={errors.age ? "age-error" : undefined}
+                type="date"
+                autoComplete="bday"
+                aria-invalid={!!errors.dateOfBirth}
+                aria-describedby={
+                  errors.dateOfBirth ? "dateOfBirth-error" : undefined
+                }
               />
-              {errors.age && (
+              {errors.dateOfBirth && (
                 <div
-                  id="age-error"
+                  id="dateOfBirth-error"
                   role="alert"
                   className="text-sm text-destructive"
                 >
-                  {errors.age.message}
+                  {errors.dateOfBirth.message}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label
+                htmlFor="pseudo"
+                className="block text-sm text-muted-foreground"
+              >
+                Pseudo (optionnel)
+              </label>
+              <input
+                id="pseudo"
+                {...register("pseudo")}
+                className="mt-1 w-full rounded border border-border bg-transparent px-3 py-2"
+                placeholder="MonPseudo"
+                autoComplete="nickname"
+                aria-invalid={!!errors.pseudo}
+                aria-describedby={errors.pseudo ? "pseudo-error" : undefined}
+              />
+              {errors.pseudo && (
+                <div
+                  id="pseudo-error"
+                  role="alert"
+                  className="text-sm text-destructive"
+                >
+                  {errors.pseudo.message}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label
+                htmlFor="phone"
+                className="block text-sm text-muted-foreground"
+              >
+                Téléphone (optionnel)
+              </label>
+              <input
+                id="phone"
+                {...register("phone")}
+                className="mt-1 w-full rounded border border-border bg-transparent px-3 py-2"
+                placeholder="0612345678"
+                autoComplete="tel"
+                inputMode="tel"
+                aria-invalid={!!errors.phone}
+                aria-describedby={errors.phone ? "phone-error" : undefined}
+              />
+              {errors.phone && (
+                <div
+                  id="phone-error"
+                  role="alert"
+                  className="text-sm text-destructive"
+                >
+                  {errors.phone.message}
                 </div>
               )}
             </div>
@@ -295,7 +454,7 @@ export default function AuthForm({ mode = "login" }: Props) {
         )}
 
         <div className="flex items-center gap-2">
-          <Button type="submit">
+          <Button type="submit" disabled={isSubmitting}>
             {mode === "login" ? "Connexion" : "Créer un compte"}
           </Button>
         </div>

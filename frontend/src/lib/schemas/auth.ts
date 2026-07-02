@@ -7,13 +7,30 @@ export const loginSchema = z.object({
 
 export const registerSchema = z
   .object({
-    name: z.string().min(1, { message: "Nom requis" }),
+    lastname: z
+      .string()
+      .min(2, { message: "Nom requis (2 caractères minimum)" })
+      .max(255, { message: "Nom trop long" }),
+    firstname: z
+      .string()
+      .min(2, { message: "Prénom requis (2 caractères minimum)" })
+      .max(255, { message: "Prénom trop long" }),
     email: z.string().email({ message: "Email invalide" }),
     password: z
       .string()
-      .min(6, { message: "Mot de passe trop court (6 caractères)" }),
-    confirm: z.string().min(6, { message: "Confirmation requise" }),
-    age: z.number().int().min(0, { message: "Âge invalide" }),
+      .min(8, { message: "Mot de passe trop court (8 caractères)" }),
+    confirm: z.string().min(8, { message: "Confirmation requise" }),
+    dateOfBirth: z
+      .string()
+      .min(1, { message: "Date de naissance requise" })
+      .refine((value) => !Number.isNaN(Date.parse(value)), {
+        message: "Date de naissance invalide",
+      })
+      .refine((value) => new Date(value).getTime() <= Date.now(), {
+        message: "La date de naissance ne peut pas être dans le futur",
+      }),
+    pseudo: z.string().max(100, { message: "Pseudo trop long" }).optional(),
+    phone: z.string().max(20, { message: "Téléphone trop long" }).optional(),
   })
   .superRefine((val, ctx) => {
     if (val.password !== val.confirm) {
@@ -29,9 +46,9 @@ export const guardianSchema = z.object({
   guardianName: z.string().min(1, { message: "Nom du responsable requis" }),
   guardianEmail: z.string().email({ message: "Email du responsable invalide" }),
   guardianPhone: z.string().min(4, { message: "Téléphone requis" }),
-  guardianConsent: z.literal(true, {
-    errorMap: () => ({ message: "Le responsable doit accepter" }),
-  }),
+  guardianConsent: z
+    .boolean()
+    .refine((value) => value, "Le responsable doit accepter"),
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;

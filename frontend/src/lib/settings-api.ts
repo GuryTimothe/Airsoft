@@ -1,3 +1,5 @@
+import { getAuthHeaders } from "@/lib/auth";
+
 export interface AppSetting {
   id: number;
   defaultAddress: string;
@@ -44,8 +46,10 @@ function normalizeSettings(data: unknown): AppSetting {
 }
 
 export async function getAppSettings(): Promise<AppSetting | null> {
+  const headers = await getAuthHeaders();
   const response = await fetch(buildUrl("/api/app_settings"), {
     cache: "no-store",
+    headers,
   });
 
   if (!response.ok) {
@@ -73,11 +77,12 @@ export async function getAppSettings(): Promise<AppSetting | null> {
 export async function createAppSettings(
   payload: AppSettingPayload,
 ): Promise<AppSetting> {
+  const headers = await getAuthHeaders({
+    "Content-Type": "application/ld+json",
+  });
   const response = await fetch(buildUrl("/api/app_settings"), {
     method: "POST",
-    headers: {
-      "Content-Type": "application/ld+json",
-    },
+    headers,
     body: JSON.stringify(payload),
   });
 
@@ -93,11 +98,12 @@ export async function updateAppSettings(
   id: number,
   payload: AppSettingPayload,
 ): Promise<AppSetting> {
+  const headers = await getAuthHeaders({
+    "Content-Type": "application/merge-patch+json",
+  });
   const response = await fetch(buildUrl(`/api/app_settings/${id}`), {
     method: "PATCH",
-    headers: {
-      "Content-Type": "application/merge-patch+json",
-    },
+    headers,
     body: JSON.stringify(payload),
   });
 
