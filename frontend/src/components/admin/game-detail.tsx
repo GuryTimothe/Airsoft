@@ -20,7 +20,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { deleteGame, getGame, type Game } from "@/lib/games";
+import { deleteGame, getGame, type Game } from "@/lib/game-api";
 import { CalendarDays, MapPin, PencilLine, Trash2, Users } from "lucide-react";
 
 interface GameDetailProps {

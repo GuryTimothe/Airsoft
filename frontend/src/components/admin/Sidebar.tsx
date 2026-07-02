@@ -17,7 +17,7 @@ export function Sidebar() {
 
   return (
     <aside
-      className={`h-screen border-r bg-background transition-all duration-300 ${
+      className={`h-screen border-r bg-primary text-primary-foreground transition-all duration-300 ${
         open ? "w-64" : "w-16"
       }`}
     >

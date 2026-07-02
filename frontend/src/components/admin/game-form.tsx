@@ -20,7 +20,8 @@ import {
   updateGame,
   type Game,
   type GameFormValues,
-} from "@/lib/games";
+  type GamePayload,
+} from "@/lib/game-api";
 
 interface GameFormProps {
   gameId?: number;
@@ -33,7 +34,6 @@ const emptyValues: GameFormValues = {
   address: "",
   price: "",
   maxPlaces: "",
-  image: "",
   isPublic: true,
 };
 
@@ -49,7 +49,6 @@ function toFormValues(game?: Game): GameFormValues {
     address: game.address ?? "",
     price: String(game.price ?? 0),
     maxPlaces: String(game.maxPlaces ?? 0),
-    image: game.image ?? "",
     isPublic: game.isPublic ?? true,
   };
 }
@@ -102,17 +101,29 @@ export function GameForm({ gameId }: GameFormProps) {
     setSubmitting(true);
 
     try {
-      const payload = {
-        ...values,
+      const payload: GamePayload = {
+        title: values.title,
+        description: values.description,
+        startDateTime: values.startDateTime,
+        address: values.address,
         price: Number(values.price),
         maxPlaces: Number(values.maxPlaces),
+        isPublic: values.isPublic,
       };
 
       const savedGame = gameId
         ? await updateGame(gameId, payload)
         : await createGame(payload);
 
-      router.push(`/admin/games/${savedGame.id}`);
+      if (gameId) {
+        // After update, go to detail
+        router.push(`/admin/games/${savedGame.id}`);
+      } else {
+        // After creation, go back to the list and force a server refresh
+        router.push(`/admin/games`);
+      }
+
+      // Ensure server-side data is re-fetched
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Une erreur est survenue");
@@ -222,28 +233,16 @@ export function GameForm({ gameId }: GameFormProps) {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="image">Image</Label>
-              <Input
-                id="image"
-                value={values.image}
-                onChange={(event) =>
-                  setValues({ ...values, image: event.target.value })
-                }
-                placeholder="/images/party.jpg"
-              />
-            </div>
-
             <div className="flex items-center gap-2 rounded-md border p-3">
               <Checkbox
-                id="isPublic"
-                checked={values.isPublic}
+                id="isPrivate"
+                checked={!values.isPublic}
                 onCheckedChange={(checked) =>
-                  setValues({ ...values, isPublic: Boolean(checked) })
+                  setValues({ ...values, isPublic: !Boolean(checked) })
                 }
               />
-              <Label htmlFor="isPublic" className="cursor-pointer">
-                Partie publique
+              <Label htmlFor="isPrivate" className="cursor-pointer">
+                Partie privée
               </Label>
             </div>
 

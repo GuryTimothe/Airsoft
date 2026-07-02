@@ -6,7 +6,6 @@ export interface Game {
   address: string;
   price: number;
   maxPlaces: number;
-  image?: string | null;
   isPublic: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -19,7 +18,16 @@ export interface GameFormValues {
   address: string;
   price: string;
   maxPlaces: string;
-  image: string;
+  isPublic: boolean;
+}
+
+export interface GamePayload {
+  title: string;
+  description: string;
+  startDateTime: string;
+  address: string;
+  price: number;
+  maxPlaces: number;
   isPublic: boolean;
 }
 
@@ -27,6 +35,21 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 function buildUrl(path: string) {
   return `${API_BASE_URL}${path}`;
+}
+
+function normalizeGame(data: any): Game {
+  return {
+    id: data.id,
+    title: data.title,
+    description: data.description ?? null,
+    startDateTime: data.startDateTime,
+    address: data.address,
+    price: Number(data.price ?? 0),
+    maxPlaces: Number(data.maxPlaces ?? data.max_places ?? 0),
+    isPublic: data.isPublic ?? data.public ?? false,
+    createdAt: data.createdAt ?? data.created_at ?? undefined,
+    updatedAt: data.updatedAt ?? data.updated_at ?? undefined,
+  };
 }
 
 export async function getGames(): Promise<Game[]> {
@@ -39,7 +62,22 @@ export async function getGames(): Promise<Game[]> {
   }
 
   const data = await response.json();
-  return data["hydra:member"] ?? [];
+
+  // API Platform (JSON-LD) returns an object with `hydra:member`.
+  // Some setups or mock servers may return a plain array.
+  let items: any[] = [];
+
+  if (Array.isArray(data)) {
+    items = data;
+  } else if (Array.isArray(data["hydra:member"])) {
+    items = data["hydra:member"];
+  } else if (Array.isArray(data["member"])) {
+    items = data["member"];
+  } else if (Array.isArray(data["items"])) {
+    items = data["items"];
+  }
+
+  return items.map(normalizeGame);
 }
 
 export async function getGame(id: number): Promise<Game> {
@@ -51,10 +89,10 @@ export async function getGame(id: number): Promise<Game> {
     throw new Error("Impossible de charger la partie");
   }
 
-  return response.json();
+  return normalizeGame(await response.json());
 }
 
-export async function createGame(payload: GameFormValues): Promise<Game> {
+export async function createGame(payload: GamePayload): Promise<Game> {
   const response = await fetch(buildUrl("/api/games"), {
     method: "POST",
     headers: {
@@ -68,12 +106,12 @@ export async function createGame(payload: GameFormValues): Promise<Game> {
     throw new Error(errorText || "Impossible de créer la partie");
   }
 
-  return response.json();
+  return normalizeGame(await response.json());
 }
 
 export async function updateGame(
   id: number,
-  payload: GameFormValues,
+  payload: GamePayload,
 ): Promise<Game> {
   const response = await fetch(buildUrl(`/api/games/${id}`), {
     method: "PUT",
@@ -88,7 +126,7 @@ export async function updateGame(
     throw new Error(errorText || "Impossible de modifier la partie");
   }
 
-  return response.json();
+  return normalizeGame(await response.json());
 }
 
 export async function deleteGame(id: number): Promise<void> {
