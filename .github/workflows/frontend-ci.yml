@@ -54,8 +54,20 @@ jobs:
 
   test:
     needs: prettier
-    uses: ./.github/workflows/test.yml
-    with:
-      job-type: frontend
-      node-version: ${{ inputs.node-version }}
-      working-directory: ${{ inputs.working-directory }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - name: Install dependencies
+        working-directory: ${{ inputs.working-directory }}
+        run: npm install
+
+      - name: Run tests
+        working-directory: ${{ inputs.working-directory }}
+        run: npm test --if-present
