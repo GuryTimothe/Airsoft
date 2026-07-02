@@ -1,12 +1,6 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { getGames, type Game } from "@/lib/game-api";
 import { Plus } from "lucide-react";
 import GameTable from "@/components/admin/GameTable";
@@ -17,7 +11,7 @@ export default async function GamesPage() {
 
   try {
     games = await getGames();
-  } catch (error) {
+  } catch {
     errorMessage = "Impossible de charger les parties.";
   }
 

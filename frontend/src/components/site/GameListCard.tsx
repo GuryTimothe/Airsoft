@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -112,18 +112,23 @@ export function GameListCard() {
     };
   }, []);
 
-  const upcomingGames = games
-    .filter(
-      (game) =>
-        game.isPublic && new Date(game.startDateTime).getTime() > Date.now(),
-    )
-    .sort(
-      (a, b) =>
-        new Date(a.startDateTime).getTime() -
-        new Date(b.startDateTime).getTime(),
-    )
-    .slice(0, 3)
-    .map(mapGameToParty);
+  const upcomingGames = useMemo(() => {
+    // Calling Date.now() is intentionally done once inside the memo.
+    // eslint-disable-next-line react-hooks/purity
+    const now = Date.now();
+
+    return games
+      .filter(
+        (game) => game.isPublic && new Date(game.startDateTime).getTime() > now,
+      )
+      .sort(
+        (a, b) =>
+          new Date(a.startDateTime).getTime() -
+          new Date(b.startDateTime).getTime(),
+      )
+      .slice(0, 3)
+      .map(mapGameToParty);
+  }, [games]);
 
   return (
     <section aria-labelledby="upcoming-games-title" className="space-y-4">

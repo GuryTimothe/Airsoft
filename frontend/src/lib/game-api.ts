@@ -37,18 +37,28 @@ function buildUrl(path: string) {
   return `${API_BASE_URL}${path}`;
 }
 
-function normalizeGame(data: any): Game {
+function normalizeGame(data: unknown): Game {
+  const d = data as Record<string, unknown>;
+
+  const get = (k: string) => d[k];
+
   return {
-    id: data.id,
-    title: data.title,
-    description: data.description ?? null,
-    startDateTime: data.startDateTime,
-    address: data.address,
-    price: Number(data.price ?? 0),
-    maxPlaces: Number(data.maxPlaces ?? data.max_places ?? 0),
-    isPublic: data.isPublic ?? data.public ?? false,
-    createdAt: data.createdAt ?? data.created_at ?? undefined,
-    updatedAt: data.updatedAt ?? data.updated_at ?? undefined,
+    id: Number(get("id") ?? 0),
+    title: String(get("title") ?? ""),
+    description: (get("description") as string) ?? null,
+    startDateTime: String(get("startDateTime") ?? get("start_date") ?? ""),
+    address: String(get("address") ?? ""),
+    price: Number(get("price") ?? 0),
+    maxPlaces: Number(get("maxPlaces") ?? get("max_places") ?? 0),
+    isPublic: Boolean(get("isPublic") ?? get("public") ?? false),
+    createdAt:
+      (get("createdAt") as string) ??
+      (get("created_at") as string) ??
+      undefined,
+    updatedAt:
+      (get("updatedAt") as string) ??
+      (get("updated_at") as string) ??
+      undefined,
   };
 }
 
@@ -65,7 +75,7 @@ export async function getGames(): Promise<Game[]> {
 
   // API Platform (JSON-LD) returns an object with `hydra:member`.
   // Some setups or mock servers may return a plain array.
-  let items: any[] = [];
+  let items: unknown[] = [];
 
   if (Array.isArray(data)) {
     items = data;
@@ -77,7 +87,7 @@ export async function getGames(): Promise<Game[]> {
     items = data["items"];
   }
 
-  return items.map(normalizeGame);
+  return items.map((it) => normalizeGame(it));
 }
 
 export async function getGame(id: number): Promise<Game> {

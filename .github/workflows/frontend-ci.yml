@@ -51,3 +51,11 @@ jobs:
       - name: Run Prettier check
         working-directory: ${{ inputs.working-directory }}
         run: npm run format:check
+
+  test:
+    needs: prettier
+    uses: ./.github/workflows/test.yml
+    with:
+      job-type: frontend
+      node-version: ${{ inputs.node-version }}
+      working-directory: ${{ inputs.working-directory }}
