@@ -71,6 +71,6 @@ jobs:
       - name: Run tests
         working-directory: ${{ inputs.working-directory }}
         run: |
-          # Ensure required Jest transform is available in CI (some runners install only prod deps)
-          npm install --no-save --save-dev @swc/jest --no-audit --no-fund || true
+          # Ensure required Jest transforms are available in CI (some runners install only prod deps)
+          npm install --no-save --save-dev @swc/jest jest-transform-stub tmpl --no-audit --no-fund || true
           npm test --if-present
