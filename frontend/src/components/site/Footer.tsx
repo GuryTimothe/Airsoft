@@ -13,7 +13,10 @@ export function Footer() {
               <Image
                 src="/images/logo.png"
                 alt="Logo"
-                className="h-25 w-20 ml-4"
+                className="ml-4 h-25 w-20"
+                width={80}
+                height={100}
+                sizes="80px"
               />
               <h3 className="text-lg font-bold">Muret Airsoft</h3>
             </div>

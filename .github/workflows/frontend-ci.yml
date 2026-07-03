@@ -51,3 +51,26 @@ jobs:
       - name: Run Prettier check
         working-directory: ${{ inputs.working-directory }}
         run: npm run format:check
+
+  test:
+    needs: prettier
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - name: Install dependencies
+        working-directory: ${{ inputs.working-directory }}
+        run: npm install
+
+      - name: Run tests
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          # Ensure required Jest transforms are available in CI (some runners install only prod deps)
+          npm install --no-save --save-dev @swc/jest jest-transform-stub tmpl --no-audit --no-fund || true
+          npm test --if-present

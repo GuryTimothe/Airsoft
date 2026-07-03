@@ -17,7 +17,7 @@ export function Sidebar() {
 
   return (
     <aside
-      className={`h-screen border-r bg-background transition-all duration-300 ${
+      className={`h-screen border-r bg-primary text-primary-foreground transition-all duration-300 ${
         open ? "w-64" : "w-16"
       }`}
     >
@@ -41,7 +41,7 @@ export function Sidebar() {
         </Link>
 
         <Link
-          href="/admin/parties"
+          href="/admin/games"
           className="flex items-center gap-3 p-2 hover:bg-muted rounded"
         >
           <Calendar className="h-5 w-5" />
