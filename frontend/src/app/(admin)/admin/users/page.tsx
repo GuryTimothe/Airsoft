@@ -1,93 +1,47 @@
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Plus } from "lucide-react";
+import UserTable from "@/components/admin/UserTable";
+import { getUsers, type User } from "@/lib/user-api";
 
-const users = [
-  {
-    id: 1,
-    name: "Alex Martin",
-    email: "alex@mail.com",
-    role: "member",
-    warnings: 1,
-    banned: false,
-  },
-  {
-    id: 2,
-    name: "Lucas Durand",
-    email: "lucas@mail.com",
-    role: "organizer",
-    warnings: 0,
-    banned: false,
-  },
-  {
-    id: 3,
-    name: "John Doe",
-    email: "john@mail.com",
-    role: "member",
-    warnings: 2,
-    banned: true,
-  },
-];
+export default async function UsersPage() {
+  let users: User[] = [];
+  let errorMessage: string | null = null;
 
-export default function UsersPage() {
+  try {
+    users = await getUsers();
+  } catch {
+    errorMessage = "Impossible de charger les utilisateurs.";
+  }
+
   return (
-    <main className="p-8 space-y-6">
-      <h1 className="text-2xl font-bold">Utilisateurs</h1>
+    <main className="space-y-6 p-6">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Gestion des utilisateurs
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Cette section est reservee a l'administration. Les utilisateurs ne
+            sont pas affiches sur le site public.
+          </p>
+        </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Nom</TableHead>
-            <TableHead>Email</TableHead>
-            <TableHead>Rôle</TableHead>
-            <TableHead>Warnings</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Actions</TableHead>
-          </TableRow>
-        </TableHeader>
+        <Button asChild>
+          <Link href="/admin/users/new">
+            <Plus className="mr-2 h-4 w-4" />
+            Nouvel utilisateur
+          </Link>
+        </Button>
+      </div>
 
-        <TableBody>
-          {users.map((u) => (
-            <TableRow key={u.id}>
-              <TableCell className="font-medium">{u.name}</TableCell>
+      {errorMessage ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          {errorMessage}
+        </div>
+      ) : null}
 
-              <TableCell>{u.email}</TableCell>
-
-              <TableCell>
-                <Badge variant="secondary">{u.role}</Badge>
-              </TableCell>
-
-              <TableCell>{u.warnings}</TableCell>
-
-              <TableCell>
-                {u.banned ? (
-                  <Badge variant="destructive">Banni</Badge>
-                ) : (
-                  <Badge variant="default">Actif</Badge>
-                )}
-              </TableCell>
-
-              <TableCell className="space-x-2">
-                <Button size="sm" variant="secondary">
-                  Voir
-                </Button>
-
-                <Button size="sm" variant="destructive">
-                  Ban
-                </Button>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+      <UserTable initialUsers={users} />
     </main>
   );
 }

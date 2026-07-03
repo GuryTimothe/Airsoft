@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import {
   LayoutDashboard,
@@ -12,9 +11,12 @@ import {
   X,
 } from "lucide-react";
 
-export function Sidebar() {
-  const [open, setOpen] = useState(true);
+type SidebarProps = {
+  open: boolean;
+  onToggle: () => void;
+};
 
+export function Sidebar({ open, onToggle }: SidebarProps) {
   return (
     <aside
       className={`h-screen border-r bg-primary text-primary-foreground transition-all duration-300 ${
@@ -25,7 +27,7 @@ export function Sidebar() {
       <div className="flex items-center justify-between p-3 border-b">
         {open && <span className="font-semibold text-sm">Admin</span>}
 
-        <button onClick={() => setOpen(!open)}>
+        <button onClick={onToggle}>
           {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
       </div>

@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Button } from "@/components/ui/button";
 import { getGames, type Game } from "@/lib/game-api";
 import { Plus } from "lucide-react";
 import GameTable from "@/components/admin/GameTable";
