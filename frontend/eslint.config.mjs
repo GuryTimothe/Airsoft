@@ -5,18 +5,14 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
-
-  {
-    rules: {
-      "react/no-unescaped-entities": "off",
-    },
-  },
-
+  // Override default ignores of eslint-config-next.
   globalIgnores([
+    // Default ignores of eslint-config-next:
     ".next/**",
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Config files that require CommonJS
     "jest.config.js",
     "jest.setup.ts",
     "postcss.config.mjs",

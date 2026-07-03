@@ -45,9 +45,11 @@ export default function AuthForm({ mode = "login" }: Props) {
     const collect = (value: unknown) => {
       if (!value || typeof value !== "object") return;
 
-      const maybeMessage = (value as Record<string, unknown>).message;
-      if (typeof maybeMessage === "string") {
-        messages.push(maybeMessage);
+      if (
+        value &&
+        typeof (value as Record<string, unknown>).message === "string"
+      ) {
+        messages.push((value as Record<string, unknown>).message);
       }
 
       for (const item of Object.values(value as Record<string, unknown>)) {
