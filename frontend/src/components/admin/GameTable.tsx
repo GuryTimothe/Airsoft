@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -88,58 +89,77 @@ export default function GameTable({ initialGames }: GameTableProps) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="mb-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <label className="space-y-2 text-sm">
-            <span>Visibilité</span>
-            <select
-              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
-              value={visibility}
-              onChange={(event) =>
-                setVisibility(event.target.value as VisibilityFilter)
-              }
-            >
-              <option value="all">Tous</option>
-              <option value="public">Publiques</option>
-              <option value="private">Privées</option>
-            </select>
-          </label>
+        <div className="mb-6 space-y-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:max-w-4xl lg:grid-cols-4">
+            <label className="space-y-2 text-sm">
+              <span>Filtrer par visibilité</span>
+              <select
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                value={visibility}
+                onChange={(event) =>
+                  setVisibility(event.target.value as VisibilityFilter)
+                }
+              >
+                <option value="all">Tous</option>
+                <option value="public">Publiques</option>
+                <option value="private">Privées</option>
+              </select>
+            </label>
 
-          <label className="space-y-2 text-sm">
-            <span>Date à partir de</span>
-            <input
-              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
-              type="date"
-              value={dateFilter}
-              onChange={(event) => setDateFilter(event.target.value)}
-            />
-          </label>
+            <label className="space-y-2 text-sm">
+              <span>Date minimale</span>
+              <input
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                type="date"
+                value={dateFilter}
+                onChange={(event) => setDateFilter(event.target.value)}
+              />
+            </label>
 
-          <label className="space-y-2 text-sm">
-            <span>Trier par</span>
-            <select
-              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
-              value={sortBy}
-              onChange={(event) => setSortBy(event.target.value as SortOption)}
-            >
-              <option value="date">Date</option>
-              <option value="people">Nombre de places</option>
-              <option value="paf">PAF</option>
-            </select>
-          </label>
+            <label className="space-y-2 text-sm">
+              <span>Trier par</span>
+              <select
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                value={sortBy}
+                onChange={(event) =>
+                  setSortBy(event.target.value as SortOption)
+                }
+              >
+                <option value="date">Date</option>
+                <option value="people">Nombre de places</option>
+                <option value="paf">PAF</option>
+              </select>
+            </label>
 
-          <label className="space-y-2 text-sm">
-            <span>Ordre</span>
-            <select
-              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
-              value={sortDirection}
-              onChange={(event) =>
-                setSortDirection(event.target.value as "asc" | "desc")
-              }
+            <label className="space-y-2 text-sm">
+              <span>Ordre</span>
+              <select
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                value={sortDirection}
+                onChange={(event) =>
+                  setSortDirection(event.target.value as "asc" | "desc")
+                }
+              >
+                <option value="asc">Ascendant</option>
+                <option value="desc">Descendant</option>
+              </select>
+            </label>
+          </div>
+
+          <div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setVisibility("all");
+                setDateFilter("");
+                setSortBy("date");
+                setSortDirection("asc");
+              }}
             >
-              <option value="asc">Ascendant</option>
-              <option value="desc">Descendant</option>
-            </select>
-          </label>
+              Réinitialiser les filtres
+            </Button>
+          </div>
         </div>
 
         {filteredGames.length === 0 ? (
@@ -178,15 +198,9 @@ export default function GameTable({ initialGames }: GameTableProps) {
                   </TableCell>
                   <TableCell>{game.price.toFixed(2)} €</TableCell>
                   <TableCell>
-                    <span
-                      className={`rounded-full px-2 py-1 text-xs ${
-                        game.isPublic
-                          ? "bg-emerald-100 text-emerald-700"
-                          : "bg-amber-100 text-amber-700"
-                      }`}
-                    >
+                    <Badge variant={game.isPublic ? "default" : "outline"}>
                       {game.isPublic ? "Publique" : "Privée"}
-                    </span>
+                    </Badge>
                   </TableCell>
                   <TableCell className="text-right">
                     <Button asChild size="sm" variant="outline">

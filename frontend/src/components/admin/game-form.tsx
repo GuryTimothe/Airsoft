@@ -27,6 +27,10 @@ interface GameFormProps {
   gameId?: number;
 }
 
+function RequiredMark() {
+  return <span className="ml-1 text-destructive">*</span>;
+}
+
 const emptyValues: GameFormValues = {
   title: "",
   description: "",
@@ -153,7 +157,10 @@ export function GameForm({ gameId }: GameFormProps) {
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="title">Titre</Label>
+                <Label htmlFor="title">
+                  Titre
+                  <RequiredMark />
+                </Label>
                 <Input
                   id="title"
                   value={values.title}
@@ -165,7 +172,10 @@ export function GameForm({ gameId }: GameFormProps) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="address">Adresse</Label>
+                <Label htmlFor="address">
+                  Adresse
+                  <RequiredMark />
+                </Label>
                 <Input
                   id="address"
                   value={values.address}
@@ -191,7 +201,10 @@ export function GameForm({ gameId }: GameFormProps) {
 
             <div className="grid gap-4 md:grid-cols-3">
               <div className="space-y-2">
-                <Label htmlFor="startDateTime">Date et heure</Label>
+                <Label htmlFor="startDateTime">
+                  Date et heure
+                  <RequiredMark />
+                </Label>
                 <Input
                   id="startDateTime"
                   type="datetime-local"
@@ -204,7 +217,10 @@ export function GameForm({ gameId }: GameFormProps) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="price">PAF</Label>
+                <Label htmlFor="price">
+                  PAF
+                  <RequiredMark />
+                </Label>
                 <Input
                   id="price"
                   type="number"
@@ -219,7 +235,10 @@ export function GameForm({ gameId }: GameFormProps) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="maxPlaces">Places max</Label>
+                <Label htmlFor="maxPlaces">
+                  Places max
+                  <RequiredMark />
+                </Label>
                 <Input
                   id="maxPlaces"
                   type="number"
@@ -262,6 +281,8 @@ export function GameForm({ gameId }: GameFormProps) {
                 Annuler
               </Button>
             </div>
+
+            <p className="text-xs text-muted-foreground">* Champ obligatoire</p>
           </form>
         )}
       </CardContent>

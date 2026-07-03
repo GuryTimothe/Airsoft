@@ -14,7 +14,7 @@ export default function AdminLayout({
 
   return (
     <div className="flex h-screen">
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar open={sidebarOpen} onToggle={() => setSidebarOpen((v) => !v)} />
       <div className="flex flex-1 flex-col">
         <Header onToggleSidebar={() => setSidebarOpen((v) => !v)} />
         <main className="flex-1 p-4 overflow-auto">{children}</main>
