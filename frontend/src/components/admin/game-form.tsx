@@ -22,6 +22,7 @@ import {
   type GameFormValues,
   type GamePayload,
 } from "@/lib/game-api";
+import { getAppSettings } from "@/lib/settings-api";
 
 interface GameFormProps {
   gameId?: number;
@@ -92,6 +93,35 @@ export function GameForm({ gameId }: GameFormProps) {
         if (active) {
           setLoading(false);
         }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [gameId]);
+
+  useEffect(() => {
+    if (gameId) {
+      return;
+    }
+
+    let active = true;
+
+    getAppSettings()
+      .then((settings) => {
+        if (!active || !settings) {
+          return;
+        }
+
+        setValues((current) => ({
+          ...current,
+          address: current.address || settings.defaultAddress,
+          price: current.price || String(settings.defaultPrice),
+          maxPlaces: current.maxPlaces || String(settings.defaultMaxPlaces),
+        }));
+      })
+      .catch(() => {
+        // Keep local defaults if settings cannot be loaded.
       });
 
     return () => {
