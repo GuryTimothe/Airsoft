@@ -18,11 +18,9 @@ export const baseGameSchema = z.object({
       message: "La date de début doit être dans le futur",
     }),
   address: z.string().min(5, "L'adresse est requise"),
-  price: z.coerce
-    .number({ invalid_type_error: "Le prix doit être un nombre" })
-    .min(0, "Le prix doit être positif"),
+  price: z.coerce.number().min(0, "Le prix doit être positif"),
   maxPlaces: z.coerce
-    .number({ invalid_type_error: "Le nombre de places doit être un nombre" })
+    .number()
     .int("Le nombre de places doit être un entier")
     .min(1, "Il faut au moins 1 place")
     .max(200, "Maximum 200 places"),

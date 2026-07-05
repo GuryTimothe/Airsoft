@@ -1,0 +1,101 @@
+<?php
+
+namespace App\State;
+
+use ApiPlatform\Metadata\Operation;
+use ApiPlatform\State\ProcessorInterface;
+use ApiPlatform\Validator\Exception\ValidationException;
+use App\Dto\MeEmailUpdateInput;
+use App\Dto\MeUpdateOutput;
+use App\Entity\User;
+use Doctrine\ORM\EntityManagerInterface;
+use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
+use Symfony\Bundle\SecurityBundle\Security;
+use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+use Symfony\Component\Validator\ConstraintViolation;
+use Symfony\Component\Validator\ConstraintViolationList;
+
+/**
+ * @implements ProcessorInterface<MeEmailUpdateInput, MeUpdateOutput>
+ */
+class MeEmailUpdateProcessor implements ProcessorInterface
+{
+    public function __construct(
+        private EntityManagerInterface $entityManager,
+        private UserPasswordHasherInterface $passwordHasher,
+        private JWTTokenManagerInterface $jwtManager,
+        private Security $security,
+    ) {
+    }
+
+    public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): mixed
+    {
+
+        $previousData = $context['previous_data'] ?? null;
+        if (null !== $previousData && !$previousData instanceof User) {
+            throw new \InvalidArgumentException('Previous user state is invalid.');
+        }
+
+        $targetUser = $this->resolveTargetUser($previousData);
+
+        $currentPassword = $data->currentPassword;
+
+        if (!\is_string($currentPassword) || '' === trim($currentPassword)) {
+            throw new ValidationException(new ConstraintViolationList([
+                new ConstraintViolation(
+                    'Le mot de passe actuel est requis.',
+                    null,
+                    [],
+                    null,
+                    'currentPassword',
+                    $currentPassword,
+                ),
+            ]));
+        }
+
+        if (!$this->passwordHasher->isPasswordValid($targetUser, $currentPassword)) {
+            throw new ValidationException(new ConstraintViolationList([
+                new ConstraintViolation(
+                    'Le mot de passe actuel est incorrect.',
+                    null,
+                    [],
+                    null,
+                    'currentPassword',
+                    null,
+                ),
+            ]));
+        }
+
+        if (!\is_string($data->email) || '' === trim($data->email)) {
+            throw new ValidationException(new ConstraintViolationList([
+                new ConstraintViolation(
+                    'L\'email est requis.',
+                    null,
+                    [],
+                    null,
+                    'email',
+                    $data->email,
+                ),
+            ]));
+        }
+
+        $targetUser->setEmail($data->email);
+        $this->entityManager->flush();
+
+        return new MeUpdateOutput($targetUser, $this->jwtManager->create($targetUser));
+    }
+
+    private function resolveTargetUser(?User $previousData): User
+    {
+        if ($previousData instanceof User) {
+            return $previousData;
+        }
+
+        $actor = $this->security->getUser();
+        if ($actor instanceof User) {
+            return $actor;
+        }
+
+        throw new \InvalidArgumentException('Unable to resolve target user for email update.');
+    }
+}

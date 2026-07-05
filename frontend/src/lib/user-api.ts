@@ -1,3 +1,5 @@
+import { getAuthHeaders } from "@/lib/auth";
+
 export type UserRole =
   | "ROLE_USER"
   | "ROLE_ADMIN"
@@ -78,8 +80,10 @@ function normalizeUser(data: unknown): User {
 }
 
 export async function getUsers(): Promise<User[]> {
+  const headers = await getAuthHeaders();
   const response = await fetch(buildUrl("/api/users"), {
     cache: "no-store",
+    headers,
   });
 
   if (!response.ok) {
@@ -106,11 +110,12 @@ export async function updateUser(
   id: number,
   payload: UpdateUserPayload,
 ): Promise<User> {
+  const headers = await getAuthHeaders({
+    "Content-Type": "application/merge-patch+json",
+  });
   const response = await fetch(buildUrl(`/api/users/${id}`), {
     method: "PATCH",
-    headers: {
-      "Content-Type": "application/merge-patch+json",
-    },
+    headers,
     body: JSON.stringify(payload),
   });
 
@@ -123,8 +128,10 @@ export async function updateUser(
 }
 
 export async function getUser(id: number): Promise<User> {
+  const headers = await getAuthHeaders();
   const response = await fetch(buildUrl(`/api/users/${id}`), {
     cache: "no-store",
+    headers,
   });
 
   if (!response.ok) {
@@ -135,11 +142,12 @@ export async function getUser(id: number): Promise<User> {
 }
 
 export async function createUser(payload: CreateUserPayload): Promise<User> {
+  const headers = await getAuthHeaders({
+    "Content-Type": "application/ld+json",
+  });
   const response = await fetch(buildUrl("/api/users"), {
     method: "POST",
-    headers: {
-      "Content-Type": "application/ld+json",
-    },
+    headers,
     body: JSON.stringify(payload),
   });
 
@@ -152,8 +160,10 @@ export async function createUser(payload: CreateUserPayload): Promise<User> {
 }
 
 export async function deleteUser(id: number): Promise<void> {
+  const headers = await getAuthHeaders();
   const response = await fetch(buildUrl(`/api/users/${id}`), {
     method: "DELETE",
+    headers,
   });
 
   if (!response.ok) {
