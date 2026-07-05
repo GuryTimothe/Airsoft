@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Suspense } from "react";
 import AuthForm from "@/components/auth/AuthForm";
 
 export default function RegisterPage() {
@@ -16,7 +17,9 @@ export default function RegisterPage() {
           </p>
         </div>
 
-        <AuthForm mode="register" />
+        <Suspense fallback={null}>
+          <AuthForm mode="register" />
+        </Suspense>
 
         <div className="mt-6 text-sm text-muted-foreground">
           Déjà inscrit ?{" "}

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Suspense } from "react";
 import AuthForm from "@/components/auth/AuthForm";
 
 export default function LoginPage() {
@@ -16,7 +17,9 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <AuthForm mode="login" />
+        <Suspense fallback={null}>
+          <AuthForm mode="login" />
+        </Suspense>
 
         <div className="mt-6 text-sm text-muted-foreground">
           Pas de compte ?{" "}
