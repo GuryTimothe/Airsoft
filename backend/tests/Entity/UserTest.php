@@ -4,6 +4,7 @@ namespace App\Tests\Entity;
 
 use App\Entity\User;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Validator\Validation;
 
 final class UserTest extends TestCase
 {
@@ -15,6 +16,8 @@ final class UserTest extends TestCase
         $user->setEmail('lucas@example.com');
         $user->setPassword('secret');
         $user->setDateOfBirth(new \DateTimeImmutable('1990-02-14'));
+        $user->setAge(17);
+        $user->setEmergencyContact('Parent - 0600000000');
         $user->setPseudo('Lulu');
         $user->setPhone('0601020304');
         $user->setRole('ROLE_ADMIN');
@@ -26,6 +29,8 @@ final class UserTest extends TestCase
         $this->assertSame('lucas@example.com', $user->getEmail());
         $this->assertSame('secret', $user->getPassword());
         $this->assertSame('1990-02-14', $user->getDateOfBirth()->format('Y-m-d'));
+        $this->assertSame(17, $user->getAge());
+        $this->assertSame('Parent - 0600000000', $user->getEmergencyContact());
         $this->assertSame('Lulu', $user->getPseudo());
         $this->assertSame('0601020304', $user->getPhone());
         $this->assertSame('ROLE_ADMIN', $user->getRole());
@@ -54,5 +59,37 @@ final class UserTest extends TestCase
         $user->onPreUpdate();
 
         $this->assertNotSame($updatedAfterPersist, $user->getUpdatedAt());
+    }
+
+    public function testEmergencyContactIsRequiredForMinor(): void
+    {
+        $validator = Validation::createValidatorBuilder()
+            ->enableAttributeMapping()
+            ->getValidator();
+
+        $minorWithoutContact = new User();
+        $minorWithoutContact->setLastname('Durand');
+        $minorWithoutContact->setFirstname('Lucas');
+        $minorWithoutContact->setEmail('lucas-minor@example.com');
+        $minorWithoutContact->setPassword('secret');
+        $minorWithoutContact->setDateOfBirth(new \DateTimeImmutable('2010-05-15'));
+        $minorWithoutContact->setAge(16);
+        $minorWithoutContact->setRole('ROLE_USER');
+
+        $minorViolations = $validator->validate($minorWithoutContact);
+        $this->assertGreaterThan(0, $minorViolations->count());
+
+        $adultWithoutContact = new User();
+        $adultWithoutContact->setLastname('Martin');
+        $adultWithoutContact->setFirstname('Alex');
+        $adultWithoutContact->setEmail('alex-adult@example.com');
+        $adultWithoutContact->setPassword('secret');
+        $adultWithoutContact->setDateOfBirth(new \DateTimeImmutable('1995-05-15'));
+        $adultWithoutContact->setAge(25);
+        $adultWithoutContact->setRole('ROLE_USER');
+
+        $adultViolations = $validator->validate($adultWithoutContact);
+
+        $this->assertSame(0, $adultViolations->count());
     }
 }

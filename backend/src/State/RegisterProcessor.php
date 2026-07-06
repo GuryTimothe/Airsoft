@@ -52,6 +52,14 @@ class RegisterProcessor implements ProcessorInterface
             $user->setDateOfBirth(new \DateTime($input->dateOfBirth->format('Y-m-d')));
         }
 
+        if (null !== $input->age) {
+            $user->setAge($input->age);
+        }
+
+        if (null !== $input->emergencyContact) {
+            $user->setEmergencyContact($input->emergencyContact);
+        }
+
         if (null !== $input->pseudo) {
             $user->setPseudo($input->pseudo);
         }

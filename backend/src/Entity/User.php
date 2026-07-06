@@ -8,23 +8,14 @@ use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
-use App\Dto\MeEmailUpdateInput;
-use App\Dto\MePasswordUpdateInput;
-use App\Dto\MeUpdateOutput;
-use App\Dto\RegisterInput;
+use ApiPlatform\Metadata\Put;
 use App\Repository\UserRepository;
-use App\State\MeDeleteProcessor;
-use App\State\MeEmailUpdateProcessor;
-use App\State\MePasswordUpdateProcessor;
-use App\State\MeProvider;
-use App\State\MeUpdateProcessor;
-use App\State\RegisterProcessor;
-use App\State\UserUpdateProcessor;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Serializer\Annotation\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
+use Symfony\Component\Validator\Context\ExecutionContextInterface;
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\Table(name: 'users')]
@@ -34,70 +25,12 @@ use Symfony\Component\Validator\Constraints as Assert;
     normalizationContext: ['groups' => ['user:read']],
     denormalizationContext: ['groups' => ['user:write']],
     operations: [
-        new Delete(
-            uriTemplate: '/me',
-            provider: MeProvider::class,
-            processor: MeDeleteProcessor::class,
-            security: "is_granted('IS_AUTHENTICATED_FULLY')",
-        ),
-        new Get(
-            uriTemplate: '/me',
-            provider: MeProvider::class,
-            security: "is_granted('IS_AUTHENTICATED_FULLY')",
-        ),
-        new Patch(
-            uriTemplate: '/me',
-            provider: MeProvider::class,
-            processor: MeUpdateProcessor::class,
-            security: "is_granted('IS_AUTHENTICATED_FULLY')",
-            denormalizationContext: ['groups' => ['user:self:write']],
-            validationContext: ['groups' => ['user:self:general']],
-        ),
-        new Patch(
-            uriTemplate: '/me/email',
-            provider: MeProvider::class,
-            processor: MeEmailUpdateProcessor::class,
-            security: "is_granted('IS_AUTHENTICATED_FULLY')",
-            input: MeEmailUpdateInput::class,
-            denormalizationContext: ['groups' => ['me:email:write']],
-            normalizationContext: ['groups' => ['user:read', 'me:update:read']],
-            validationContext: ['groups' => ['me:email:input']],
-            output: MeUpdateOutput::class,
-        ),
-        new Patch(
-            uriTemplate: '/me/password',
-            provider: MeProvider::class,
-            processor: MePasswordUpdateProcessor::class,
-            security: "is_granted('IS_AUTHENTICATED_FULLY')",
-            input: MePasswordUpdateInput::class,
-            denormalizationContext: ['groups' => ['me:password:write']],
-            normalizationContext: ['groups' => ['user:read', 'me:update:read']],
-            validationContext: ['groups' => ['me:password:input']],
-            output: MeUpdateOutput::class,
-        ),
-        new Get(security: "is_granted('VIEW_ALL_USERS')"),
-        new GetCollection(security: "is_granted('VIEW_ALL_USERS')"),
-        new Post(
-            securityPostDenormalize: "is_granted('CREATE_USER', object)",
-            denormalizationContext: ['groups' => ['user:write', 'user:create']],
-            validationContext: ['groups' => ['user:create']],
-        ),
-        new Post(
-            uriTemplate: '/register',
-            processor: RegisterProcessor::class,
-            input: RegisterInput::class,
-            denormalizationContext: ['groups' => ['user:write']],
-            output: User::class,
-            status: 201,
-            deserialize: true,
-            security: "is_granted('PUBLIC_ACCESS')",
-        ),
-        new Patch(
-            securityPostDenormalize: "is_granted('UPDATE_USER', object)",
-            processor: UserUpdateProcessor::class,
-            validationContext: ['groups' => ['user:admin:update']],
-        ),
-        new Delete(security: "is_granted('DELETE_USER', object)"),
+        new Get(security: "is_granted('ROLE_ADMIN')"),
+        new GetCollection(security: "is_granted('ROLE_ADMIN')"),
+        new Post(security: "is_granted('ROLE_ADMIN')"),
+        new Put(security: "is_granted('ROLE_ADMIN')"),
+        new Patch(security: "is_granted('ROLE_ADMIN')"),
+        new Delete(security: "is_granted('ROLE_ADMIN')"),
     ]
 )]
 class User implements UserInterface, PasswordAuthenticatedUserInterface
@@ -109,46 +42,57 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?int $id = null;
 
     #[ORM\Column(length: 255)]
-    #[Assert\NotBlank(groups: ['user:create', 'user:admin:update', 'user:self:general'])]
-    #[Groups(['user:read', 'user:write', 'user:self:write'])]
+    #[Assert\NotBlank]
+    #[Groups(['user:read', 'user:write'])]
     private string $lastname;
 
     #[ORM\Column(length: 255)]
-    #[Assert\NotBlank(groups: ['user:create', 'user:admin:update', 'user:self:general'])]
-    #[Groups(['user:read', 'user:write', 'user:self:write'])]
+    #[Assert\NotBlank]
+    #[Groups(['user:read', 'user:write'])]
     private string $firstname;
 
     #[ORM\Column(length: 255, unique: true)]
-    #[Assert\NotBlank(groups: ['user:create', 'user:admin:update', 'user:self:email'])]
-    #[Assert\Email(groups: ['user:create', 'user:admin:update', 'user:self:email'])]
-    #[Groups(['user:read', 'user:write', 'user:self:email:write'])]
+    #[Assert\NotBlank]
+    #[Assert\Email]
+    #[Groups(['user:read', 'user:write'])]
     private string $email;
 
     #[ORM\Column(length: 255)]
-    #[Assert\NotBlank(groups: ['user:create'])]
-    #[Groups(['user:create'])]
+    #[Assert\NotBlank]
+    #[Groups(['user:write'])]
     private string $password;
 
     #[ORM\Column(type: 'date')]
-    #[Assert\NotNull(groups: ['user:create', 'user:admin:update', 'user:self:general'])]
-    #[Groups(['user:read', 'user:write', 'user:self:write'])]
+    #[Assert\NotNull]
+    #[Groups(['user:read', 'user:write'])]
     private \DateTimeInterface $dateOfBirth;
 
+    #[ORM\Column(type: 'integer')]
+    #[Assert\NotNull]
+    #[Assert\PositiveOrZero]
+    #[Groups(['user:read', 'user:write'])]
+    private ?int $age = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    #[Assert\Length(max: 255)]
+    #[Groups(['user:read', 'user:write'])]
+    private ?string $emergencyContact = null;
+
     #[ORM\Column(length: 100, nullable: true)]
-    #[Groups(['user:read', 'user:write', 'user:self:write'])]
+    #[Groups(['user:read', 'user:write'])]
     private ?string $pseudo = null;
 
     #[ORM\Column(length: 20, nullable: true)]
-    #[Groups(['user:read', 'user:write', 'user:self:write'])]
+    #[Groups(['user:read', 'user:write'])]
     private ?string $phone = null;
 
     #[ORM\Column(length: 50)]
-    #[Assert\Choice([
+    #[Assert\Choice(choices: [
         'ROLE_USER',
         'ROLE_ADMIN',
         'ROLE_ORGANIZER',
         'ROLE_SUPER_ADMIN',
-    ], groups: ['user:create', 'user:admin:update'])]
+    ])]
     #[Groups(['user:read', 'user:write'])]
     private string $role = 'ROLE_USER';
 
@@ -227,33 +171,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    /**
-     * @return non-empty-string
-     */
-    public function getUserIdentifier(): string
-    {
-        if ('' === $this->email) {
-            throw new \LogicException('L’email utilisateur ne peut pas être vide.');
-        }
-
-        return $this->email;
-    }
-
-    public function getRoles(): array
-    {
-        return [$this->role];
-    }
-
-    public function getSalt(): ?string
-    {
-        return null;
-    }
-
-    public function eraseCredentials(): void
-    {
-        // If you store any temporary, sensitive data on the user, clear it here
-    }
-
     public function getDateOfBirth(): \DateTimeInterface
     {
         return $this->dateOfBirth;
@@ -262,6 +179,30 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setDateOfBirth(\DateTimeInterface $dateOfBirth): self
     {
         $this->dateOfBirth = $dateOfBirth;
+
+        return $this;
+    }
+
+    public function getAge(): ?int
+    {
+        return $this->age;
+    }
+
+    public function setAge(int $age): self
+    {
+        $this->age = $age;
+
+        return $this;
+    }
+
+    public function getEmergencyContact(): ?string
+    {
+        return $this->emergencyContact;
+    }
+
+    public function setEmergencyContact(?string $emergencyContact): self
+    {
+        $this->emergencyContact = $emergencyContact;
 
         return $this;
     }
@@ -293,6 +234,20 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function getRole(): string
     {
         return $this->role;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function getRoles(): array
+    {
+        $roles = [$this->role];
+
+        if (!in_array('ROLE_USER', $roles, true)) {
+            $roles[] = 'ROLE_USER';
+        }
+
+        return array_values(array_unique($roles));
     }
 
     public function setRole(string $role): self
@@ -336,6 +291,15 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->updatedAt;
     }
 
+    public function getUserIdentifier(): string
+    {
+        return $this->email;
+    }
+
+    public function eraseCredentials(): void
+    {
+    }
+
     #[ORM\PrePersist]
     public function onPrePersist(): void
     {
@@ -349,5 +313,16 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function onPreUpdate(): void
     {
         $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    #[Assert\Callback]
+    public function validateEmergencyContactForMinor(
+        ExecutionContextInterface $context,
+    ): void {
+        if (null !== $this->age && $this->age < 18 && empty($this->emergencyContact)) {
+            $context->buildViolation('Le contact d\'urgence est obligatoire pour un mineur.')
+                ->atPath('emergencyContact')
+                ->addViolation();
+        }
     }
 }

@@ -13,6 +13,8 @@ type RegisterPayload = {
   email: string;
   password: string;
   dateOfBirth: string;
+  age: number;
+  emergencyContact?: string;
   pseudo?: string;
   phone?: string;
 };

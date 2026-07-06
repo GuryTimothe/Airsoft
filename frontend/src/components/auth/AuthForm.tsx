@@ -105,13 +105,15 @@ export default function AuthForm({ mode = "login" }: Props) {
     return age;
   }
 
-  async function submitRegister(reg: RegisterInput) {
+  async function submitRegister(reg: RegisterInput, emergencyContact?: string) {
     await registerUser({
       firstname: reg.firstname.trim(),
       lastname: reg.lastname.trim(),
       email: reg.email,
       password: reg.password,
       dateOfBirth: reg.dateOfBirth,
+      age: computeAge(reg.dateOfBirth),
+      emergencyContact,
       pseudo: reg.pseudo?.trim() || undefined,
       phone: reg.phone?.trim() || undefined,
     });
@@ -169,9 +171,8 @@ export default function AuthForm({ mode = "login" }: Props) {
     if (!pendingRegister) return;
 
     try {
-      // Backend register endpoint currently ignores guardian details.
-      void values;
-      await submitRegister(pendingRegister);
+      const emergencyContact = `${values.guardianName.trim()} - ${values.guardianPhone.trim()}`;
+      await submitRegister(pendingRegister, emergencyContact);
       setShowGuardian(false);
       setPendingRegister(null);
     } catch (error) {

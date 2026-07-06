@@ -199,6 +199,10 @@ export function UserDetail({ userId }: UserDetailProps) {
             <span>{user.canSeePrivate ? "Oui" : "Non"}</span>
           </div>
           <div>
+            <span className="font-medium">Age: </span>
+            <span>{user.age}</span>
+          </div>
+          <div>
             <span className="font-medium">Date de naissance: </span>
             <span>
               {new Date(user.dateOfBirth).toLocaleDateString("fr-FR")}
@@ -207,6 +211,10 @@ export function UserDetail({ userId }: UserDetailProps) {
           <div>
             <span className="font-medium">Pseudo: </span>
             <span>{user.pseudo || "Non renseigne"}</span>
+          </div>
+          <div>
+            <span className="font-medium">Contact d'urgence: </span>
+            <span>{user.emergencyContact || "Non renseigne"}</span>
           </div>
         </CardContent>
       </Card>
