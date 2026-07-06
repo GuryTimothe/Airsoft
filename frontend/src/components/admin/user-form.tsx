@@ -48,8 +48,10 @@ type UserFormValues = {
   email: string;
   password: string;
   dateOfBirth: string;
+  age: string;
   pseudo: string;
   phone: string;
+  emergencyContact: string;
   role: UserRole;
   canSeePrivate: boolean;
 };
@@ -60,8 +62,10 @@ const emptyValues: UserFormValues = {
   email: "",
   password: "",
   dateOfBirth: "",
+  age: "",
   pseudo: "",
   phone: "",
+  emergencyContact: "",
   role: "ROLE_USER",
   canSeePrivate: false,
 };
@@ -77,8 +81,10 @@ function toFormValues(user?: User): UserFormValues {
     email: user.email ?? "",
     password: "",
     dateOfBirth: user.dateOfBirth ? user.dateOfBirth.slice(0, 10) : "",
+    age: user.age ? String(user.age) : "",
     pseudo: user.pseudo ?? "",
     phone: user.phone ?? "",
+    emergencyContact: user.emergencyContact ?? "",
     role: user.role ?? "ROLE_USER",
     canSeePrivate: user.canSeePrivate ?? false,
   };
@@ -91,6 +97,8 @@ export function UserForm({ userId }: UserFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  const isMinor = Number(values.age) < 18;
 
   const pageTitle = useMemo(
     () => (userId ? "Modifier l'utilisateur" : "Creer un utilisateur"),
@@ -133,14 +141,28 @@ export function UserForm({ userId }: UserFormProps) {
     setSubmitting(true);
 
     try {
+      const ageValue = Number(values.age);
+
+      if (!Number.isFinite(ageValue) || ageValue < 0) {
+        throw new Error("L'age doit etre un nombre positif ou nul.");
+      }
+
+      if (ageValue < 18 && !values.emergencyContact.trim()) {
+        throw new Error(
+          "Le contact d'urgence est obligatoire pour un utilisateur mineur.",
+        );
+      }
+
       if (userId) {
         const payload: UpdateUserPayload = {
           lastname: values.lastname,
           firstname: values.firstname,
           email: values.email,
           dateOfBirth: values.dateOfBirth,
+          age: ageValue,
           pseudo: values.pseudo || null,
           phone: values.phone || null,
+          emergencyContact: values.emergencyContact || null,
           role: values.role,
           canSeePrivate: values.canSeePrivate,
         };
@@ -158,8 +180,10 @@ export function UserForm({ userId }: UserFormProps) {
           email: values.email,
           password: values.password,
           dateOfBirth: values.dateOfBirth,
+          age: ageValue,
           pseudo: values.pseudo || null,
           phone: values.phone || null,
+          emergencyContact: values.emergencyContact || null,
           role: values.role,
           canSeePrivate: values.canSeePrivate,
         };
@@ -301,6 +325,22 @@ export function UserForm({ userId }: UserFormProps) {
                 />
               </div>
               <div className="space-y-2">
+                <Label htmlFor="age">
+                  Age
+                  <RequiredMark />
+                </Label>
+                <Input
+                  id="age"
+                  type="number"
+                  min="0"
+                  value={values.age}
+                  onChange={(event) =>
+                    setValues({ ...values, age: event.target.value })
+                  }
+                  required
+                />
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="pseudo">Pseudo</Label>
                 <Input
                   id="pseudo"
@@ -320,6 +360,25 @@ export function UserForm({ userId }: UserFormProps) {
                   }
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="emergencyContact">
+                Contact d'urgence
+                {isMinor ? <RequiredMark /> : null}
+              </Label>
+              <Input
+                id="emergencyContact"
+                placeholder="Nom + telephone"
+                value={values.emergencyContact}
+                onChange={(event) =>
+                  setValues({ ...values, emergencyContact: event.target.value })
+                }
+                required={isMinor}
+              />
+              <p className="text-xs text-muted-foreground">
+                Obligatoire si l'utilisateur est mineur.
+              </p>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
