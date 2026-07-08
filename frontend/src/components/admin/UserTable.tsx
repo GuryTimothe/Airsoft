@@ -17,6 +17,7 @@ import { type User, type UserRole } from "@/lib/user-api";
 
 type UserTableProps = {
   initialUsers: User[];
+  referenceDateIso: string;
 };
 
 const roles: UserRole[] = [
@@ -39,7 +40,25 @@ function roleLabel(role: UserRole): string {
   }
 }
 
-export default function UserTable({ initialUsers }: UserTableProps) {
+function computeAge(dateOfBirth: string, referenceDateIso: string): number {
+  const birthDate = new Date(dateOfBirth);
+  const now = new Date(referenceDateIso);
+
+  let age = now.getFullYear() - birthDate.getFullYear();
+  const monthDiff = now.getMonth() - birthDate.getMonth();
+  const dayDiff = now.getDate() - birthDate.getDate();
+
+  if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
+    age -= 1;
+  }
+
+  return age;
+}
+
+export default function UserTable({
+  initialUsers,
+  referenceDateIso,
+}: UserTableProps) {
   const [roleFilter, setRoleFilter] = useState<UserRole | "all">("all");
   const [privateFilter, setPrivateFilter] = useState<"all" | "yes" | "no">(
     "all",
@@ -107,6 +126,7 @@ export default function UserTable({ initialUsers }: UserTableProps) {
           <TableRow>
             <TableHead>Nom</TableHead>
             <TableHead>Email</TableHead>
+            <TableHead>Age</TableHead>
             <TableHead>Role</TableHead>
             <TableHead>Acces parties privees</TableHead>
             <TableHead className="text-right">Actions</TableHead>
@@ -116,11 +136,22 @@ export default function UserTable({ initialUsers }: UserTableProps) {
         <TableBody>
           {filteredUsers.map((user) => {
             const fullName = `${user.firstname} ${user.lastname}`.trim();
+            const age = computeAge(user.dateOfBirth, referenceDateIso);
+            const isMinor = age < 18;
 
             return (
               <TableRow key={user.id}>
                 <TableCell className="font-medium">{fullName}</TableCell>
                 <TableCell>{user.email}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    {isMinor ? (
+                      <Badge variant="destructive">{age} ans</Badge>
+                    ) : (
+                      <Badge variant="ghost">{age} ans</Badge>
+                    )}
+                  </div>
+                </TableCell>
                 <TableCell>
                   <Badge variant="secondary">{roleLabel(user.role)}</Badge>
                 </TableCell>
