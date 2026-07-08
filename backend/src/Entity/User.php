@@ -10,12 +10,14 @@ use ApiPlatform\Metadata\ApiProperty;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use ApiPlatform\Metadata\Put;
+use ApiPlatform\Metadata\Put;
 use App\Repository\UserRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Serializer\Annotation\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
+use Symfony\Component\Validator\Context\ExecutionContextInterface;
 use Symfony\Component\Validator\Context\ExecutionContextInterface;
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
@@ -26,6 +28,12 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
     normalizationContext: ['groups' => ['user:read']],
     denormalizationContext: ['groups' => ['user:write']],
     operations: [
+        new Get(security: "is_granted('ROLE_ADMIN')"),
+        new GetCollection(security: "is_granted('ROLE_ADMIN')"),
+        new Post(security: "is_granted('ROLE_ADMIN')"),
+        new Put(security: "is_granted('ROLE_ADMIN')"),
+        new Patch(security: "is_granted('ROLE_ADMIN')"),
+        new Delete(security: "is_granted('ROLE_ADMIN')"),
         new Get(security: "is_granted('ROLE_ADMIN')"),
         new GetCollection(security: "is_granted('ROLE_ADMIN')"),
         new Post(security: "is_granted('ROLE_ADMIN')"),
@@ -45,9 +53,13 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(length: 255)]
     #[Assert\NotBlank]
     #[Groups(['user:read', 'user:write'])]
+    #[Assert\NotBlank]
+    #[Groups(['user:read', 'user:write'])]
     private string $lastname;
 
     #[ORM\Column(length: 255)]
+    #[Assert\NotBlank]
+    #[Groups(['user:read', 'user:write'])]
     #[Assert\NotBlank]
     #[Groups(['user:read', 'user:write'])]
     private string $firstname;
@@ -56,14 +68,21 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Assert\NotBlank]
     #[Assert\Email]
     #[Groups(['user:read', 'user:write'])]
+    #[Assert\NotBlank]
+    #[Assert\Email]
+    #[Groups(['user:read', 'user:write'])]
     private string $email;
 
     #[ORM\Column(length: 255)]
     #[Assert\NotBlank]
     #[Groups(['user:write'])]
+    #[Assert\NotBlank]
+    #[Groups(['user:write'])]
     private string $password;
 
     #[ORM\Column(type: 'date')]
+    #[Assert\NotNull]
+    #[Groups(['user:read', 'user:write'])]
     #[Assert\NotNull]
     #[Groups(['user:read', 'user:write'])]
     private \DateTimeInterface $dateOfBirth;
@@ -76,18 +95,22 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column(length: 100, nullable: true)]
     #[Groups(['user:read', 'user:write'])]
+    #[Groups(['user:read', 'user:write'])]
     private ?string $pseudo = null;
 
     #[ORM\Column(length: 20, nullable: true)]
+    #[Groups(['user:read', 'user:write'])]
     #[Groups(['user:read', 'user:write'])]
     private ?string $phone = null;
 
     #[ORM\Column(length: 50)]
     #[Assert\Choice(choices: [
+    #[Assert\Choice(choices: [
         'ROLE_USER',
         'ROLE_ADMIN',
         'ROLE_ORGANIZER',
         'ROLE_SUPER_ADMIN',
+    ])]
     ])]
     #[Groups(['user:read', 'user:write'])]
     private string $role = 'ROLE_USER';
@@ -266,6 +289,20 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return array_values(array_unique($roles));
     }
 
+    /**
+     * @return list<string>
+     */
+    public function getRoles(): array
+    {
+        $roles = [$this->role];
+
+        if (!in_array('ROLE_USER', $roles, true)) {
+            $roles[] = 'ROLE_USER';
+        }
+
+        return array_values(array_unique($roles));
+    }
+
     public function setRole(string $role): self
     {
         $this->role = $role;
@@ -305,6 +342,15 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function getUpdatedAt(): ?\DateTimeImmutable
     {
         return $this->updatedAt;
+    }
+
+    public function getUserIdentifier(): string
+    {
+        return $this->email;
+    }
+
+    public function eraseCredentials(): void
+    {
     }
 
     public function getUserIdentifier(): string

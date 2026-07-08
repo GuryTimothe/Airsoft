@@ -16,6 +16,7 @@ export interface User {
   firstname: string;
   email: string;
   dateOfBirth: string;
+  age: number;
   pseudo?: string | null;
   phone?: string | null;
   emergencyContact?: EmergencyContactFields | null;
@@ -32,6 +33,7 @@ export interface UpdateUserPayload {
   email?: string;
   password?: string;
   dateOfBirth?: string;
+  age?: number;
   pseudo?: string | null;
   phone?: string | null;
   emergencyContact?: EmergencyContactFields | null;
@@ -46,6 +48,7 @@ export interface CreateUserPayload {
   email: string;
   password: string;
   dateOfBirth: string;
+  age: number;
   pseudo?: string | null;
   phone?: string | null;
   emergencyContact?: EmergencyContactFields | null;
@@ -98,6 +101,7 @@ function normalizeUser(data: unknown): User {
     firstname: String(get("firstname") ?? ""),
     email: String(get("email") ?? ""),
     dateOfBirth: String(get("dateOfBirth") ?? ""),
+    age: Number(get("age") ?? 0),
     pseudo: (get("pseudo") as string) ?? null,
     phone: (get("phone") as string) ?? null,
     emergencyContact,

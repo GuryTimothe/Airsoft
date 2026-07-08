@@ -55,6 +55,7 @@ type UserFormValues = {
   email: string;
   password: string;
   dateOfBirth: string;
+  age: string;
   pseudo: string;
   phone: string;
   emergencyLastname: string;
@@ -71,6 +72,7 @@ const emptyValues: UserFormValues = {
   email: "",
   password: "",
   dateOfBirth: "",
+  age: "",
   pseudo: "",
   phone: "",
   emergencyLastname: "",
@@ -94,6 +96,7 @@ function toFormValues(user?: User): UserFormValues {
     email: user.email ?? "",
     password: "",
     dateOfBirth: user.dateOfBirth ? user.dateOfBirth.slice(0, 10) : "",
+    age: user.age ? String(user.age) : "",
     pseudo: user.pseudo ?? "",
     phone: user.phone ?? "",
     emergencyLastname: emergency.lastname,
@@ -221,6 +224,7 @@ export function UserForm({ userId }: UserFormProps) {
           firstname: values.firstname,
           email: values.email,
           dateOfBirth: values.dateOfBirth,
+          age: ageValue,
           pseudo: values.pseudo || null,
           phone: values.phone || null,
           emergencyContact,
@@ -241,6 +245,7 @@ export function UserForm({ userId }: UserFormProps) {
           email: values.email,
           password: values.password,
           dateOfBirth: values.dateOfBirth,
+          age: ageValue,
           pseudo: values.pseudo || null,
           phone: values.phone || null,
           emergencyContact,
@@ -380,6 +385,22 @@ export function UserForm({ userId }: UserFormProps) {
                   value={values.dateOfBirth}
                   onChange={(event) =>
                     setValues({ ...values, dateOfBirth: event.target.value })
+                  }
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="age">
+                  Age
+                  <RequiredMark />
+                </Label>
+                <Input
+                  id="age"
+                  type="number"
+                  min="0"
+                  value={values.age}
+                  onChange={(event) =>
+                    setValues({ ...values, age: event.target.value })
                   }
                   required
                 />
