@@ -61,7 +61,7 @@ class RegisterInput
             return;
         }
 
-        $today = new \DateTimeImmutable('today');
+        $today   = new \DateTimeImmutable('today');
         $isMinor = $this->dateOfBirth->diff($today)->y < 18;
 
         if ($isMinor && empty($this->emergencyContact)) {
