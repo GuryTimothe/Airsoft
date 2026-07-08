@@ -309,7 +309,13 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function getUserIdentifier(): string
     {
-        return $this->email;
+        $email = $this->email;
+
+        if ('' === $email) {
+            throw new \LogicException('User email cannot be empty.');
+        }
+
+        return $email;
     }
 
     public function eraseCredentials(): void

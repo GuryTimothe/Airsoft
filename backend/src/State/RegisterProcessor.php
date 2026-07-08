@@ -118,7 +118,7 @@ class RegisterProcessor implements ProcessorInterface
         $parts = array_map('trim', explode('-', $trimmed, 2));
 
         $contact
-            ->setLastname($parts[0] ?? '')
+            ->setLastname($parts[0])
             ->setFirstname('')
             ->setEmail('')
             ->setPhone($parts[1] ?? '');
