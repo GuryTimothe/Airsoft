@@ -6,6 +6,7 @@ use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Delete;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
+use ApiPlatform\Metadata\ApiProperty;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use ApiPlatform\Metadata\Put;
@@ -67,16 +68,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['user:read', 'user:write'])]
     private \DateTimeInterface $dateOfBirth;
 
-    #[ORM\Column(type: 'integer')]
-    #[Assert\NotNull]
-    #[Assert\PositiveOrZero]
+    #[ORM\OneToOne(mappedBy: 'user', targetEntity: EmergencyContact::class, cascade: ['persist', 'remove'], orphanRemoval: true)]
+    #[ApiProperty(readableLink: true, writableLink: true)]
+    #[Assert\Valid]
     #[Groups(['user:read', 'user:write'])]
-    private ?int $age = null;
-
-    #[ORM\Column(length: 255, nullable: true)]
-    #[Assert\Length(max: 255)]
-    #[Groups(['user:read', 'user:write'])]
-    private ?string $emergencyContact = null;
+    private ?EmergencyContact $emergencyContact = null;
 
     #[ORM\Column(length: 100, nullable: true)]
     #[Groups(['user:read', 'user:write'])]
@@ -183,25 +179,45 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    public function getAge(): ?int
-    {
-        return $this->age;
-    }
-
-    public function setAge(int $age): self
-    {
-        $this->age = $age;
-
-        return $this;
-    }
-
-    public function getEmergencyContact(): ?string
+    public function getEmergencyContact(): ?EmergencyContact
     {
         return $this->emergencyContact;
     }
 
-    public function setEmergencyContact(?string $emergencyContact): self
+    #[Groups(['user:read'])]
+    public function getEmergencyContactLastname(): ?string
     {
+        return $this->emergencyContact?->getLastname();
+    }
+
+    #[Groups(['user:read'])]
+    public function getEmergencyContactFirstname(): ?string
+    {
+        return $this->emergencyContact?->getFirstname();
+    }
+
+    #[Groups(['user:read'])]
+    public function getEmergencyContactEmail(): ?string
+    {
+        return $this->emergencyContact?->getEmail();
+    }
+
+    #[Groups(['user:read'])]
+    public function getEmergencyContactPhone(): ?string
+    {
+        return $this->emergencyContact?->getPhone();
+    }
+
+    public function setEmergencyContact(?EmergencyContact $emergencyContact): self
+    {
+        if (null === $emergencyContact && null !== $this->emergencyContact) {
+            $this->emergencyContact->setUser(null);
+        }
+
+        if (null !== $emergencyContact) {
+            $emergencyContact->setUser($this);
+        }
+
         $this->emergencyContact = $emergencyContact;
 
         return $this;
@@ -319,10 +335,22 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function validateEmergencyContactForMinor(
         ExecutionContextInterface $context,
     ): void {
-        if (null !== $this->age && $this->age < 18 && empty($this->emergencyContact)) {
+        if ($this->isMinor() && (null === $this->emergencyContact || !$this->emergencyContact->isComplete())) {
             $context->buildViolation('Le contact d\'urgence est obligatoire pour un mineur.')
                 ->atPath('emergencyContact')
                 ->addViolation();
         }
+    }
+
+    private function isMinor(): bool
+    {
+        if (!isset($this->dateOfBirth)) {
+            return false;
+        }
+
+        $today = new \DateTimeImmutable('today');
+        $birthDate = \DateTimeImmutable::createFromInterface($this->dateOfBirth);
+
+        return $birthDate->diff($today)->y < 18;
     }
 }

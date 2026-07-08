@@ -40,12 +40,6 @@ class RegisterInput
 
     #[ApiProperty]
     #[Groups(['user:write'])]
-    #[Assert\NotNull(message: 'L\'age est requis.')]
-    #[Assert\PositiveOrZero(message: 'L\'age doit etre positif ou nul.')]
-    public ?int $age = null;
-
-    #[ApiProperty]
-    #[Groups(['user:write'])]
     #[Assert\Length(max: 255)]
     public ?string $emergencyContact = null;
 
@@ -63,7 +57,14 @@ class RegisterInput
     public function validateEmergencyContactForMinor(
         ExecutionContextInterface $context,
     ): void {
-        if (null !== $this->age && $this->age < 18 && empty($this->emergencyContact)) {
+        if (null === $this->dateOfBirth) {
+            return;
+        }
+
+        $today = new \DateTimeImmutable('today');
+        $isMinor = $this->dateOfBirth->diff($today)->y < 18;
+
+        if ($isMinor && empty($this->emergencyContact)) {
             $context->buildViolation('Le contact d\'urgence est obligatoire pour un mineur.')
                 ->atPath('emergencyContact')
                 ->addViolation();

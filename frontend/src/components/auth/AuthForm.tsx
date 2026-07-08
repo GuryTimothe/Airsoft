@@ -1,18 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { login, registerUser } from "@/lib/auth";
+import { serializeEmergencyContact } from "@/lib/emergency-contact";
 import {
   loginSchema,
   registerSchema,
-  guardianSchema,
   RegisterInput,
   LoginInput,
-  GuardianInput,
 } from "@/lib/schemas/auth";
 
 type Mode = "login" | "register";
@@ -24,15 +23,10 @@ interface Props {
 export default function AuthForm({ mode = "login" }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [showGuardian, setShowGuardian] = useState(false);
-  const [pendingRegister, setPendingRegister] = useState<RegisterInput | null>(
-    null,
-  );
   const [status, setStatus] = useState<{
     type: "success" | "error";
     message: string;
   } | null>(null);
-  const dialogRef = useRef<HTMLDivElement | null>(null);
 
   const resolver = zodResolver(mode === "login" ? loginSchema : registerSchema);
 
@@ -42,7 +36,12 @@ export default function AuthForm({ mode = "login" }: Props) {
     formState: { errors, isSubmitting },
     reset,
     setValue,
+    control,
   } = useForm<Record<string, unknown>>({ resolver, mode: "onTouched" });
+
+  const watchedDateOfBirth = String(
+    useWatch({ control, name: "dateOfBirth" }) ?? "",
+  );
 
   const validationMessages = useMemo(() => {
     const messages: string[] = [];
@@ -85,12 +84,6 @@ export default function AuthForm({ mode = "login" }: Props) {
   }
 
   useEffect(() => {
-    if (showGuardian) {
-      dialogRef.current?.querySelector<HTMLInputElement>("input")?.focus();
-    }
-  }, [showGuardian]);
-
-  useEffect(() => {
     if (mode !== "login") {
       return;
     }
@@ -123,7 +116,6 @@ export default function AuthForm({ mode = "login" }: Props) {
       email: reg.email,
       password: reg.password,
       dateOfBirth: reg.dateOfBirth,
-      age: computeAge(reg.dateOfBirth),
       emergencyContact,
       pseudo: reg.pseudo?.trim() || undefined,
       phone: reg.phone?.trim() || undefined,
@@ -142,14 +134,21 @@ export default function AuthForm({ mode = "login" }: Props) {
 
     if (mode === "register") {
       const reg = data as RegisterInput;
-      if (computeAge(reg.dateOfBirth) < 18) {
-        setPendingRegister(reg);
-        setShowGuardian(true);
-        return;
-      }
+      const isMinor = computeAge(reg.dateOfBirth) < 18;
+      const emergencyContact = isMinor
+        ? serializeEmergencyContact({
+            lastname: reg.guardianLastname?.trim() ?? "",
+            firstname: reg.guardianFirstname?.trim() ?? "",
+            email: reg.guardianEmail?.trim() ?? "",
+            phone: reg.guardianPhone?.trim() ?? "",
+          })
+        : null;
 
       try {
-        await submitRegister(reg);
+        await submitRegister(
+          reg,
+          emergencyContact ? JSON.stringify(emergencyContact) : undefined,
+        );
       } catch (error) {
         const message =
           error instanceof Error
@@ -178,22 +177,11 @@ export default function AuthForm({ mode = "login" }: Props) {
     }
   }
 
-  async function onGuardianSubmit(values: GuardianInput) {
-    if (!pendingRegister) return;
-
-    try {
-      const emergencyContact = `${values.guardianName.trim()} - ${values.guardianPhone.trim()}`;
-      await submitRegister(pendingRegister, emergencyContact);
-      setShowGuardian(false);
-      setPendingRegister(null);
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Impossible de créer le compte.";
-      setStatus({ type: "error", message });
-    }
-  }
+  const isMinorRegistration =
+    mode === "register" &&
+    watchedDateOfBirth.length > 0 &&
+    !Number.isNaN(Date.parse(watchedDateOfBirth)) &&
+    computeAge(watchedDateOfBirth) < 18;
 
   return (
     <div className="max-w-md">
@@ -452,6 +440,135 @@ export default function AuthForm({ mode = "login" }: Props) {
                 </div>
               )}
             </div>
+
+            <div className="space-y-4 rounded border border-border p-4">
+              <div>
+                <p className="text-sm font-medium">Contact d'urgence</p>
+                <p className="text-xs text-muted-foreground">
+                  {isMinorRegistration
+                    ? "Obligatoire pour un mineur."
+                    : "Optionnel pour un majeur."}
+                </p>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="guardianLastname"
+                  className="block text-sm text-muted-foreground"
+                >
+                  Nom du responsable
+                </label>
+                <input
+                  id="guardianLastname"
+                  {...register("guardianLastname")}
+                  className="mt-1 w-full rounded border border-border bg-transparent px-3 py-2"
+                  autoComplete="family-name"
+                  aria-invalid={!!errors.guardianLastname}
+                  aria-describedby={
+                    errors.guardianLastname
+                      ? "guardianLastname-error"
+                      : undefined
+                  }
+                />
+                {errors.guardianLastname && (
+                  <div
+                    id="guardianLastname-error"
+                    role="alert"
+                    className="text-sm text-destructive"
+                  >
+                    {errors.guardianLastname.message}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label
+                  htmlFor="guardianFirstname"
+                  className="block text-sm text-muted-foreground"
+                >
+                  Prénom du responsable
+                </label>
+                <input
+                  id="guardianFirstname"
+                  {...register("guardianFirstname")}
+                  className="mt-1 w-full rounded border border-border bg-transparent px-3 py-2"
+                  autoComplete="given-name"
+                  aria-invalid={!!errors.guardianFirstname}
+                  aria-describedby={
+                    errors.guardianFirstname
+                      ? "guardianFirstname-error"
+                      : undefined
+                  }
+                />
+                {errors.guardianFirstname && (
+                  <div
+                    id="guardianFirstname-error"
+                    role="alert"
+                    className="text-sm text-destructive"
+                  >
+                    {errors.guardianFirstname.message}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label
+                  htmlFor="guardianEmail"
+                  className="block text-sm text-muted-foreground"
+                >
+                  Email du responsable
+                </label>
+                <input
+                  id="guardianEmail"
+                  {...register("guardianEmail")}
+                  className="mt-1 w-full rounded border border-border bg-transparent px-3 py-2"
+                  type="email"
+                  autoComplete="email"
+                  aria-invalid={!!errors.guardianEmail}
+                  aria-describedby={
+                    errors.guardianEmail ? "guardianEmail-error" : undefined
+                  }
+                />
+                {errors.guardianEmail && (
+                  <div
+                    id="guardianEmail-error"
+                    role="alert"
+                    className="text-sm text-destructive"
+                  >
+                    {errors.guardianEmail.message}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label
+                  htmlFor="guardianPhone"
+                  className="block text-sm text-muted-foreground"
+                >
+                  Téléphone du responsable
+                </label>
+                <input
+                  id="guardianPhone"
+                  {...register("guardianPhone")}
+                  className="mt-1 w-full rounded border border-border bg-transparent px-3 py-2"
+                  autoComplete="tel"
+                  inputMode="tel"
+                  aria-invalid={!!errors.guardianPhone}
+                  aria-describedby={
+                    errors.guardianPhone ? "guardianPhone-error" : undefined
+                  }
+                />
+                {errors.guardianPhone && (
+                  <div
+                    id="guardianPhone-error"
+                    role="alert"
+                    className="text-sm text-destructive"
+                  >
+                    {errors.guardianPhone.message}
+                  </div>
+                )}
+              </div>
+            </div>
           </>
         )}
 
@@ -471,172 +588,6 @@ export default function AuthForm({ mode = "login" }: Props) {
           </Button>
         </div>
       </form>
-
-      {showGuardian && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div
-            ref={dialogRef}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="guardian-title"
-            className="w-full max-w-lg rounded bg-card p-6 shadow-xl"
-          >
-            <h3 id="guardian-title" className="mb-2 text-lg font-semibold">
-              Consentement responsable légal
-            </h3>
-            <p className="mb-4 text-sm text-muted-foreground">
-              L&apos;utilisateur est mineur. Veuillez remplir les informations
-              du responsable légal et cocher l&apos;accord pour poursuivre.
-            </p>
-
-            <GuardianForm
-              onSubmit={onGuardianSubmit}
-              onCancel={() => {
-                setShowGuardian(false);
-                setPendingRegister(null);
-              }}
-            />
-          </div>
-        </div>
-      )}
     </div>
-  );
-}
-
-function GuardianForm({
-  onSubmit,
-  onCancel,
-}: {
-  onSubmit: (v: GuardianInput) => void;
-  onCancel: () => void;
-}) {
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<GuardianInput>({ resolver: zodResolver(guardianSchema) });
-
-  return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
-      <div>
-        <label
-          htmlFor="guardianName"
-          className="block text-sm text-muted-foreground"
-        >
-          Nom du responsable
-        </label>
-        <input
-          id="guardianName"
-          {...register("guardianName")}
-          className="mt-1 w-full rounded border border-border bg-transparent px-3 py-2"
-          autoComplete="name"
-          aria-invalid={!!errors.guardianName}
-          aria-describedby={
-            errors.guardianName ? "guardianName-error" : undefined
-          }
-        />
-        {errors.guardianName && (
-          <div
-            id="guardianName-error"
-            role="alert"
-            className="text-sm text-destructive"
-          >
-            {errors.guardianName.message}
-          </div>
-        )}
-      </div>
-
-      <div>
-        <label
-          htmlFor="guardianEmail"
-          className="block text-sm text-muted-foreground"
-        >
-          Email du responsable
-        </label>
-        <input
-          id="guardianEmail"
-          {...register("guardianEmail")}
-          className="mt-1 w-full rounded border border-border bg-transparent px-3 py-2"
-          type="email"
-          autoComplete="email"
-          aria-invalid={!!errors.guardianEmail}
-          aria-describedby={
-            errors.guardianEmail ? "guardianEmail-error" : undefined
-          }
-        />
-        {errors.guardianEmail && (
-          <div
-            id="guardianEmail-error"
-            role="alert"
-            className="text-sm text-destructive"
-          >
-            {errors.guardianEmail.message}
-          </div>
-        )}
-      </div>
-
-      <div>
-        <label
-          htmlFor="guardianPhone"
-          className="block text-sm text-muted-foreground"
-        >
-          Téléphone
-        </label>
-        <input
-          id="guardianPhone"
-          {...register("guardianPhone")}
-          className="mt-1 w-full rounded border border-border bg-transparent px-3 py-2"
-          autoComplete="tel"
-          inputMode="tel"
-          aria-invalid={!!errors.guardianPhone}
-          aria-describedby={
-            errors.guardianPhone ? "guardianPhone-error" : undefined
-          }
-        />
-        {errors.guardianPhone && (
-          <div
-            id="guardianPhone-error"
-            role="alert"
-            className="text-sm text-destructive"
-          >
-            {errors.guardianPhone.message}
-          </div>
-        )}
-      </div>
-
-      <div className="flex items-center gap-2">
-        <input
-          id="guardianConsent"
-          {...register("guardianConsent")}
-          type="checkbox"
-          aria-invalid={!!errors.guardianConsent}
-          aria-describedby={
-            errors.guardianConsent ? "guardianConsent-error" : undefined
-          }
-        />
-        <label
-          htmlFor="guardianConsent"
-          className="text-sm text-muted-foreground"
-        >
-          J&apos;autorise le responsable légal
-        </label>
-      </div>
-      {errors.guardianConsent && (
-        <div
-          id="guardianConsent-error"
-          role="alert"
-          className="text-sm text-destructive"
-        >
-          {errors.guardianConsent.message}
-        </div>
-      )}
-
-      <div className="flex justify-end gap-2">
-        <Button variant="outline" type="button" onClick={onCancel}>
-          Annuler
-        </Button>
-        <Button type="submit">Valider et enregistrer</Button>
-      </div>
-    </form>
   );
 }

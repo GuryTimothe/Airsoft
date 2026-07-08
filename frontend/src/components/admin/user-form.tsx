@@ -33,6 +33,13 @@ import {
   type User,
   type UserRole,
 } from "@/lib/user-api";
+import {
+  hasCompleteEmergencyContact,
+  parseEmergencyContact,
+  serializeEmergencyContact,
+  type EmergencyContactFields,
+} from "@/lib/emergency-contact";
+import { getEmergencyContactByUserId } from "@/lib/emergency-contact-api";
 
 interface UserFormProps {
   userId?: number;
@@ -48,10 +55,12 @@ type UserFormValues = {
   email: string;
   password: string;
   dateOfBirth: string;
-  age: string;
   pseudo: string;
   phone: string;
-  emergencyContact: string;
+  emergencyLastname: string;
+  emergencyFirstname: string;
+  emergencyEmail: string;
+  emergencyPhone: string;
   role: UserRole;
   canSeePrivate: boolean;
 };
@@ -62,10 +71,12 @@ const emptyValues: UserFormValues = {
   email: "",
   password: "",
   dateOfBirth: "",
-  age: "",
   pseudo: "",
   phone: "",
-  emergencyContact: "",
+  emergencyLastname: "",
+  emergencyFirstname: "",
+  emergencyEmail: "",
+  emergencyPhone: "",
   role: "ROLE_USER",
   canSeePrivate: false,
 };
@@ -75,18 +86,39 @@ function toFormValues(user?: User): UserFormValues {
     return emptyValues;
   }
 
+  const emergency = parseEmergencyContact(user.emergencyContact);
+
   return {
     lastname: user.lastname ?? "",
     firstname: user.firstname ?? "",
     email: user.email ?? "",
     password: "",
     dateOfBirth: user.dateOfBirth ? user.dateOfBirth.slice(0, 10) : "",
-    age: user.age ? String(user.age) : "",
     pseudo: user.pseudo ?? "",
     phone: user.phone ?? "",
-    emergencyContact: user.emergencyContact ?? "",
+    emergencyLastname: emergency.lastname,
+    emergencyFirstname: emergency.firstname,
+    emergencyEmail: emergency.email,
+    emergencyPhone: emergency.phone,
     role: user.role ?? "ROLE_USER",
     canSeePrivate: user.canSeePrivate ?? false,
+  };
+}
+
+function applyEmergencyContactToValues(
+  values: UserFormValues,
+  emergency: EmergencyContactFields | null,
+): UserFormValues {
+  if (!emergency) {
+    return values;
+  }
+
+  return {
+    ...values,
+    emergencyLastname: emergency.lastname,
+    emergencyFirstname: emergency.firstname,
+    emergencyEmail: emergency.email,
+    emergencyPhone: emergency.phone,
   };
 }
 
@@ -98,7 +130,27 @@ export function UserForm({ userId }: UserFormProps) {
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  const isMinor = Number(values.age) < 18;
+  const isMinor = useMemo(() => {
+    if (!values.dateOfBirth) {
+      return false;
+    }
+
+    const birthDate = new Date(values.dateOfBirth);
+    if (Number.isNaN(birthDate.getTime())) {
+      return false;
+    }
+
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    const dayDiff = today.getDate() - birthDate.getDate();
+
+    if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
+      age -= 1;
+    }
+
+    return age < 18;
+  }, [values.dateOfBirth]);
 
   const pageTitle = useMemo(
     () => (userId ? "Modifier l'utilisateur" : "Creer un utilisateur"),
@@ -111,10 +163,11 @@ export function UserForm({ userId }: UserFormProps) {
     }
 
     let active = true;
-    getUser(userId)
-      .then((user) => {
+    Promise.all([getUser(userId), getEmergencyContactByUserId(userId)])
+      .then(([user, emergency]) => {
         if (active) {
-          setValues(toFormValues(user));
+          const baseValues = toFormValues(user);
+          setValues(applyEmergencyContactToValues(baseValues, emergency));
         }
       })
       .catch((err) => {
@@ -141,15 +194,24 @@ export function UserForm({ userId }: UserFormProps) {
     setSubmitting(true);
 
     try {
-      const ageValue = Number(values.age);
-
-      if (!Number.isFinite(ageValue) || ageValue < 0) {
-        throw new Error("L'age doit etre un nombre positif ou nul.");
+      const birthDate = new Date(values.dateOfBirth);
+      if (Number.isNaN(birthDate.getTime())) {
+        throw new Error("La date de naissance est invalide.");
       }
 
-      if (ageValue < 18 && !values.emergencyContact.trim()) {
+      const emergencyContactFields = {
+        lastname: values.emergencyLastname,
+        firstname: values.emergencyFirstname,
+        email: values.emergencyEmail,
+        phone: values.emergencyPhone,
+      };
+      const emergencyContact = serializeEmergencyContact(
+        emergencyContactFields,
+      );
+
+      if (isMinor && !hasCompleteEmergencyContact(emergencyContactFields)) {
         throw new Error(
-          "Le contact d'urgence est obligatoire pour un utilisateur mineur.",
+          "Le contact d'urgence mineur doit contenir nom, prenom, email et telephone.",
         );
       }
 
@@ -159,10 +221,9 @@ export function UserForm({ userId }: UserFormProps) {
           firstname: values.firstname,
           email: values.email,
           dateOfBirth: values.dateOfBirth,
-          age: ageValue,
           pseudo: values.pseudo || null,
           phone: values.phone || null,
-          emergencyContact: values.emergencyContact || null,
+          emergencyContact,
           role: values.role,
           canSeePrivate: values.canSeePrivate,
         };
@@ -180,10 +241,9 @@ export function UserForm({ userId }: UserFormProps) {
           email: values.email,
           password: values.password,
           dateOfBirth: values.dateOfBirth,
-          age: ageValue,
           pseudo: values.pseudo || null,
           phone: values.phone || null,
-          emergencyContact: values.emergencyContact || null,
+          emergencyContact,
           role: values.role,
           canSeePrivate: values.canSeePrivate,
         };
@@ -325,22 +385,6 @@ export function UserForm({ userId }: UserFormProps) {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="age">
-                  Age
-                  <RequiredMark />
-                </Label>
-                <Input
-                  id="age"
-                  type="number"
-                  min="0"
-                  value={values.age}
-                  onChange={(event) =>
-                    setValues({ ...values, age: event.target.value })
-                  }
-                  required
-                />
-              </div>
-              <div className="space-y-2">
                 <Label htmlFor="pseudo">Pseudo</Label>
                 <Input
                   id="pseudo"
@@ -362,23 +406,91 @@ export function UserForm({ userId }: UserFormProps) {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="emergencyContact">
-                Contact d'urgence
-                {isMinor ? <RequiredMark /> : null}
-              </Label>
-              <Input
-                id="emergencyContact"
-                placeholder="Nom + telephone"
-                value={values.emergencyContact}
-                onChange={(event) =>
-                  setValues({ ...values, emergencyContact: event.target.value })
-                }
-                required={isMinor}
-              />
-              <p className="text-xs text-muted-foreground">
-                Obligatoire si l'utilisateur est mineur.
-              </p>
+            <div className="space-y-3">
+              <div>
+                <Label>
+                  Contact d'urgence
+                  {isMinor ? <RequiredMark /> : null}
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Renseigner nom, prenom, email et telephone.
+                </p>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="emergencyLastname">
+                    Nom du contact
+                    {isMinor ? <RequiredMark /> : null}
+                  </Label>
+                  <Input
+                    id="emergencyLastname"
+                    value={values.emergencyLastname}
+                    onChange={(event) =>
+                      setValues({
+                        ...values,
+                        emergencyLastname: event.target.value,
+                      })
+                    }
+                    required={isMinor}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="emergencyFirstname">
+                    Prenom du contact
+                    {isMinor ? <RequiredMark /> : null}
+                  </Label>
+                  <Input
+                    id="emergencyFirstname"
+                    value={values.emergencyFirstname}
+                    onChange={(event) =>
+                      setValues({
+                        ...values,
+                        emergencyFirstname: event.target.value,
+                      })
+                    }
+                    required={isMinor}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="emergencyEmail">
+                    Email du contact
+                    {isMinor ? <RequiredMark /> : null}
+                  </Label>
+                  <Input
+                    id="emergencyEmail"
+                    type="email"
+                    value={values.emergencyEmail}
+                    onChange={(event) =>
+                      setValues({
+                        ...values,
+                        emergencyEmail: event.target.value,
+                      })
+                    }
+                    required={isMinor}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="emergencyPhone">
+                    Telephone du contact
+                    {isMinor ? <RequiredMark /> : null}
+                  </Label>
+                  <Input
+                    id="emergencyPhone"
+                    value={values.emergencyPhone}
+                    onChange={(event) =>
+                      setValues({
+                        ...values,
+                        emergencyPhone: event.target.value,
+                      })
+                    }
+                    required={isMinor}
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">

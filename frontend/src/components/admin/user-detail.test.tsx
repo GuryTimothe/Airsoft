@@ -1,0 +1,77 @@
+import { render, screen } from "@testing-library/react";
+import { UserDetail } from "./user-detail";
+
+jest.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: jest.fn(),
+    refresh: jest.fn(),
+  }),
+}));
+
+jest.mock("@/lib/user-api", () => ({
+  getUser: jest.fn(),
+  deleteUser: jest.fn(),
+}));
+
+jest.mock("@/lib/emergency-contact-api", () => ({
+  getEmergencyContactByUserId: jest.fn(),
+}));
+
+import { getUser } from "@/lib/user-api";
+import { getEmergencyContactByUserId } from "@/lib/emergency-contact-api";
+
+describe("UserDetail", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("renders emergency contact card when a contact exists", async () => {
+    (getUser as jest.Mock).mockResolvedValue({
+      id: 3,
+      firstname: "Enfant",
+      lastname: "MMineur",
+      email: "enfant@example.com",
+      dateOfBirth: "2010-05-15",
+      role: "ROLE_USER",
+      canSeePrivate: false,
+      pseudo: null,
+      phone: null,
+    });
+    (getEmergencyContactByUserId as jest.Mock).mockResolvedValue({
+      lastname: "Micheline",
+      firstname: "Michel",
+      email: "testmail2@mail.comm",
+      phone: "0123456789",
+    });
+
+    render(<UserDetail userId={3} />);
+
+    expect(await screen.findByText("Contact d'urgence")).toBeInTheDocument();
+    expect(screen.getByText("Micheline")).toBeInTheDocument();
+    expect(screen.getByText("Michel")).toBeInTheDocument();
+    expect(screen.getByText("testmail2@mail.comm")).toBeInTheDocument();
+    expect(screen.getByText("0123456789")).toBeInTheDocument();
+  });
+
+  it("does not render emergency contact card when no contact exists", async () => {
+    (getUser as jest.Mock).mockResolvedValue({
+      id: 1,
+      firstname: "Hadd",
+      lastname: "Mine",
+      email: "hadd@example.com",
+      dateOfBirth: "1990-02-14",
+      role: "ROLE_USER",
+      canSeePrivate: false,
+      pseudo: null,
+      phone: null,
+    });
+    (getEmergencyContactByUserId as jest.Mock).mockResolvedValue(null);
+
+    render(<UserDetail userId={1} />);
+
+    expect(
+      await screen.findByText("Informations principales"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Contact d'urgence")).not.toBeInTheDocument();
+  });
+});

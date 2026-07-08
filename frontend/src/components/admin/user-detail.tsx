@@ -29,6 +29,8 @@ import {
   UserRound,
   PencilLine,
 } from "lucide-react";
+import { getEmergencyContactByUserId } from "@/lib/emergency-contact-api";
+import { type EmergencyContactFields } from "@/lib/emergency-contact";
 
 interface UserDetailProps {
   userId: number;
@@ -47,9 +49,29 @@ function roleLabel(role: User["role"]): string {
   }
 }
 
+function computeAge(dateOfBirth: string): number | null {
+  const birthDate = new Date(dateOfBirth);
+  if (Number.isNaN(birthDate.getTime())) {
+    return null;
+  }
+
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  const dayDiff = today.getDate() - birthDate.getDate();
+
+  if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
+    age -= 1;
+  }
+
+  return age;
+}
+
 export function UserDetail({ userId }: UserDetailProps) {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
+  const [emergencyContact, setEmergencyContact] =
+    useState<EmergencyContactFields | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -57,10 +79,11 @@ export function UserDetail({ userId }: UserDetailProps) {
   useEffect(() => {
     let active = true;
 
-    getUser(userId)
-      .then((data) => {
+    Promise.all([getUser(userId), getEmergencyContactByUserId(userId)])
+      .then(([userData, emergencyData]) => {
         if (active) {
-          setUser(data);
+          setUser(userData);
+          setEmergencyContact(emergencyData);
         }
       })
       .catch((err) => {
@@ -118,6 +141,9 @@ export function UserDetail({ userId }: UserDetailProps) {
       </Card>
     );
   }
+
+  const age = computeAge(user.dateOfBirth);
+  const hasEmergencyContact = Boolean(emergencyContact);
 
   return (
     <div className="space-y-6">
@@ -200,7 +226,7 @@ export function UserDetail({ userId }: UserDetailProps) {
           </div>
           <div>
             <span className="font-medium">Age: </span>
-            <span>{user.age}</span>
+            <span>{age ?? "Non renseigne"}</span>
           </div>
           <div>
             <span className="font-medium">Date de naissance: </span>
@@ -212,12 +238,37 @@ export function UserDetail({ userId }: UserDetailProps) {
             <span className="font-medium">Pseudo: </span>
             <span>{user.pseudo || "Non renseigne"}</span>
           </div>
-          <div>
-            <span className="font-medium">Contact d'urgence: </span>
-            <span>{user.emergencyContact || "Non renseigne"}</span>
-          </div>
         </CardContent>
       </Card>
+
+      {hasEmergencyContact ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Contact d'urgence</CardTitle>
+            <CardDescription>
+              Personne à contacter en cas de besoin.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <div>
+              <span className="font-medium">Nom: </span>
+              <span>{emergencyContact?.lastname || "-"}</span>
+            </div>
+            <div>
+              <span className="font-medium">Prenom: </span>
+              <span>{emergencyContact?.firstname || "-"}</span>
+            </div>
+            <div>
+              <span className="font-medium">Email: </span>
+              <span>{emergencyContact?.email || "-"}</span>
+            </div>
+            <div>
+              <span className="font-medium">Telephone: </span>
+              <span>{emergencyContact?.phone || "-"}</span>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }
