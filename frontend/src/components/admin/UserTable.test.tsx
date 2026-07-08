@@ -17,7 +17,7 @@ const users: User[] = [
     lastname: "Durand",
     firstname: "Lucas",
     email: "lucas@example.com",
-    dateOfBirth: "1990-02-14",
+    dateOfBirth: "2010-02-14",
     role: "ROLE_USER",
     canSeePrivate: false,
   },
@@ -33,12 +33,19 @@ const users: User[] = [
 ];
 
 describe("UserTable", () => {
-  it("renders users and filters them by role and private access", () => {
-    render(<UserTable initialUsers={users} />);
+  it("renders users, highlights minors, and filters by role/private access", () => {
+    render(
+      <UserTable
+        initialUsers={users}
+        referenceDateIso="2026-07-08T00:00:00.000Z"
+      />,
+    );
 
     expect(screen.getByText("Alex Martin")).toBeInTheDocument();
     expect(screen.getByText("Lucas Durand")).toBeInTheDocument();
     expect(screen.getByText("Nina Roux")).toBeInTheDocument();
+    expect(screen.getByText("16 ans")).toBeInTheDocument();
+    expect(screen.getByText("34 ans")).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Filtrer par role"), {
       target: { value: "ROLE_ADMIN" },

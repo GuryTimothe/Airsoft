@@ -7,6 +7,7 @@ import { getUsers, type User } from "@/lib/user-api";
 export default async function UsersPage() {
   let users: User[] = [];
   let errorMessage: string | null = null;
+  const referenceDateIso = new Date().toISOString();
 
   try {
     users = await getUsers();
@@ -41,7 +42,7 @@ export default async function UsersPage() {
         </div>
       ) : null}
 
-      <UserTable initialUsers={users} />
+      <UserTable initialUsers={users} referenceDateIso={referenceDateIso} />
     </main>
   );
 }
