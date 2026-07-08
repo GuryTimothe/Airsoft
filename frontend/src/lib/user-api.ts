@@ -1,4 +1,8 @@
 import { getAuthHeaders } from "@/lib/auth";
+import {
+  parseEmergencyContact,
+  type EmergencyContactFields,
+} from "@/lib/emergency-contact";
 
 export type UserRole =
   | "ROLE_USER"
@@ -12,8 +16,10 @@ export interface User {
   firstname: string;
   email: string;
   dateOfBirth: string;
+  age: number;
   pseudo?: string | null;
   phone?: string | null;
+  emergencyContact?: EmergencyContactFields | null;
   role: UserRole;
   adminNotes?: string | null;
   canSeePrivate: boolean;
@@ -27,8 +33,10 @@ export interface UpdateUserPayload {
   email?: string;
   password?: string;
   dateOfBirth?: string;
+  age?: number;
   pseudo?: string | null;
   phone?: string | null;
+  emergencyContact?: EmergencyContactFields | null;
   role?: UserRole;
   canSeePrivate?: boolean;
   adminNotes?: string | null;
@@ -40,8 +48,10 @@ export interface CreateUserPayload {
   email: string;
   password: string;
   dateOfBirth: string;
+  age: number;
   pseudo?: string | null;
   phone?: string | null;
+  emergencyContact?: EmergencyContactFields | null;
   role?: UserRole;
   canSeePrivate?: boolean;
   adminNotes?: string | null;
@@ -56,6 +66,34 @@ function buildUrl(path: string): string {
 function normalizeUser(data: unknown): User {
   const d = data as Record<string, unknown>;
   const get = (key: string) => d[key];
+  const rawEmergencyContact =
+    (get("emergencyContact") as EmergencyContactFields | string | null) ??
+    (get("emergency_contact") as EmergencyContactFields | string | null) ??
+    null;
+  const emergencyFromRelation =
+    rawEmergencyContact &&
+    !(
+      typeof rawEmergencyContact === "string" &&
+      (rawEmergencyContact.trim() === "" ||
+        rawEmergencyContact.trim().startsWith("/api/"))
+    )
+      ? parseEmergencyContact(rawEmergencyContact)
+      : null;
+  const emergencyFromFlat: EmergencyContactFields = {
+    lastname: String(get("emergencyContactLastname") ?? "").trim(),
+    firstname: String(get("emergencyContactFirstname") ?? "").trim(),
+    email: String(get("emergencyContactEmail") ?? "").trim(),
+    phone: String(get("emergencyContactPhone") ?? "").trim(),
+  };
+  const hasEmergencyFromFlat = Boolean(
+    emergencyFromFlat.lastname ||
+    emergencyFromFlat.firstname ||
+    emergencyFromFlat.email ||
+    emergencyFromFlat.phone,
+  );
+  const emergencyContact = hasEmergencyFromFlat
+    ? emergencyFromFlat
+    : emergencyFromRelation;
 
   return {
     id: Number(get("id") ?? 0),
@@ -63,8 +101,10 @@ function normalizeUser(data: unknown): User {
     firstname: String(get("firstname") ?? ""),
     email: String(get("email") ?? ""),
     dateOfBirth: String(get("dateOfBirth") ?? ""),
+    age: Number(get("age") ?? 0),
     pseudo: (get("pseudo") as string) ?? null,
     phone: (get("phone") as string) ?? null,
+    emergencyContact,
     role: (get("role") as UserRole) ?? "ROLE_USER",
     adminNotes: (get("adminNotes") as string) ?? null,
     canSeePrivate: Boolean(get("canSeePrivate") ?? false),

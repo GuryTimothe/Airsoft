@@ -6,6 +6,7 @@ use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
 use ApiPlatform\Validator\Exception\ValidationException;
 use App\Dto\RegisterInput;
+use App\Entity\EmergencyContact;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\Request;
@@ -52,6 +53,10 @@ class RegisterProcessor implements ProcessorInterface
             $user->setDateOfBirth(new \DateTime($input->dateOfBirth->format('Y-m-d')));
         }
 
+        if (null !== $input->emergencyContact && '' !== trim($input->emergencyContact)) {
+            $user->setEmergencyContact($this->createEmergencyContactFromLegacyString($input->emergencyContact));
+        }
+
         if (null !== $input->pseudo) {
             $user->setPseudo($input->pseudo);
         }
@@ -85,5 +90,39 @@ class RegisterProcessor implements ProcessorInterface
         }
 
         return $decoded;
+    }
+
+    private function createEmergencyContactFromLegacyString(string $value): EmergencyContact
+    {
+        $trimmed = trim($value);
+        $contact = new EmergencyContact();
+
+        if ('' === $trimmed) {
+            return $contact;
+        }
+
+        if (str_starts_with($trimmed, '{')) {
+            $decoded = json_decode($trimmed, true);
+
+            if (is_array($decoded)) {
+                $contact
+                    ->setLastname((string) ($decoded['lastname'] ?? ''))
+                    ->setFirstname((string) ($decoded['firstname'] ?? ''))
+                    ->setEmail((string) ($decoded['email'] ?? ''))
+                    ->setPhone((string) ($decoded['phone'] ?? ''));
+
+                return $contact;
+            }
+        }
+
+        $parts = array_map('trim', explode('-', $trimmed, 2));
+
+        $contact
+            ->setLastname($parts[0])
+            ->setFirstname('')
+            ->setEmail('')
+            ->setPhone($parts[1] ?? '');
+
+        return $contact;
     }
 }
