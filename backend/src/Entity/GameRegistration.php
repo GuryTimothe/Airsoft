@@ -11,8 +11,10 @@ use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\Dto\GameRegistrationInput;
+use App\Dto\GameRegistrationPresenceInput;
 use App\Repository\GameRegistrationRepository;
 use App\State\GameRegistrationCreateProcessor;
+use App\State\GameRegistrationPresenceProcessor;
 use App\State\MyGameRegistrationsProvider;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Annotation\Groups;
@@ -36,7 +38,8 @@ use Symfony\Component\Serializer\Annotation\Groups;
         ),
         new Patch(
             security: "is_granted('ROLE_ADMIN')",
-            denormalizationContext: ['groups' => ['game_registration:write']],
+            input: GameRegistrationPresenceInput::class,
+            processor: GameRegistrationPresenceProcessor::class,
         ),
         new Delete(security: "is_granted('ROLE_ADMIN') or object.getUser() == user"),
     ]
@@ -118,6 +121,13 @@ class GameRegistration
     public function setIsPresent(bool $isPresent): self
     {
         $this->isPresent = $isPresent;
+
+        return $this;
+    }
+
+    public function setPresent(bool $present): self
+    {
+        $this->isPresent = $present;
 
         return $this;
     }

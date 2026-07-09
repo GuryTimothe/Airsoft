@@ -80,6 +80,7 @@ class GameRegistrationCreateProcessor implements ProcessorInterface
         $registration = new GameRegistration();
         $registration->setGame($game);
         $registration->setUser($user);
+        $registration->setIsPresent(false);
 
         try {
             $this->entityManager->persist($registration);

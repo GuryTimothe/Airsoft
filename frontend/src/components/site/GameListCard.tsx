@@ -6,11 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, MapPin, Euro, Lock, Users } from "lucide-react";
 import Link from "next/link";
-import {
-  getAuthToken,
-  getUserIdentifierCandidatesFromToken,
-  hasAdminAccessToken,
-} from "@/lib/auth";
+import { getAuthToken, hasAdminAccessToken } from "@/lib/auth";
 import { getGames, type Game } from "@/lib/game-api";
 import {
   cancelGameRegistration,
@@ -130,28 +126,6 @@ export function GameListCard() {
   const [referenceDateIso] = useState<string>(() => new Date().toISOString());
   const [canBypassFullCapacity, setCanBypassFullCapacity] = useState(false);
 
-  const matchesCurrentUser = useCallback(
-    (registration: GameRegistration): boolean => {
-      const token = getAuthToken();
-      const candidates = getUserIdentifierCandidatesFromToken(token).map(
-        (value) => value.toLowerCase(),
-      );
-
-      if (candidates.length === 0) {
-        return false;
-      }
-
-      const email = registration.userEmail?.toLowerCase();
-      const userId = String(registration.userId);
-
-      return (
-        candidates.includes(userId) ||
-        (email ? candidates.includes(email) : false)
-      );
-    },
-    [],
-  );
-
   const fetchData = useCallback(async (): Promise<{
     hasToken: boolean;
     hasAdminAccess: boolean;
@@ -172,33 +146,6 @@ export function GameListCard() {
         registrations = [];
       }
 
-      if (registrations.length === 0 && fetchedGames.length > 0) {
-        const now = Date.now();
-        const publicUpcomingGames = fetchedGames
-          .filter(
-            (game) =>
-              game.isPublic && new Date(game.startDateTime).getTime() > now,
-          )
-          .slice(0, 3);
-
-        const crossResults = await Promise.all(
-          publicUpcomingGames.map(async (game) => {
-            try {
-              const gameRegistrations = await getGameRegistrationsByGameId(
-                game.id,
-              );
-              return gameRegistrations.filter((registration) =>
-                matchesCurrentUser(registration),
-              );
-            } catch {
-              return [] as GameRegistration[];
-            }
-          }),
-        );
-
-        registrations = crossResults.flat();
-      }
-
       return {
         hasToken,
         games: fetchedGames,
@@ -213,7 +160,7 @@ export function GameListCard() {
       registrations: [],
       hasAdminAccess,
     };
-  }, [matchesCurrentUser]);
+  }, []);
 
   useEffect(() => {
     let active = true;

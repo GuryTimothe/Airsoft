@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { getGames, type Game } from "@/lib/game-api";
 import { Plus } from "lucide-react";
 import GameTable from "@/components/admin/GameTable";
+import { GamesExportControls } from "@/components/admin/GamesExportControls";
 
 export default async function GamesPage() {
   let games: Game[] = [];
@@ -38,6 +39,8 @@ export default async function GamesPage() {
           {errorMessage}
         </div>
       ) : null}
+
+      <GamesExportControls />
 
       <GameTable initialGames={games} />
     </main>
