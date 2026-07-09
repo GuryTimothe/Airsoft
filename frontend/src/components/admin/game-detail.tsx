@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,12 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { deleteGame, getGame, type Game } from "@/lib/game-api";
+import {
+  cancelGameRegistration,
+  getGameRegistrationsByGameId,
+  updateGameRegistrationPresence,
+  type GameRegistration,
+} from "@/lib/game-registration-api";
 import { CalendarDays, MapPin, PencilLine, Trash2, Users } from "lucide-react";
 
 interface GameDetailProps {
@@ -32,34 +38,117 @@ export function GameDetail({ gameId }: GameDetailProps) {
   const [game, setGame] = useState<Game | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [registrationsError, setRegistrationsError] = useState<string | null>(
+    null,
+  );
   const [deleting, setDeleting] = useState(false);
+  const [registrations, setRegistrations] = useState<GameRegistration[]>([]);
+  const [cancelingRegistrationId, setCancelingRegistrationId] = useState<
+    number | null
+  >(null);
+  const [updatingPresenceId, setUpdatingPresenceId] = useState<number | null>(
+    null,
+  );
+
+  const fetchGameAndRegistrations = useCallback(async (): Promise<{
+    game: Game;
+    registrations: GameRegistration[];
+  }> => {
+    const gameData = await getGame(gameId);
+    let registrationData: GameRegistration[] = [];
+
+    try {
+      registrationData = await getGameRegistrationsByGameId(gameId);
+    } catch (registrationError) {
+      setRegistrationsError(
+        registrationError instanceof Error
+          ? registrationError.message
+          : "Impossible de charger la liste des inscrits.",
+      );
+      registrationData = [];
+    }
+
+    return { game: gameData, registrations: registrationData };
+  }, [gameId]);
 
   useEffect(() => {
     let active = true;
 
-    getGame(gameId)
-      .then((data) => {
-        if (active) {
-          setGame(data);
+    void (async () => {
+      try {
+        const data = await fetchGameAndRegistrations();
+
+        if (!active) {
+          return;
         }
-      })
-      .catch((err) => {
+
+        setGame(data.game);
+        setRegistrations(data.registrations);
+        setRegistrationsError(null);
+        setError(null);
+      } catch (err) {
         if (active) {
           setError(
             err instanceof Error ? err.message : "Une erreur est survenue",
           );
         }
-      })
-      .finally(() => {
+      } finally {
         if (active) {
           setLoading(false);
         }
-      });
+      }
+    })();
 
     return () => {
       active = false;
     };
-  }, [gameId]);
+  }, [fetchGameAndRegistrations]);
+
+  async function handleForceCancel(registrationId: number): Promise<void> {
+    setCancelingRegistrationId(registrationId);
+
+    try {
+      await cancelGameRegistration(registrationId);
+      const data = await fetchGameAndRegistrations();
+      setGame(data.game);
+      setRegistrations(data.registrations);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Impossible d'annuler cette inscription.",
+      );
+    } finally {
+      setCancelingRegistrationId(null);
+    }
+  }
+
+  async function handleTogglePresence(
+    registrationId: number,
+    isPresent: boolean,
+  ): Promise<void> {
+    setUpdatingPresenceId(registrationId);
+
+    try {
+      const updated = await updateGameRegistrationPresence(
+        registrationId,
+        isPresent,
+      );
+      setRegistrations((current) =>
+        current.map((registration) =>
+          registration.id === registrationId ? updated : registration,
+        ),
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Impossible de mettre a jour la presence.",
+      );
+    } finally {
+      setUpdatingPresenceId(null);
+    }
+  }
 
   async function handleDelete() {
     setDeleting(true);
@@ -147,13 +236,13 @@ export function GameDetail({ gameId }: GameDetailProps) {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Informations principales</CardTitle>
-            <CardDescription>Vue d’ensemble de la partie.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4 text-sm">
+      <Card>
+        <CardHeader>
+          <CardTitle>Informations principales</CardTitle>
+          <CardDescription>Vue d’ensemble de la partie.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 text-sm">
+          <div className="grid gap-4 lg:grid-cols-2">
             <div className="flex items-start gap-2">
               <CalendarDays className="mt-0.5 h-4 w-4 text-muted-foreground" />
               <div>
@@ -180,54 +269,108 @@ export function GameDetail({ gameId }: GameDetailProps) {
               <div>
                 <p className="font-medium">Capacité</p>
                 <p className="text-muted-foreground">
-                  {game.maxPlaces} place(s) maximum
+                  {game.registrationCount}/{game.maxPlaces} place(s)
                 </p>
               </div>
             </div>
+          </div>
 
-            <div>
-              <p className="font-medium">PAF</p>
-              <p className="text-muted-foreground">{game.price.toFixed(2)} €</p>
+          <div>
+            <p className="font-medium">PAF</p>
+            <p className="text-muted-foreground">{game.price.toFixed(2)} €</p>
+          </div>
+
+          <div>
+            <p className="font-medium">Visibilité</p>
+            <p className="text-muted-foreground">
+              {game.isPublic ? "Partie publique" : "Partie privée"}
+            </p>
+          </div>
+
+          <div>
+            <p className="font-medium">Description</p>
+            <p className="whitespace-pre-wrap text-muted-foreground">
+              {game.description || "Aucune description"}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Joueurs inscrits</CardTitle>
+          <CardDescription>
+            Suivi de presence et gestion des inscriptions.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {registrationsError ? (
+            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              {registrationsError}
             </div>
+          ) : null}
 
-            <div>
-              <p className="font-medium">Visibilité</p>
-              <p className="text-muted-foreground">
-                {game.isPublic ? "Partie publique" : "Partie privée"}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Joueurs associés</CardTitle>
-            <CardDescription>
-              La relation joueurs n’est pas encore exposée par l’entité Game du
-              backend.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+          {registrations.length === 0 ? (
             <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-              Aucun joueur lié n’est actuellement disponible via l’API. La
-              capacité maximale est visible ici, et la relation pourra être
-              ajoutée plus tard si vous exposez les participants dans le
-              backend.
+              Aucun joueur n’est inscrit à cette partie.
             </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {game.description ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Description</CardTitle>
-          </CardHeader>
-          <CardContent className="whitespace-pre-wrap text-sm text-muted-foreground">
-            {game.description}
-          </CardContent>
-        </Card>
-      ) : null}
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="border-b text-left">
+                    <th className="px-3 py-2 font-medium">Nom</th>
+                    <th className="px-3 py-2 font-medium">Prenom</th>
+                    <th className="px-3 py-2 font-medium">Adresse mail</th>
+                    <th className="px-3 py-2 font-medium">Present</th>
+                    <th className="px-3 py-2 font-medium">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {registrations.map((registration) => (
+                    <tr key={registration.id} className="border-b">
+                      <td className="px-3 py-2">
+                        {registration.userLastname || "-"}
+                      </td>
+                      <td className="px-3 py-2">
+                        {registration.userFirstname || "-"}
+                      </td>
+                      <td className="px-3 py-2">
+                        {registration.userEmail || "-"}
+                      </td>
+                      <td className="px-3 py-2">
+                        <input
+                          type="checkbox"
+                          checked={registration.isPresent}
+                          disabled={updatingPresenceId === registration.id}
+                          onChange={(event) =>
+                            handleTogglePresence(
+                              registration.id,
+                              event.target.checked,
+                            )
+                          }
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={cancelingRegistrationId === registration.id}
+                          onClick={() => handleForceCancel(registration.id)}
+                        >
+                          {cancelingRegistrationId === registration.id
+                            ? "Annulation..."
+                            : "Retirer"}
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

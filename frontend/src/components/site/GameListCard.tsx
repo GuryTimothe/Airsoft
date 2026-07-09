@@ -1,12 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, MapPin, Euro, Lock, Users } from "lucide-react";
 import Link from "next/link";
+import {
+  getAuthToken,
+  getUserIdentifierCandidatesFromToken,
+  hasAdminAccessToken,
+} from "@/lib/auth";
 import { getGames, type Game } from "@/lib/game-api";
+import {
+  cancelGameRegistration,
+  getMyGameRegistrations,
+  registerToGame,
+  type GameRegistration,
+} from "@/lib/game-registration-api";
 import gameBanner from "@/assets/images/game-banner.jpg";
 
 interface Party {
@@ -17,13 +28,12 @@ interface Party {
   paf: number;
   maxPlayers: number;
   players: number;
-  waitlist: number;
   isPrivate: boolean;
-  // État d'inscription de l'utilisateur courant
-  registrationStatus?: "registered" | "waitlisted" | null;
+  registrationId: number | null;
+  isFull: boolean;
 }
 
-function mapGameToParty(game: Game): Party {
+function mapGameToParty(game: Game, registrationId: number | null): Party {
   return {
     id: game.id,
     title: game.title,
@@ -31,70 +41,196 @@ function mapGameToParty(game: Game): Party {
     location: game.address,
     paf: game.price,
     maxPlayers: game.maxPlaces,
-    players: 0,
-    waitlist: 0,
+    players: game.registrationCount,
     isPrivate: !game.isPublic,
-    registrationStatus: null,
+    registrationId,
+    isFull: game.full,
   };
 }
 
-function RegistrationButton({ party }: { party: Party }) {
-  const { registrationStatus, title } = party;
+type RegistrationButtonProps = {
+  party: Party;
+  isAuthenticated: boolean;
+  canBypassFullCapacity: boolean;
+  isSubmitting: boolean;
+  onRegister: (gameId: number) => Promise<void>;
+  onCancel: (registrationId: number) => Promise<void>;
+};
 
-  if (registrationStatus === "registered") {
+function RegistrationButton({
+  party,
+  isAuthenticated,
+  canBypassFullCapacity,
+  isSubmitting,
+  onRegister,
+  onCancel,
+}: RegistrationButtonProps) {
+  const { registrationId, title, isFull, id } = party;
+
+  if (registrationId !== null) {
     return (
       <Button
         variant="outline"
         className="w-full"
         aria-label={`Annuler l'inscription à ${title}`}
+        disabled={isSubmitting}
+        onClick={() => onCancel(registrationId)}
       >
         Annuler l'inscription
       </Button>
     );
   }
 
-  if (registrationStatus === "waitlisted") {
+  if (!isAuthenticated) {
     return (
-      <div className="space-y-2">
-        <p className="text-xs text-muted-foreground text-center">
-          Vous êtes en liste d'attente
-        </p>
+      <Link href="/auth/login" className="block">
         <Button
-          variant="outline"
           className="w-full"
-          aria-label={`Quitter la liste d'attente pour ${title}`}
+          aria-label={`Se connecter pour s'inscrire à ${title}`}
         >
-          Quitter la liste d'attente
+          Se connecter pour s'inscrire
         </Button>
-      </div>
+      </Link>
     );
   }
 
-  // Non inscrit ou non connecté
-  return (
-    <Link href="/auth/register" className="block">
-      <Button className="w-full" aria-label={`S'inscrire à ${title}`}>
-        S'inscrire
+  if (isFull && !canBypassFullCapacity) {
+    return (
+      <Button className="w-full" disabled aria-label={`${title} est complet`}>
+        Complet
       </Button>
-    </Link>
+    );
+  }
+
+  return (
+    <Button
+      className="w-full"
+      aria-label={`S'inscrire à ${title}`}
+      disabled={isSubmitting}
+      onClick={() => onRegister(id)}
+    >
+      {isSubmitting
+        ? "Inscription..."
+        : isFull && canBypassFullCapacity
+          ? "S'inscrire malgré complet"
+          : "S'inscrire"}
+    </Button>
   );
 }
 
 export function GameListCard() {
   const [games, setGames] = useState<Game[]>([]);
+  const [myRegistrations, setMyRegistrations] = useState<GameRegistration[]>(
+    [],
+  );
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [submittingId, setSubmittingId] = useState<number | null>(null);
+  const [referenceDateIso] = useState<string>(() => new Date().toISOString());
+  const [canBypassFullCapacity, setCanBypassFullCapacity] = useState(false);
+
+  const matchesCurrentUser = useCallback(
+    (registration: GameRegistration): boolean => {
+      const token = getAuthToken();
+      const candidates = getUserIdentifierCandidatesFromToken(token).map(
+        (value) => value.toLowerCase(),
+      );
+
+      if (candidates.length === 0) {
+        return false;
+      }
+
+      const email = registration.userEmail?.toLowerCase();
+      const userId = String(registration.userId);
+
+      return (
+        candidates.includes(userId) ||
+        (email ? candidates.includes(email) : false)
+      );
+    },
+    [],
+  );
+
+  const fetchData = useCallback(async (): Promise<{
+    hasToken: boolean;
+    hasAdminAccess: boolean;
+    games: Game[];
+    registrations: GameRegistration[];
+  }> => {
+    const hasToken = getAuthToken() !== null;
+    const hasAdminAccess = hasAdminAccessToken();
+
+    const fetchedGames = await getGames();
+
+    if (hasToken) {
+      let registrations: GameRegistration[] = [];
+
+      try {
+        registrations = await getMyGameRegistrations();
+      } catch {
+        registrations = [];
+      }
+
+      if (registrations.length === 0 && fetchedGames.length > 0) {
+        const now = Date.now();
+        const publicUpcomingGames = fetchedGames
+          .filter(
+            (game) =>
+              game.isPublic && new Date(game.startDateTime).getTime() > now,
+          )
+          .slice(0, 3);
+
+        const crossResults = await Promise.all(
+          publicUpcomingGames.map(async (game) => {
+            try {
+              const gameRegistrations = await getGameRegistrationsByGameId(
+                game.id,
+              );
+              return gameRegistrations.filter((registration) =>
+                matchesCurrentUser(registration),
+              );
+            } catch {
+              return [] as GameRegistration[];
+            }
+          }),
+        );
+
+        registrations = crossResults.flat();
+      }
+
+      return {
+        hasToken,
+        games: fetchedGames,
+        registrations,
+        hasAdminAccess,
+      };
+    }
+
+    return {
+      hasToken,
+      games: fetchedGames,
+      registrations: [],
+      hasAdminAccess,
+    };
+  }, [matchesCurrentUser]);
 
   useEffect(() => {
     let active = true;
 
-    getGames()
-      .then((fetchedGames) => {
+    fetchData()
+      .then((data) => {
         if (!active) return;
-        setGames(fetchedGames);
+
+        setIsAuthenticated(data.hasToken);
+        setCanBypassFullCapacity(data.hasAdminAccess);
+        setGames(data.games);
+        setMyRegistrations(data.registrations);
+        setError(null);
       })
       .catch((err) => {
         if (!active) return;
+
         setError(
           err instanceof Error
             ? err.message
@@ -110,16 +246,70 @@ export function GameListCard() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [fetchData]);
+
+  async function handleRegister(gameId: number): Promise<void> {
+    setSubmittingId(gameId);
+    setError(null);
+
+    try {
+      await registerToGame(gameId);
+      const data = await fetchData();
+      setIsAuthenticated(data.hasToken);
+      setCanBypassFullCapacity(data.hasAdminAccess);
+      setGames(data.games);
+      setMyRegistrations(data.registrations);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Impossible de finaliser l'inscription.",
+      );
+    } finally {
+      setSubmittingId(null);
+    }
+  }
+
+  async function handleCancel(registrationId: number): Promise<void> {
+    setSubmittingId(registrationId);
+    setError(null);
+
+    try {
+      await cancelGameRegistration(registrationId);
+      const data = await fetchData();
+      setIsAuthenticated(data.hasToken);
+      setCanBypassFullCapacity(data.hasAdminAccess);
+      setGames(data.games);
+      setMyRegistrations(data.registrations);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Impossible d'annuler l'inscription.",
+      );
+    } finally {
+      setSubmittingId(null);
+    }
+  }
+
+  const registrationsByGameId = useMemo(() => {
+    const map = new Map<number, number>();
+
+    myRegistrations.forEach((registration) => {
+      map.set(registration.gameId, registration.id);
+    });
+
+    return map;
+  }, [myRegistrations]);
 
   const upcomingGames = useMemo(() => {
-    // Calling Date.now() is intentionally done once inside the memo.
-    // eslint-disable-next-line react-hooks/purity
-    const now = Date.now();
+    const referenceTime = new Date(referenceDateIso).getTime();
 
     return games
       .filter(
-        (game) => game.isPublic && new Date(game.startDateTime).getTime() > now,
+        (game) =>
+          game.isPublic &&
+          new Date(game.startDateTime).getTime() > referenceTime,
       )
       .sort(
         (a, b) =>
@@ -127,8 +317,10 @@ export function GameListCard() {
           new Date(b.startDateTime).getTime(),
       )
       .slice(0, 3)
-      .map(mapGameToParty);
-  }, [games]);
+      .map((game) =>
+        mapGameToParty(game, registrationsByGameId.get(game.id) ?? null),
+      );
+  }, [games, referenceDateIso, registrationsByGameId]);
 
   return (
     <section aria-labelledby="upcoming-games-title" className="space-y-4">
@@ -149,8 +341,7 @@ export function GameListCard() {
       ) : (
         <ul className="space-y-4 list-none p-0 m-0" role="list">
           {upcomingGames.map((party) => {
-            const isFull = party.players >= party.maxPlayers;
-            const spotsLeft = party.maxPlayers - party.players;
+            const spotsLeft = Math.max(0, party.maxPlayers - party.players);
 
             const formattedDate = new Date(party.date).toLocaleString("fr-FR", {
               weekday: "long",
@@ -178,7 +369,9 @@ export function GameListCard() {
                           Privée
                         </Badge>
                       )}
-                      {isFull && <Badge variant="destructive">Complet</Badge>}
+                      {party.isFull && (
+                        <Badge variant="destructive">Complet</Badge>
+                      )}
                     </div>
                   </div>
 
@@ -219,7 +412,7 @@ export function GameListCard() {
                           <dt className="sr-only">Joueurs</dt>
                           <dd>
                             {party.players}/{party.maxPlayers} joueurs
-                            {!isFull && (
+                            {!party.isFull && (
                               <span className="text-muted-foreground">
                                 {" "}
                                 ({spotsLeft} place{spotsLeft > 1 ? "s" : ""})
@@ -241,7 +434,18 @@ export function GameListCard() {
                       </div>
                     </dl>
 
-                    <RegistrationButton party={party} />
+                    <RegistrationButton
+                      party={party}
+                      isAuthenticated={isAuthenticated}
+                      canBypassFullCapacity={canBypassFullCapacity}
+                      isSubmitting={
+                        submittingId === party.id ||
+                        (party.registrationId !== null &&
+                          submittingId === party.registrationId)
+                      }
+                      onRegister={handleRegister}
+                      onCancel={handleCancel}
+                    />
                   </CardContent>
                 </Card>
               </li>

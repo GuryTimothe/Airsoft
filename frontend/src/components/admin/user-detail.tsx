@@ -238,10 +238,6 @@ export function UserDetail({ userId }: UserDetailProps) {
             <span className="font-medium">Pseudo: </span>
             <span>{user.pseudo || "Non renseigne"}</span>
           </div>
-          <div>
-            <span className="font-medium">Contact d'urgence: </span>
-            <span>{user.emergencyContact || "Non renseigne"}</span>
-          </div>
         </CardContent>
       </Card>
 

@@ -1,9 +1,27 @@
 import { render, screen } from "@testing-library/react";
 import { GameListCard } from "./GameListCard";
 import { getGames } from "@/lib/game-api";
+import { getMyGameRegistrations } from "@/lib/game-registration-api";
+import {
+  getAuthToken,
+  getUserIdentifierCandidatesFromToken,
+  hasAdminAccessToken,
+} from "@/lib/auth";
 
 jest.mock("@/lib/game-api", () => ({
   getGames: jest.fn(),
+}));
+
+jest.mock("@/lib/game-registration-api", () => ({
+  getMyGameRegistrations: jest.fn(),
+  registerToGame: jest.fn(),
+  cancelGameRegistration: jest.fn(),
+}));
+
+jest.mock("@/lib/auth", () => ({
+  getAuthToken: jest.fn(),
+  getUserIdentifierCandidatesFromToken: jest.fn(),
+  hasAdminAccessToken: jest.fn(),
 }));
 
 jest.mock("@/assets/images/game-banner.jpg", () => ({
@@ -11,9 +29,25 @@ jest.mock("@/assets/images/game-banner.jpg", () => ({
 }));
 
 const mockedGetGames = getGames as jest.MockedFunction<typeof getGames>;
+const mockedGetMyGameRegistrations =
+  getMyGameRegistrations as jest.MockedFunction<typeof getMyGameRegistrations>;
+const mockedGetAuthToken = getAuthToken as jest.MockedFunction<
+  typeof getAuthToken
+>;
+const mockedGetUserIdentifierCandidatesFromToken =
+  getUserIdentifierCandidatesFromToken as jest.MockedFunction<
+    typeof getUserIdentifierCandidatesFromToken
+  >;
+const mockedHasAdminAccessToken = hasAdminAccessToken as jest.MockedFunction<
+  typeof hasAdminAccessToken
+>;
 
 describe("GameListCard", () => {
   beforeEach(() => {
+    mockedGetAuthToken.mockReturnValue(null);
+    mockedGetUserIdentifierCandidatesFromToken.mockReturnValue([]);
+    mockedHasAdminAccessToken.mockReturnValue(false);
+    mockedGetMyGameRegistrations.mockResolvedValue([]);
     mockedGetGames.mockResolvedValue([
       {
         id: 1,
@@ -23,6 +57,9 @@ describe("GameListCard", () => {
         address: "Domaine de la Forêt",
         price: 15,
         maxPlaces: 24,
+        registrationCount: 0,
+        availablePlaces: 24,
+        full: false,
         isPublic: true,
       },
       {
@@ -33,6 +70,9 @@ describe("GameListCard", () => {
         address: "Base secrète",
         price: 18,
         maxPlaces: 20,
+        registrationCount: 0,
+        availablePlaces: 20,
+        full: false,
         isPublic: false,
       },
     ]);
@@ -54,5 +94,52 @@ describe("GameListCard", () => {
     const banner = container.querySelector('[data-testid="game-banner"]');
     expect(banner).toBeInTheDocument();
     expect(banner).toHaveStyle("background-image: url(/game-banner.jpg)");
+  });
+
+  it("keeps games visible when registration lookup fails for a connected user", async () => {
+    mockedGetAuthToken.mockReturnValue("token");
+    mockedGetMyGameRegistrations.mockRejectedValueOnce(
+      new Error("Impossible de charger vos inscriptions."),
+    );
+
+    render(<GameListCard />);
+
+    expect(await screen.findByText("Forêt")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "S'inscrire à Forêt" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Impossible de charger vos inscriptions."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps the registration button enabled for admins even when the game is full", async () => {
+    mockedGetAuthToken.mockReturnValue("token");
+    mockedHasAdminAccessToken.mockReturnValue(true);
+    mockedGetGames.mockResolvedValueOnce([
+      {
+        id: 1,
+        title: "Forêt",
+        description: "Partie en forêt",
+        startDateTime: new Date(Date.now() + 86400000).toISOString(),
+        address: "Domaine de la Forêt",
+        price: 15,
+        maxPlaces: 24,
+        registrationCount: 24,
+        availablePlaces: 0,
+        full: true,
+        isPublic: true,
+      },
+    ]);
+
+    render(<GameListCard />);
+
+    expect(await screen.findByText("Forêt")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "S'inscrire à Forêt" }),
+    ).toHaveTextContent("S'inscrire malgré complet");
+    expect(
+      screen.getByRole("button", { name: "S'inscrire à Forêt" }),
+    ).toBeEnabled();
   });
 });

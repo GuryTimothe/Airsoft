@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Menu } from "lucide-react";
 
 export function Header({ onToggleSidebar }: { onToggleSidebar: () => void }) {
@@ -10,7 +11,14 @@ export function Header({ onToggleSidebar }: { onToggleSidebar: () => void }) {
       >
         <Menu className="h-5 w-5" />
       </button>
-      <span className="font-semibold text-lg">Muret Airsoft</span>
+      <Link href="/" className="font-semibold text-lg hover:underline">
+        Muret Airsoft
+      </Link>
+      <div className="ml-auto">
+        <Link href="/" className="text-sm font-medium hover:underline">
+          Voir le site
+        </Link>
+      </div>
     </header>
   );
 }
