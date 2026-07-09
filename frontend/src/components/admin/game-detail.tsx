@@ -29,6 +29,7 @@ import {
   updateGameRegistrationPresence,
   type GameRegistration,
 } from "@/lib/game-registration-api";
+import { getUsers, type User } from "@/lib/user-api";
 import { GameRegistrationsExportButton } from "@/components/admin/GameRegistrationsExportButton";
 import { CalendarDays, MapPin, PencilLine, Trash2, Users } from "lucide-react";
 
@@ -37,6 +38,21 @@ interface GameDetailProps {
 }
 
 type PresenceFilter = "all" | "present" | "absent";
+
+function computeAge(dateOfBirth: string, referenceDateIso: string): number {
+  const birthDate = new Date(dateOfBirth);
+  const now = new Date(referenceDateIso);
+
+  let age = now.getFullYear() - birthDate.getFullYear();
+  const monthDiff = now.getMonth() - birthDate.getMonth();
+  const dayDiff = now.getDate() - birthDate.getDate();
+
+  if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
+    age -= 1;
+  }
+
+  return age;
+}
 
 export function GameDetail({ gameId }: GameDetailProps) {
   const router = useRouter();
@@ -55,6 +71,7 @@ export function GameDetail({ gameId }: GameDetailProps) {
     null,
   );
   const [presenceFilter, setPresenceFilter] = useState<PresenceFilter>("all");
+  const [referenceDateIso] = useState<string>(() => new Date().toISOString());
 
   const fetchGameAndRegistrations = useCallback(async (): Promise<{
     game: Game;
@@ -62,9 +79,13 @@ export function GameDetail({ gameId }: GameDetailProps) {
   }> => {
     const gameData = await getGame(gameId);
     let registrationData: GameRegistration[] = [];
+    let usersData: User[] = [];
 
     try {
-      registrationData = await getGameRegistrationsByGameId(gameId);
+      [registrationData, usersData] = await Promise.all([
+        getGameRegistrationsByGameId(gameId),
+        getUsers(),
+      ]);
     } catch (registrationError) {
       setRegistrationsError(
         registrationError instanceof Error
@@ -72,10 +93,22 @@ export function GameDetail({ gameId }: GameDetailProps) {
           : "Impossible de charger la liste des inscrits.",
       );
       registrationData = [];
+      usersData = [];
     }
 
-    return { game: gameData, registrations: registrationData };
-  }, [gameId]);
+    const userAgeById = new Map<number, number>();
+    usersData.forEach((user) => {
+      userAgeById.set(user.id, computeAge(user.dateOfBirth, referenceDateIso));
+    });
+
+    const registrationsWithAge = registrationData.map((registration) => ({
+      ...registration,
+      userAge:
+        registration.userAge ?? userAgeById.get(registration.userId) ?? null,
+    }));
+
+    return { game: gameData, registrations: registrationsWithAge };
+  }, [gameId, referenceDateIso]);
 
   useEffect(() => {
     let active = true;
@@ -453,68 +486,85 @@ export function GameDetail({ gameId }: GameDetailProps) {
                     <th className="px-3 py-2 font-medium">Nom</th>
                     <th className="px-3 py-2 font-medium">Prenom</th>
                     <th className="px-3 py-2 font-medium">Adresse mail</th>
+                    <th className="px-3 py-2 font-medium">Age</th>
                     <th className="px-3 py-2 font-medium">Present</th>
                     <th className="px-3 py-2 font-medium">Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {visibleRegistrations.map((registration) => (
-                    <tr
-                      key={registration.id}
-                      className={
-                        registration.isPresent
-                          ? "border-b bg-emerald-50/60"
-                          : "border-b"
-                      }
-                    >
-                      <td className="px-3 py-2">
-                        {registration.userLastname || "-"}
-                      </td>
-                      <td className="px-3 py-2">
-                        {registration.userFirstname || "-"}
-                      </td>
-                      <td className="px-3 py-2">
-                        {registration.userEmail || "-"}
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="flex items-center gap-3">
-                          <Checkbox
-                            checked={registration.isPresent}
-                            disabled={updatingPresenceId === registration.id}
-                            onCheckedChange={(checked) => {
-                              if (typeof checked !== "boolean") {
-                                return;
-                              }
+                  {visibleRegistrations.map((registration) => {
+                    const age = registration.userAge;
+                    const isMinor = age !== null && age < 18;
 
-                              void handleTogglePresence(
-                                registration.id,
-                                checked,
-                              );
-                            }}
-                          />
-                          <Badge
-                            variant={
-                              registration.isPresent ? "default" : "outline"
+                    return (
+                      <tr
+                        key={registration.id}
+                        className={
+                          registration.isPresent
+                            ? "border-b bg-emerald-50/60"
+                            : "border-b"
+                        }
+                      >
+                        <td className="px-3 py-2">
+                          {registration.userLastname || "-"}
+                        </td>
+                        <td className="px-3 py-2">
+                          {registration.userFirstname || "-"}
+                        </td>
+                        <td className="px-3 py-2">
+                          {registration.userEmail || "-"}
+                        </td>
+                        <td className="px-3 py-2">
+                          {age === null ? (
+                            "-"
+                          ) : (
+                            <Badge variant={isMinor ? "destructive" : "ghost"}>
+                              {age} ans
+                            </Badge>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex items-center gap-3">
+                            <Checkbox
+                              checked={registration.isPresent}
+                              disabled={updatingPresenceId === registration.id}
+                              onCheckedChange={(checked) => {
+                                if (typeof checked !== "boolean") {
+                                  return;
+                                }
+
+                                void handleTogglePresence(
+                                  registration.id,
+                                  checked,
+                                );
+                              }}
+                            />
+                            <Badge
+                              variant={
+                                registration.isPresent ? "default" : "outline"
+                              }
+                            >
+                              {registration.isPresent ? "Present" : "Absent"}
+                            </Badge>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={
+                              cancelingRegistrationId === registration.id
                             }
+                            onClick={() => handleForceCancel(registration.id)}
                           >
-                            {registration.isPresent ? "Present" : "Absent"}
-                          </Badge>
-                        </div>
-                      </td>
-                      <td className="px-3 py-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={cancelingRegistrationId === registration.id}
-                          onClick={() => handleForceCancel(registration.id)}
-                        >
-                          {cancelingRegistrationId === registration.id
-                            ? "Annulation..."
-                            : "Retirer"}
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
+                            {cancelingRegistrationId === registration.id
+                              ? "Annulation..."
+                              : "Retirer"}
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

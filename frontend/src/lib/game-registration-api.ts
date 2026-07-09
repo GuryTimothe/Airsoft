@@ -17,6 +17,7 @@ export interface GameRegistration {
   userFirstname: string | null;
   userLastname: string | null;
   userEmail: string | null;
+  userAge: number | null;
   isPresent: boolean;
   createdAt: string;
 }
@@ -38,6 +39,15 @@ function toPositiveInt(value: unknown): number {
   const n = Number(value);
   if (!Number.isFinite(n) || n <= 0) {
     return 0;
+  }
+
+  return Math.trunc(n);
+}
+
+function toNonNegativeIntOrNull(value: unknown): number | null {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) {
+    return null;
   }
 
   return Math.trunc(n);
@@ -140,6 +150,10 @@ function normalizeGameRegistration(data: unknown): GameRegistration {
         : typeof userObject?.email === "string"
           ? userObject.email
           : null,
+    userAge:
+      toNonNegativeIntOrNull(d.userAge) ??
+      toNonNegativeIntOrNull(d.user_age) ??
+      toNonNegativeIntOrNull(userObject?.age),
     isPresent: toBoolean(
       d.isPresent ?? d.is_present ?? d.present ?? d.presence ?? false,
     ),
@@ -354,6 +368,7 @@ export async function updateGameRegistrationPresence(
       userFirstname: null,
       userLastname: null,
       userEmail: null,
+      userAge: null,
       isPresent,
       createdAt: "",
     };
@@ -369,6 +384,7 @@ export async function updateGameRegistrationPresence(
       userFirstname: null,
       userLastname: null,
       userEmail: null,
+      userAge: null,
       isPresent,
       createdAt: "",
     };

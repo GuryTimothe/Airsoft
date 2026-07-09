@@ -168,4 +168,18 @@ class GameRegistration
     {
         return $this->user?->getEmail();
     }
+
+    #[Groups(['game_registration:read'])]
+    public function getUserAge(): ?int
+    {
+        $dateOfBirth = $this->user?->getDateOfBirth();
+        if (!$dateOfBirth instanceof \DateTimeInterface) {
+            return null;
+        }
+
+        $today = new \DateTimeImmutable('today');
+        $birth = \DateTimeImmutable::createFromInterface($dateOfBirth);
+
+        return $birth->diff($today)->y;
+    }
 }
