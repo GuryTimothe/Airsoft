@@ -30,7 +30,10 @@ import {
   PencilLine,
 } from "lucide-react";
 import { getEmergencyContactByUserId } from "@/lib/emergency-contact-api";
-import { type EmergencyContactFields } from "@/lib/emergency-contact";
+import {
+  parseEmergencyContact,
+  type EmergencyContactFields,
+} from "@/lib/emergency-contact";
 
 interface UserDetailProps {
   userId: number;
@@ -79,25 +82,51 @@ export function UserDetail({ userId }: UserDetailProps) {
   useEffect(() => {
     let active = true;
 
-    Promise.all([getUser(userId), getEmergencyContactByUserId(userId)])
-      .then(([userData, emergencyData]) => {
-        if (active) {
-          setUser(userData);
-          setEmergencyContact(emergencyData);
+    const load = async () => {
+      try {
+        const userData = await getUser(userId);
+
+        if (!active) {
+          return;
         }
-      })
-      .catch((err) => {
+
+        setUser(userData);
+
+        const fallbackEmergency = parseEmergencyContact(
+          userData.emergencyContact,
+        );
+        const hasFallbackEmergency = Boolean(
+          fallbackEmergency.lastname ||
+          fallbackEmergency.firstname ||
+          fallbackEmergency.email ||
+          fallbackEmergency.phone,
+        );
+
+        setEmergencyContact(hasFallbackEmergency ? fallbackEmergency : null);
+
+        try {
+          const emergencyData = await getEmergencyContactByUserId(userId);
+
+          if (active && emergencyData) {
+            setEmergencyContact(emergencyData);
+          }
+        } catch {
+          // Keep profile usable even if emergency-contact filter endpoint fails.
+        }
+      } catch (err) {
         if (active) {
           setError(
             err instanceof Error ? err.message : "Une erreur est survenue",
           );
         }
-      })
-      .finally(() => {
+      } finally {
         if (active) {
           setLoading(false);
         }
-      });
+      }
+    };
+
+    load();
 
     return () => {
       active = false;

@@ -1,9 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Card,
   CardContent,
@@ -27,10 +29,29 @@ import {
   updateGameRegistrationPresence,
   type GameRegistration,
 } from "@/lib/game-registration-api";
+import { getUsers, type User } from "@/lib/user-api";
+import { GameRegistrationsExportButton } from "@/components/admin/GameRegistrationsExportButton";
 import { CalendarDays, MapPin, PencilLine, Trash2, Users } from "lucide-react";
 
 interface GameDetailProps {
   gameId: number;
+}
+
+type PresenceFilter = "all" | "present" | "absent";
+
+function computeAge(dateOfBirth: string, referenceDateIso: string): number {
+  const birthDate = new Date(dateOfBirth);
+  const now = new Date(referenceDateIso);
+
+  let age = now.getFullYear() - birthDate.getFullYear();
+  const monthDiff = now.getMonth() - birthDate.getMonth();
+  const dayDiff = now.getDate() - birthDate.getDate();
+
+  if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
+    age -= 1;
+  }
+
+  return age;
 }
 
 export function GameDetail({ gameId }: GameDetailProps) {
@@ -49,6 +70,8 @@ export function GameDetail({ gameId }: GameDetailProps) {
   const [updatingPresenceId, setUpdatingPresenceId] = useState<number | null>(
     null,
   );
+  const [presenceFilter, setPresenceFilter] = useState<PresenceFilter>("all");
+  const [referenceDateIso] = useState<string>(() => new Date().toISOString());
 
   const fetchGameAndRegistrations = useCallback(async (): Promise<{
     game: Game;
@@ -56,9 +79,13 @@ export function GameDetail({ gameId }: GameDetailProps) {
   }> => {
     const gameData = await getGame(gameId);
     let registrationData: GameRegistration[] = [];
+    let usersData: User[] = [];
 
     try {
-      registrationData = await getGameRegistrationsByGameId(gameId);
+      [registrationData, usersData] = await Promise.all([
+        getGameRegistrationsByGameId(gameId),
+        getUsers(),
+      ]);
     } catch (registrationError) {
       setRegistrationsError(
         registrationError instanceof Error
@@ -66,10 +93,22 @@ export function GameDetail({ gameId }: GameDetailProps) {
           : "Impossible de charger la liste des inscrits.",
       );
       registrationData = [];
+      usersData = [];
     }
 
-    return { game: gameData, registrations: registrationData };
-  }, [gameId]);
+    const userAgeById = new Map<number, number>();
+    usersData.forEach((user) => {
+      userAgeById.set(user.id, computeAge(user.dateOfBirth, referenceDateIso));
+    });
+
+    const registrationsWithAge = registrationData.map((registration) => ({
+      ...registration,
+      userAge:
+        registration.userAge ?? userAgeById.get(registration.userId) ?? null,
+    }));
+
+    return { game: gameData, registrations: registrationsWithAge };
+  }, [gameId, referenceDateIso]);
 
   useEffect(() => {
     let active = true;
@@ -127,19 +166,35 @@ export function GameDetail({ gameId }: GameDetailProps) {
     registrationId: number,
     isPresent: boolean,
   ): Promise<void> {
+    const previousRegistrations = registrations;
+
     setUpdatingPresenceId(registrationId);
+    setRegistrations((current) =>
+      current.map((registration) =>
+        registration.id === registrationId
+          ? { ...registration, isPresent }
+          : registration,
+      ),
+    );
 
     try {
       const updated = await updateGameRegistrationPresence(
         registrationId,
         isPresent,
       );
+
       setRegistrations((current) =>
         current.map((registration) =>
-          registration.id === registrationId ? updated : registration,
+          registration.id === registrationId
+            ? {
+                ...registration,
+                isPresent: updated.isPresent,
+              }
+            : registration,
         ),
       );
     } catch (err) {
+      setRegistrations(previousRegistrations);
       setError(
         err instanceof Error
           ? err.message
@@ -166,6 +221,55 @@ export function GameDetail({ gameId }: GameDetailProps) {
       setDeleting(false);
     }
   }
+
+  const registrationSummary = useMemo(() => {
+    const presentCount = registrations.filter(
+      (registration) => registration.isPresent,
+    ).length;
+    const absentCount = registrations.length - presentCount;
+
+    return {
+      presentCount,
+      absentCount,
+      totalCount: registrations.length,
+    };
+  }, [registrations]);
+
+  const visibleRegistrations = useMemo(() => {
+    const filtered = registrations.filter((registration) => {
+      if (presenceFilter === "present") {
+        return registration.isPresent;
+      }
+
+      if (presenceFilter === "absent") {
+        return !registration.isPresent;
+      }
+
+      return true;
+    });
+
+    return [...filtered].sort((left, right) => {
+      if (left.isPresent !== right.isPresent) {
+        return left.isPresent ? -1 : 1;
+      }
+
+      const leftLastname = left.userLastname ?? "";
+      const rightLastname = right.userLastname ?? "";
+      const lastNameComparison = leftLastname.localeCompare(
+        rightLastname,
+        "fr",
+      );
+
+      if (lastNameComparison !== 0) {
+        return lastNameComparison;
+      }
+
+      return (left.userFirstname ?? "").localeCompare(
+        right.userFirstname ?? "",
+        "fr",
+      );
+    });
+  }, [presenceFilter, registrations]);
 
   if (loading) {
     return (
@@ -198,6 +302,8 @@ export function GameDetail({ gameId }: GameDetailProps) {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <GameRegistrationsExportButton gameId={game.id} />
+
           <Button asChild variant="outline">
             <Link href={`/admin/games/${game.id}/edit`}>
               <PencilLine className="mr-2 h-4 w-4" />
@@ -310,9 +416,67 @@ export function GameDetail({ gameId }: GameDetailProps) {
             </div>
           ) : null}
 
+          <div className="mb-4 grid gap-3 md:grid-cols-3">
+            <div className="rounded-lg border bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+              <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">
+                Presents
+              </p>
+              <p className="mt-1 text-2xl font-semibold">
+                {registrationSummary.presentCount}
+              </p>
+            </div>
+            <div className="rounded-lg border bg-slate-50 px-4 py-3 text-sm text-slate-900">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-600">
+                Absents
+              </p>
+              <p className="mt-1 text-2xl font-semibold">
+                {registrationSummary.absentCount}
+              </p>
+            </div>
+            <div className="rounded-lg border bg-background px-4 py-3 text-sm">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Total inscrits
+              </p>
+              <p className="mt-1 text-2xl font-semibold">
+                {registrationSummary.totalCount}
+              </p>
+            </div>
+          </div>
+
+          <div className="mb-4 flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant={presenceFilter === "all" ? "default" : "outline"}
+              onClick={() => setPresenceFilter("all")}
+            >
+              Tous
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={presenceFilter === "present" ? "default" : "outline"}
+              onClick={() => setPresenceFilter("present")}
+            >
+              Presents uniquement
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={presenceFilter === "absent" ? "default" : "outline"}
+              onClick={() => setPresenceFilter("absent")}
+            >
+              Absents uniquement
+            </Button>
+          </div>
+
           {registrations.length === 0 ? (
             <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
               Aucun joueur n’est inscrit à cette partie.
+            </div>
+          ) : visibleRegistrations.length === 0 ? (
+            <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+              Aucun joueur ne correspond au filtre de presence.
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -322,49 +486,85 @@ export function GameDetail({ gameId }: GameDetailProps) {
                     <th className="px-3 py-2 font-medium">Nom</th>
                     <th className="px-3 py-2 font-medium">Prenom</th>
                     <th className="px-3 py-2 font-medium">Adresse mail</th>
+                    <th className="px-3 py-2 font-medium">Age</th>
                     <th className="px-3 py-2 font-medium">Present</th>
                     <th className="px-3 py-2 font-medium">Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {registrations.map((registration) => (
-                    <tr key={registration.id} className="border-b">
-                      <td className="px-3 py-2">
-                        {registration.userLastname || "-"}
-                      </td>
-                      <td className="px-3 py-2">
-                        {registration.userFirstname || "-"}
-                      </td>
-                      <td className="px-3 py-2">
-                        {registration.userEmail || "-"}
-                      </td>
-                      <td className="px-3 py-2">
-                        <input
-                          type="checkbox"
-                          checked={registration.isPresent}
-                          disabled={updatingPresenceId === registration.id}
-                          onChange={(event) =>
-                            handleTogglePresence(
-                              registration.id,
-                              event.target.checked,
-                            )
-                          }
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={cancelingRegistrationId === registration.id}
-                          onClick={() => handleForceCancel(registration.id)}
-                        >
-                          {cancelingRegistrationId === registration.id
-                            ? "Annulation..."
-                            : "Retirer"}
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
+                  {visibleRegistrations.map((registration) => {
+                    const age = registration.userAge;
+                    const isMinor = age !== null && age < 18;
+
+                    return (
+                      <tr
+                        key={registration.id}
+                        className={
+                          registration.isPresent
+                            ? "border-b bg-emerald-50/60"
+                            : "border-b"
+                        }
+                      >
+                        <td className="px-3 py-2">
+                          {registration.userLastname || "-"}
+                        </td>
+                        <td className="px-3 py-2">
+                          {registration.userFirstname || "-"}
+                        </td>
+                        <td className="px-3 py-2">
+                          {registration.userEmail || "-"}
+                        </td>
+                        <td className="px-3 py-2">
+                          {age === null ? (
+                            "-"
+                          ) : (
+                            <Badge variant={isMinor ? "destructive" : "ghost"}>
+                              {age} ans
+                            </Badge>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex items-center gap-3">
+                            <Checkbox
+                              checked={registration.isPresent}
+                              disabled={updatingPresenceId === registration.id}
+                              onCheckedChange={(checked) => {
+                                if (typeof checked !== "boolean") {
+                                  return;
+                                }
+
+                                void handleTogglePresence(
+                                  registration.id,
+                                  checked,
+                                );
+                              }}
+                            />
+                            <Badge
+                              variant={
+                                registration.isPresent ? "default" : "outline"
+                              }
+                            >
+                              {registration.isPresent ? "Present" : "Absent"}
+                            </Badge>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={
+                              cancelingRegistrationId === registration.id
+                            }
+                            onClick={() => handleForceCancel(registration.id)}
+                          >
+                            {cancelingRegistrationId === registration.id
+                              ? "Annulation..."
+                              : "Retirer"}
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

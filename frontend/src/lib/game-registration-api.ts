@@ -1,4 +1,8 @@
-import { getAuthHeaders } from "@/lib/auth";
+import {
+  getAuthHeaders,
+  getAuthToken,
+  getUserIdentifierCandidatesFromToken,
+} from "@/lib/auth";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -13,6 +17,7 @@ export interface GameRegistration {
   userFirstname: string | null;
   userLastname: string | null;
   userEmail: string | null;
+  userAge: number | null;
   isPresent: boolean;
   createdAt: string;
 }
@@ -34,6 +39,15 @@ function toPositiveInt(value: unknown): number {
   const n = Number(value);
   if (!Number.isFinite(n) || n <= 0) {
     return 0;
+  }
+
+  return Math.trunc(n);
+}
+
+function toNonNegativeIntOrNull(value: unknown): number | null {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) {
+    return null;
   }
 
   return Math.trunc(n);
@@ -71,6 +85,30 @@ function parseRelationId(value: unknown): number {
   }
 
   return 0;
+}
+
+function toBoolean(value: unknown): boolean {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "number") {
+    return value !== 0;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+
+    if (["true", "1", "yes", "on"].includes(normalized)) {
+      return true;
+    }
+
+    if (["false", "0", "no", "off", ""].includes(normalized)) {
+      return false;
+    }
+  }
+
+  return false;
 }
 
 function normalizeGameRegistration(data: unknown): GameRegistration {
@@ -112,7 +150,13 @@ function normalizeGameRegistration(data: unknown): GameRegistration {
         : typeof userObject?.email === "string"
           ? userObject.email
           : null,
-    isPresent: Boolean(d.isPresent ?? d.is_present ?? false),
+    userAge:
+      toNonNegativeIntOrNull(d.userAge) ??
+      toNonNegativeIntOrNull(d.user_age) ??
+      toNonNegativeIntOrNull(userObject?.age),
+    isPresent: toBoolean(
+      d.isPresent ?? d.is_present ?? d.present ?? d.presence ?? false,
+    ),
     createdAt: String(d.createdAt ?? ""),
   };
 }
@@ -161,6 +205,42 @@ async function fetchAllRegistrations(
   return extractItems(payload).map((item) => normalizeGameRegistration(item));
 }
 
+function getCurrentUserCandidates(): Set<string> {
+  const token = getAuthToken();
+  const values = getUserIdentifierCandidatesFromToken(token).map((value) =>
+    value.toLowerCase(),
+  );
+
+  return new Set(values);
+}
+
+function belongsToCurrentUser(
+  registration: GameRegistration,
+  currentUserCandidates: Set<string>,
+): boolean {
+  if (currentUserCandidates.size === 0) {
+    return false;
+  }
+
+  const email = registration.userEmail?.toLowerCase();
+  const userId = String(registration.userId);
+
+  return (
+    currentUserCandidates.has(userId) ||
+    Boolean(email && currentUserCandidates.has(email))
+  );
+}
+
+function filterToCurrentUser(
+  registrations: GameRegistration[],
+): GameRegistration[] {
+  const currentUserCandidates = getCurrentUserCandidates();
+
+  return registrations.filter((registration) =>
+    belongsToCurrentUser(registration, currentUserCandidates),
+  );
+}
+
 export async function getMyGameRegistrations(): Promise<GameRegistration[]> {
   const headers = await getAuthHeaders();
   const response = await fetch(buildUrl("/api/game_registrations/mine"), {
@@ -170,11 +250,17 @@ export async function getMyGameRegistrations(): Promise<GameRegistration[]> {
 
   if (response.ok) {
     const payload = await response.json();
-    return extractItems(payload).map((item) => normalizeGameRegistration(item));
+    const items = extractItems(payload).map((item) =>
+      normalizeGameRegistration(item),
+    );
+
+    return filterToCurrentUser(items);
   }
 
   // Fallback for environments where the custom /mine operation is unavailable.
-  return fetchAllRegistrations(headers);
+  const all = await fetchAllRegistrations(headers);
+
+  return filterToCurrentUser(all);
 }
 
 export async function getGameRegistrationsByGameId(
@@ -259,11 +345,11 @@ export async function updateGameRegistrationPresence(
     "Content-Type": "application/merge-patch+json",
   });
   const response = await fetch(
-    buildUrl(`/api/game_registrations/${registrationId}`),
+    buildUrl(`/api/game_registrations/${registrationId}/presence`),
     {
       method: "PATCH",
       headers,
-      body: JSON.stringify({ isPresent }),
+      body: JSON.stringify({ present: isPresent, isPresent }),
     },
   );
 
@@ -272,5 +358,35 @@ export async function updateGameRegistrationPresence(
     throw new Error(text || "Impossible de mettre a jour la presence.");
   }
 
-  return normalizeGameRegistration(await response.json());
+  const rawBody = await response.text();
+
+  if (rawBody.trim() === "") {
+    return {
+      id: registrationId,
+      gameId: 0,
+      userId: 0,
+      userFirstname: null,
+      userLastname: null,
+      userEmail: null,
+      userAge: null,
+      isPresent,
+      createdAt: "",
+    };
+  }
+
+  try {
+    return normalizeGameRegistration(JSON.parse(rawBody));
+  } catch {
+    return {
+      id: registrationId,
+      gameId: 0,
+      userId: 0,
+      userFirstname: null,
+      userLastname: null,
+      userEmail: null,
+      userAge: null,
+      isPresent,
+      createdAt: "",
+    };
+  }
 }

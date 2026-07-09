@@ -50,7 +50,7 @@ class GameVisibilityExtension implements QueryCollectionExtensionInterface, Quer
             return;
         }
 
-        if ($user instanceof User && $user->canSeePrivate()) {
+        if ($user instanceof User && $user->getCanSeePrivate()) {
             return;
         }
 

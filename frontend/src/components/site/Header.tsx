@@ -2,21 +2,65 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-interface HeaderProps {
-  initialIsAuthenticated: boolean;
-  initialHasAdminAccess: boolean;
-}
+import {
+  AUTH_STATE_CHANGE_EVENT,
+  clearAuthToken,
+  getAuthToken,
+  hasAdminAccessToken,
+} from "@/lib/auth";
 
 export function Header({
   initialIsAuthenticated,
   initialHasAdminAccess,
 }: HeaderProps) {
+  const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const isAuthenticated = initialIsAuthenticated;
-  const hasAdminAccess = initialHasAdminAccess;
+  const [isAuthenticated, setIsAuthenticated] = useState(
+    initialIsAuthenticated,
+  );
+  const [hasAdminAccess, setHasAdminAccess] = useState(initialHasAdminAccess);
+
+  function handleLogout() {
+    clearAuthToken();
+    setMobileMenuOpen(false);
+    router.push("/");
+    router.refresh();
+  }
+
+  useEffect(() => {
+    const syncAuthState = () => {
+      const isLoggedIn = Boolean(getAuthToken());
+
+      setIsAuthenticated(isLoggedIn);
+      setHasAdminAccess(isLoggedIn && hasAdminAccessToken());
+    };
+
+    syncAuthState();
+    window.addEventListener("storage", syncAuthState);
+    window.addEventListener("focus", syncAuthState);
+    window.addEventListener(AUTH_STATE_CHANGE_EVENT, syncAuthState);
+
+    return () => {
+      window.removeEventListener("storage", syncAuthState);
+      window.removeEventListener("focus", syncAuthState);
+      window.removeEventListener(AUTH_STATE_CHANGE_EVENT, syncAuthState);
+    };
+  }, []);
+
+  const authHref = !isAuthenticated
+    ? "/auth/login"
+    : hasAdminAccess
+      ? "/admin"
+      : "/profil";
+  const authLabel = !isAuthenticated
+    ? "Connexion"
+    : hasAdminAccess
+      ? "Panel admin"
+      : "Profil";
 
   return (
     <header className="sticky top-0 z-50 bg-primary text-primary-foreground">
@@ -59,21 +103,20 @@ export function Header({
         </div>
 
         <div className="hidden items-center gap-3 md:flex">
-          {hasAdminAccess ? (
-            <Link href="/admin">
-              <Button variant="secondary" className="text-lg font-medium">
-                Panel admin
-              </Button>
-            </Link>
+          <Link href={authHref}>
+            <Button variant="ghost" className="text-lg font-medium">
+              {authLabel}
+            </Button>
+          </Link>
+          {isAuthenticated ? (
+            <Button
+              variant="ghost"
+              className="text-lg font-medium"
+              onClick={handleLogout}
+            >
+              Se deconnecter
+            </Button>
           ) : null}
-
-          {isAuthenticated ? null : (
-            <Link href="/auth/login">
-              <Button variant="ghost" className="text-lg font-medium">
-                Connexion
-              </Button>
-            </Link>
-          )}
         </div>
 
         <button
@@ -114,21 +157,20 @@ export function Header({
             </Link>
 
             <div className="flex gap-2 pt-2">
-              {hasAdminAccess ? (
-                <Link href="/admin" className="flex-1">
-                  <Button variant="secondary" className="w-full text-sm">
-                    Panel admin
-                  </Button>
-                </Link>
+              <Link href={authHref} className="flex-1">
+                <Button variant="default" className="w-full text-sm">
+                  {authLabel}
+                </Button>
+              </Link>
+              {isAuthenticated ? (
+                <Button
+                  variant="default"
+                  className="flex-1 text-sm"
+                  onClick={handleLogout}
+                >
+                  Se deconnecter
+                </Button>
               ) : null}
-
-              {isAuthenticated ? null : (
-                <Link href="/auth/login" className="flex-1">
-                  <Button variant="default" className="w-full text-sm">
-                    Connexion
-                  </Button>
-                </Link>
-              )}
             </div>
           </div>
         </div>

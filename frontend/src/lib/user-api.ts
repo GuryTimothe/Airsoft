@@ -40,6 +40,29 @@ export interface UpdateUserPayload {
   adminNotes?: string | null;
 }
 
+export interface UpdateMyProfilePayload {
+  lastname?: string;
+  firstname?: string;
+  dateOfBirth?: string;
+  pseudo?: string | null;
+  phone?: string | null;
+}
+
+export interface UpdateMyEmailPayload {
+  email: string;
+  currentPassword: string;
+}
+
+export interface UpdateMyPasswordPayload {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export interface SelfUserUpdateResult {
+  user: User;
+  token: string;
+}
+
 export interface CreateUserPayload {
   lastname: string;
   firstname: string;
@@ -60,9 +83,36 @@ function buildUrl(path: string): string {
   return `${API_BASE_URL}${path}`;
 }
 
+function toBoolean(value: unknown): boolean {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "number") {
+    return value !== 0;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+
+    if (normalized === "true" || normalized === "1") {
+      return true;
+    }
+
+    if (normalized === "false" || normalized === "0" || normalized === "") {
+      return false;
+    }
+  }
+
+  return Boolean(value);
+}
+
 function normalizeUser(data: unknown): User {
   const d = data as Record<string, unknown>;
   const get = (key: string) => d[key];
+  const role = (get("role") as UserRole) ?? "ROLE_USER";
+  const canSeePrivateRaw =
+    get("canSeePrivate") ?? get("can_see_private") ?? get("CanSeePrivate");
   const rawEmergencyContact =
     (get("emergencyContact") as EmergencyContactFields | string | null) ??
     (get("emergency_contact") as EmergencyContactFields | string | null) ??
@@ -103,7 +153,7 @@ function normalizeUser(data: unknown): User {
     emergencyContact,
     role: (get("role") as UserRole) ?? "ROLE_USER",
     adminNotes: (get("adminNotes") as string) ?? null,
-    canSeePrivate: Boolean(get("canSeePrivate") ?? false),
+    canSeePrivate: toBoolean(canSeePrivateRaw ?? false),
     createdAt:
       (get("createdAt") as string) ??
       (get("created_at") as string) ??
@@ -112,6 +162,56 @@ function normalizeUser(data: unknown): User {
       (get("updatedAt") as string) ??
       (get("updated_at") as string) ??
       undefined,
+  };
+}
+
+async function parseApiErrorMessage(response: Response): Promise<string> {
+  let data: unknown = null;
+
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+
+  if (typeof data === "object" && data !== null) {
+    const detail = (data as { detail?: unknown }).detail;
+    if (typeof detail === "string" && detail.trim()) {
+      return detail;
+    }
+
+    const message = (data as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) {
+      return message;
+    }
+
+    const violations = (data as { violations?: unknown }).violations;
+    if (Array.isArray(violations) && violations.length > 0) {
+      const firstViolation = violations[0] as {
+        message?: unknown;
+      };
+
+      if (
+        typeof firstViolation.message === "string" &&
+        firstViolation.message.trim()
+      ) {
+        return firstViolation.message;
+      }
+    }
+  }
+
+  return "Une erreur est survenue.";
+}
+
+function normalizeSelfUserUpdateResult(data: unknown): SelfUserUpdateResult {
+  const result = data as {
+    user?: unknown;
+    token?: unknown;
+  };
+
+  return {
+    user: normalizeUser(result.user),
+    token: String(result.token ?? ""),
   };
 }
 
@@ -163,6 +263,63 @@ export async function updateUser(
   return normalizeUser(await response.json());
 }
 
+export async function updateMyProfile(
+  payload: UpdateMyProfilePayload,
+): Promise<User> {
+  const headers = await getAuthHeaders({
+    "Content-Type": "application/merge-patch+json",
+  });
+  const response = await fetch(buildUrl("/api/me"), {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseApiErrorMessage(response));
+  }
+
+  return normalizeUser(await response.json());
+}
+
+export async function updateMyEmail(
+  payload: UpdateMyEmailPayload,
+): Promise<SelfUserUpdateResult> {
+  const headers = await getAuthHeaders({
+    "Content-Type": "application/merge-patch+json",
+  });
+  const response = await fetch(buildUrl("/api/me/email"), {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseApiErrorMessage(response));
+  }
+
+  return normalizeSelfUserUpdateResult(await response.json());
+}
+
+export async function updateMyPassword(
+  payload: UpdateMyPasswordPayload,
+): Promise<SelfUserUpdateResult> {
+  const headers = await getAuthHeaders({
+    "Content-Type": "application/merge-patch+json",
+  });
+  const response = await fetch(buildUrl("/api/me/password"), {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseApiErrorMessage(response));
+  }
+
+  return normalizeSelfUserUpdateResult(await response.json());
+}
+
 export async function getUser(id: number): Promise<User> {
   const headers = await getAuthHeaders();
   const response = await fetch(buildUrl(`/api/users/${id}`), {
@@ -172,6 +329,20 @@ export async function getUser(id: number): Promise<User> {
 
   if (!response.ok) {
     throw new Error("Impossible de charger l'utilisateur");
+  }
+
+  return normalizeUser(await response.json());
+}
+
+export async function getCurrentUser(): Promise<User> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(buildUrl("/api/me"), {
+    cache: "no-store",
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error("Impossible de charger l'utilisateur courant");
   }
 
   return normalizeUser(await response.json());

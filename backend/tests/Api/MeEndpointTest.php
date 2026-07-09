@@ -11,6 +11,40 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 final class MeEndpointTest extends WebTestCase
 {
+    public function testGetMeDoesNotExposeCanSeePrivate(): void
+    {
+        $client = static::createClient();
+
+        $container = static::getContainer();
+        $entityManager = $container->get(EntityManagerInterface::class);
+        $passwordHasher = $container->get(UserPasswordHasherInterface::class);
+
+        try {
+            $entityManager->getConnection()->connect();
+        } catch (\Throwable $exception) {
+            self::markTestSkipped('Database is not available for API integration test: '.$exception->getMessage());
+        }
+
+        $email = sprintf('me-read-%s@example.com', uniqid('', true));
+        $plainPassword = 'ReadMe123!';
+
+        $this->createUser($entityManager, $passwordHasher, $email, $plainPassword);
+        $token = $this->loginAndGetToken($client, $email, $plainPassword);
+
+        $client->request('GET', '/api/me', server: [
+            'HTTP_AUTHORIZATION' => 'Bearer '.$token,
+        ]);
+
+        self::assertResponseStatusCodeSame(200);
+
+        $payload = json_decode($client->getResponse()->getContent(), true);
+        self::assertIsArray($payload);
+        self::assertArrayNotHasKey('canSeePrivate', $payload);
+        self::assertArrayNotHasKey('can_see_private', $payload);
+        self::assertSame('ROLE_USER', $payload['role']);
+        self::assertSame($email, $payload['email']);
+    }
+
     public function testDeleteMeRemovesAccountAndPreventsFutureLogin(): void
     {
         $client = static::createClient();

@@ -57,7 +57,7 @@ class GameRegistrationCreateProcessor implements ProcessorInterface
             throw new NotFoundHttpException('Partie introuvable.');
         }
 
-        if (!$game->isPublic() && !$this->security->isGranted('ROLE_ADMIN') && !$user->canSeePrivate()) {
+        if (!$game->isPublic() && !$this->security->isGranted('ROLE_ADMIN') && !$user->getCanSeePrivate()) {
             throw new AccessDeniedHttpException('Vous ne pouvez pas vous inscrire à cette partie privée.');
         }
 
@@ -80,6 +80,7 @@ class GameRegistrationCreateProcessor implements ProcessorInterface
         $registration = new GameRegistration();
         $registration->setGame($game);
         $registration->setUser($user);
+        $registration->setIsPresent(false);
 
         try {
             $this->entityManager->persist($registration);

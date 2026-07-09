@@ -74,4 +74,35 @@ describe("UserDetail", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText("Contact d'urgence")).not.toBeInTheDocument();
   });
+
+  it("keeps page usable and falls back to user emergency contact when lookup fails", async () => {
+    (getUser as jest.Mock).mockResolvedValue({
+      id: 7,
+      firstname: "Lina",
+      lastname: "Durand",
+      email: "lina@example.com",
+      dateOfBirth: "2008-09-02",
+      role: "ROLE_USER",
+      canSeePrivate: false,
+      pseudo: null,
+      phone: null,
+      emergencyContact: {
+        lastname: "Durand",
+        firstname: "Marc",
+        email: "marc@example.com",
+        phone: "0600000000",
+      },
+    });
+    (getEmergencyContactByUserId as jest.Mock).mockRejectedValue(
+      new Error("lookup failed"),
+    );
+
+    render(<UserDetail userId={7} />);
+
+    expect(
+      await screen.findByText("Informations principales"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Contact d'urgence")).toBeInTheDocument();
+    expect(screen.getByText("marc@example.com")).toBeInTheDocument();
+  });
 });

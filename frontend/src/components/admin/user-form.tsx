@@ -20,12 +20,12 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Trash2 } from "lucide-react";
 import {
   createUser,
   deleteUser,
+  getCurrentUser,
   getUser,
   updateUser,
   type CreateUserPayload,
@@ -81,6 +81,26 @@ const emptyValues: UserFormValues = {
   canSeePrivate: false,
 };
 
+const assignableRolesByAdmin: UserRole[] = ["ROLE_USER", "ROLE_ORGANIZER"];
+const assignableRolesBySuperAdmin: UserRole[] = [
+  "ROLE_USER",
+  "ROLE_ADMIN",
+  "ROLE_ORGANIZER",
+  "ROLE_SUPER_ADMIN",
+];
+
+function isElevatedRole(role: UserRole): boolean {
+  return role === "ROLE_ADMIN" || role === "ROLE_SUPER_ADMIN";
+}
+
+function isPrivateAccessForcedRole(role: UserRole): boolean {
+  return (
+    role === "ROLE_ORGANIZER" ||
+    role === "ROLE_ADMIN" ||
+    role === "ROLE_SUPER_ADMIN"
+  );
+}
+
 function toFormValues(user?: User): UserFormValues {
   if (!user) {
     return emptyValues;
@@ -126,9 +146,11 @@ export function UserForm({ userId }: UserFormProps) {
   const router = useRouter();
   const [values, setValues] = useState<UserFormValues>(emptyValues);
   const [loading, setLoading] = useState(Boolean(userId));
+  const [actorRole, setActorRole] = useState<UserRole | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const isMinor = useMemo(() => {
     if (!values.dateOfBirth) {
@@ -158,35 +180,78 @@ export function UserForm({ userId }: UserFormProps) {
   );
 
   useEffect(() => {
-    if (!userId) {
-      return;
-    }
-
     let active = true;
-    Promise.all([getUser(userId), getEmergencyContactByUserId(userId)])
-      .then(([user, emergency]) => {
+
+    getCurrentUser()
+      .then((user) => {
         if (active) {
-          const baseValues = toFormValues(user);
-          setValues(applyEmergencyContactToValues(baseValues, emergency));
+          setActorRole(user.role);
         }
       })
-      .catch((err) => {
+      .catch(() => {
         if (active) {
-          setError(
-            err instanceof Error ? err.message : "Une erreur est survenue",
-          );
-        }
-      })
-      .finally(() => {
-        if (active) {
-          setLoading(false);
+          setActorRole(null);
         }
       });
 
     return () => {
       active = false;
     };
+  }, []);
+
+  useEffect(() => {
+    if (!userId) {
+      return;
+    }
+
+    let active = true;
+
+    const load = async () => {
+      try {
+        const user = await getUser(userId);
+
+        if (!active) {
+          return;
+        }
+
+        // Pre-fill form from user payload so edit remains usable even if
+        // emergency-contact lookup fails.
+        setValues(toFormValues(user));
+
+        try {
+          const emergency = await getEmergencyContactByUserId(userId);
+
+          if (active && emergency) {
+            setValues((prev) => applyEmergencyContactToValues(prev, emergency));
+          }
+        } catch {
+          // Keep fallback values already parsed from user payload.
+        }
+      } catch (err) {
+        if (active) {
+          setError(
+            err instanceof Error ? err.message : "Une erreur est survenue",
+          );
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    load();
+
+    return () => {
+      active = false;
+    };
   }, [userId]);
+
+  const isAdminActor = actorRole === "ROLE_ADMIN";
+  const roleOptions = isAdminActor
+    ? assignableRolesByAdmin
+    : assignableRolesBySuperAdmin;
+  const isPrivateAccessLocked = isPrivateAccessForcedRole(values.role);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -225,7 +290,7 @@ export function UserForm({ userId }: UserFormProps) {
           phone: values.phone || null,
           emergencyContact,
           role: values.role,
-          canSeePrivate: values.canSeePrivate,
+          canSeePrivate: isPrivateAccessLocked ? true : values.canSeePrivate,
         };
 
         if (values.password.trim()) {
@@ -235,6 +300,11 @@ export function UserForm({ userId }: UserFormProps) {
         const updated = await updateUser(userId, payload);
         router.push(`/admin/users/${updated.id}`);
       } else {
+        if (isAdminActor && isElevatedRole(values.role)) {
+          setError("Un admin ne peut pas creer un admin ou super admin.");
+          return;
+        }
+
         const payload: CreateUserPayload = {
           lastname: values.lastname,
           firstname: values.firstname,
@@ -245,7 +315,7 @@ export function UserForm({ userId }: UserFormProps) {
           phone: values.phone || null,
           emergencyContact,
           role: values.role,
-          canSeePrivate: values.canSeePrivate,
+          canSeePrivate: isPrivateAccessLocked ? true : values.canSeePrivate,
         };
 
         const created = await createUser(payload);
@@ -270,6 +340,7 @@ export function UserForm({ userId }: UserFormProps) {
 
     try {
       await deleteUser(userId);
+      setDeleteDialogOpen(false);
       router.push("/admin/users");
       router.refresh();
     } catch (err) {
@@ -349,23 +420,23 @@ export function UserForm({ userId }: UserFormProps) {
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">
-                  {userId
-                    ? "Mot de passe (laisser vide pour conserver)"
-                    : "Mot de passe"}
-                  {!userId ? <RequiredMark /> : null}
-                </Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={values.password}
-                  onChange={(event) =>
-                    setValues({ ...values, password: event.target.value })
-                  }
-                  required={!userId}
-                />
-              </div>
+              {!userId ? (
+                <div className="space-y-2">
+                  <Label htmlFor="password">
+                    Mot de passe
+                    <RequiredMark />
+                  </Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={values.password}
+                    onChange={(event) =>
+                      setValues({ ...values, password: event.target.value })
+                    }
+                    required
+                  />
+                </div>
+              ) : null}
             </div>
 
             <div className="grid gap-4 md:grid-cols-3">
@@ -503,17 +574,31 @@ export function UserForm({ userId }: UserFormProps) {
                   id="role"
                   value={values.role}
                   onChange={(event) =>
-                    setValues({
-                      ...values,
-                      role: event.target.value as UserRole,
+                    setValues((prev) => {
+                      const nextRole = event.target.value as UserRole;
+
+                      return {
+                        ...prev,
+                        role: nextRole,
+                        canSeePrivate: isPrivateAccessForcedRole(nextRole)
+                          ? true
+                          : prev.canSeePrivate,
+                      };
                     })
                   }
                   className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
                 >
-                  <option value="ROLE_USER">Utilisateur</option>
-                  <option value="ROLE_ADMIN">Admin</option>
-                  <option value="ROLE_ORGANIZER">Organisateur</option>
-                  <option value="ROLE_SUPER_ADMIN">Super Admin</option>
+                  {roleOptions.map((role) => (
+                    <option key={role} value={role}>
+                      {role === "ROLE_USER"
+                        ? "Utilisateur"
+                        : role === "ROLE_ADMIN"
+                          ? "Admin"
+                          : role === "ROLE_ORGANIZER"
+                            ? "Organisateur"
+                            : "Super Admin"}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -523,15 +608,24 @@ export function UserForm({ userId }: UserFormProps) {
                   <input
                     id="canSeePrivate"
                     type="checkbox"
-                    checked={values.canSeePrivate}
+                    checked={
+                      isPrivateAccessLocked ? true : values.canSeePrivate
+                    }
                     onChange={(event) =>
                       setValues({
                         ...values,
                         canSeePrivate: event.target.checked,
                       })
                     }
+                    disabled={isPrivateAccessLocked}
                   />
                 </div>
+                {isPrivateAccessLocked ? (
+                  <p className="text-xs text-muted-foreground">
+                    Pour ce role, l'acces aux parties privees est toujours
+                    autorise.
+                  </p>
+                ) : null}
               </div>
             </div>
 
@@ -553,13 +647,18 @@ export function UserForm({ userId }: UserFormProps) {
               </Button>
 
               {userId ? (
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button type="button" variant="destructive">
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Supprimer
-                    </Button>
-                  </DialogTrigger>
+                <Dialog
+                  open={deleteDialogOpen}
+                  onOpenChange={setDeleteDialogOpen}
+                >
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={() => setDeleteDialogOpen(true)}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Supprimer
+                  </Button>
                   <DialogContent>
                     <DialogHeader>
                       <DialogTitle>Confirmer la suppression</DialogTitle>
@@ -569,7 +668,15 @@ export function UserForm({ userId }: UserFormProps) {
                     </DialogHeader>
                     <DialogFooter>
                       <DialogClose asChild>
-                        <Button type="button" variant="outline">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            setDeleteDialogOpen(false);
+                          }}
+                        >
                           Annuler
                         </Button>
                       </DialogClose>

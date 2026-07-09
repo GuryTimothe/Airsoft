@@ -2,6 +2,7 @@ import type { LoginInput } from "@/lib/schemas/auth";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 export const AUTH_TOKEN_KEY = "ma_access_token";
+export const AUTH_STATE_CHANGE_EVENT = "auth-state-changed";
 
 function buildUrl(path: string): string {
   return `${API_BASE_URL}${path}`;
@@ -65,6 +66,7 @@ export function setAuthToken(token: string): void {
 
   window.localStorage.setItem(AUTH_TOKEN_KEY, token);
   document.cookie = `${AUTH_TOKEN_KEY}=${encodeURIComponent(token)}; path=/; max-age=604800; samesite=lax`;
+  window.dispatchEvent(new Event(AUTH_STATE_CHANGE_EVENT));
 }
 
 export function clearAuthToken(): void {
@@ -74,6 +76,7 @@ export function clearAuthToken(): void {
 
   window.localStorage.removeItem(AUTH_TOKEN_KEY);
   document.cookie = `${AUTH_TOKEN_KEY}=; path=/; max-age=0; samesite=lax`;
+  window.dispatchEvent(new Event(AUTH_STATE_CHANGE_EVENT));
 }
 
 export function isAuthenticated(): boolean {

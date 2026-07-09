@@ -43,7 +43,7 @@ final class UserTest extends TestCase
         $this->assertSame('0601020304', $user->getPhone());
         $this->assertSame('ROLE_ADMIN', $user->getRole());
         $this->assertSame('Profil prioritaire', $user->getAdminNotes());
-        $this->assertTrue($user->canSeePrivate());
+        $this->assertTrue($user->getCanSeePrivate());
     }
 
     public function testUserDefaultsAndLifecycleCallbacksWork(): void
@@ -51,7 +51,7 @@ final class UserTest extends TestCase
         $user = new User();
 
         $this->assertSame('ROLE_USER', $user->getRole());
-        $this->assertFalse($user->canSeePrivate());
+        $this->assertFalse($user->getCanSeePrivate());
         $this->assertInstanceOf(\DateTimeImmutable::class, $user->getCreatedAt());
         $this->assertInstanceOf(\DateTimeImmutable::class, $user->getUpdatedAt());
 

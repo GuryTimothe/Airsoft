@@ -258,6 +258,55 @@ final class GameRegistrationApiTest extends WebTestCase
         self::assertSame($playerOne->getId(), $payload['hydra:member'][0]['userId'] ?? null);
     }
 
+    public function testAdminCanToggleRegistrationPresenceTrueAndFalse(): void
+    {
+        $client = static::createClient();
+        $container = static::getContainer();
+
+        $entityManager = $container->get(EntityManagerInterface::class);
+        $passwordHasher = $container->get(UserPasswordHasherInterface::class);
+
+        try {
+            $entityManager->getConnection()->connect();
+        } catch (\Throwable $exception) {
+            self::markTestSkipped('Database is not available for API integration test: '.$exception->getMessage());
+        }
+
+        $game = $this->createGame($entityManager, 'Game presence toggle', 10);
+        [$admin, $adminPassword] = $this->createUser($entityManager, $passwordHasher, 'ROLE_ADMIN');
+        [$player] = $this->createUser($entityManager, $passwordHasher, 'ROLE_USER');
+
+        $registration = new GameRegistration();
+        $registration->setGame($game);
+        $registration->setUser($player);
+        $entityManager->persist($registration);
+        $entityManager->flush();
+
+        self::assertFalse($registration->isPresent());
+
+        $adminToken = $this->loginAndGetToken($client, $admin->getEmail(), $adminPassword);
+
+        $client->request('PATCH', '/api/game_registrations/'.$registration->getId(), server: [
+            'HTTP_AUTHORIZATION' => 'Bearer '.$adminToken,
+            'CONTENT_TYPE' => 'application/merge-patch+json',
+        ], content: json_encode(['isPresent' => true], JSON_THROW_ON_ERROR));
+
+        self::assertResponseStatusCodeSame(200);
+
+        $entityManager->refresh($registration);
+        self::assertTrue($registration->isPresent());
+
+        $client->request('PATCH', '/api/game_registrations/'.$registration->getId(), server: [
+            'HTTP_AUTHORIZATION' => 'Bearer '.$adminToken,
+            'CONTENT_TYPE' => 'application/merge-patch+json',
+        ], content: json_encode(['present' => false], JSON_THROW_ON_ERROR));
+
+        self::assertResponseStatusCodeSame(200);
+
+        $entityManager->refresh($registration);
+        self::assertFalse($registration->isPresent());
+    }
+
     private function createGame(EntityManagerInterface $entityManager, string $title, int $maxPlaces): Game
     {
         $game = new Game();
