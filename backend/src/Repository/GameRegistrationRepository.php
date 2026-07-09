@@ -26,4 +26,23 @@ class GameRegistrationRepository extends ServiceEntityRepository
             ->getQuery()
             ->getSingleScalarResult();
     }
+
+    /**
+     * @return list<GameRegistration>
+     */
+    public function findForGameExport(Game $game): array
+    {
+        /** @var list<GameRegistration> $registrations */
+        $registrations = $this->createQueryBuilder('registration')
+            ->addSelect('user')
+            ->leftJoin('registration.user', 'user')
+            ->andWhere('registration.game = :game')
+            ->setParameter('game', $game)
+            ->orderBy('user.lastname', 'ASC')
+            ->addOrderBy('user.firstname', 'ASC')
+            ->getQuery()
+            ->getResult();
+
+        return $registrations;
+    }
 }

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import UserTable from "@/components/admin/UserTable";
+import { UsersExportControls } from "@/components/admin/UsersExportControls";
 import { getUsers, type User } from "@/lib/user-api";
 
 export default async function UsersPage() {
@@ -41,6 +42,8 @@ export default async function UsersPage() {
           {errorMessage}
         </div>
       ) : null}
+
+      <UsersExportControls />
 
       <UserTable initialUsers={users} referenceDateIso={referenceDateIso} />
     </main>

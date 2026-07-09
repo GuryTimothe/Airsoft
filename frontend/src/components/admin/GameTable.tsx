@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { GameRegistrationsExportButton } from "@/components/admin/GameRegistrationsExportButton";
 import {
   Card,
   CardContent,
@@ -204,12 +205,16 @@ export default function GameTable({ initialGames }: GameTableProps) {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button asChild size="sm" variant="outline">
-                      <Link href={`/admin/games/${game.id}`}>
-                        <Eye className="mr-2 h-4 w-4" />
-                        Voir
-                      </Link>
-                    </Button>
+                    <div className="flex justify-end gap-2">
+                      <GameRegistrationsExportButton gameId={game.id} />
+
+                      <Button asChild size="sm" variant="outline">
+                        <Link href={`/admin/games/${game.id}`}>
+                          <Eye className="mr-2 h-4 w-4" />
+                          Voir
+                        </Link>
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
