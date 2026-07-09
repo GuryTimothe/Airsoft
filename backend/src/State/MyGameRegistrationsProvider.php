@@ -11,7 +11,7 @@ use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
 /**
- * @implements ProviderInterface<iterable<GameRegistration>>
+ * @implements ProviderInterface<GameRegistration>
  */
 class MyGameRegistrationsProvider implements ProviderInterface
 {
