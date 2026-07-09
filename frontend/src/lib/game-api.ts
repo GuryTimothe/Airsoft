@@ -8,6 +8,9 @@ export interface Game {
   address: string;
   price: number;
   maxPlaces: number;
+  registrationCount: number;
+  availablePlaces: number;
+  full: boolean;
   isPublic: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -52,6 +55,13 @@ function normalizeGame(data: unknown): Game {
     address: String(get("address") ?? ""),
     price: Number(get("price") ?? 0),
     maxPlaces: Number(get("maxPlaces") ?? get("max_places") ?? 0),
+    registrationCount: Number(
+      get("registrationCount") ?? get("registration_count") ?? 0,
+    ),
+    availablePlaces: Number(
+      get("availablePlaces") ?? get("available_places") ?? 0,
+    ),
+    full: Boolean(get("full") ?? false),
     isPublic: Boolean(get("isPublic") ?? get("public") ?? false),
     createdAt:
       (get("createdAt") as string) ??

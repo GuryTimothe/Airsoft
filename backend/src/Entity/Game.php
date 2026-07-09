@@ -9,6 +9,8 @@ use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Post;
 use ApiPlatform\Metadata\Put;
 use App\Repository\GameRepository;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -20,9 +22,9 @@ use Symfony\Component\Validator\Constraints as Assert;
     operations: [
         new Get(),
         new GetCollection(),
-        new Post(),
-        new Put(),
-        new Delete(),
+        new Post(security: "is_granted('ROLE_ADMIN')"),
+        new Put(security: "is_granted('ROLE_ADMIN')"),
+        new Delete(security: "is_granted('ROLE_ADMIN')"),
     ]
 )]
 class Game
@@ -60,6 +62,10 @@ class Game
     #[ORM\Column(type: 'boolean')]
     private bool $isPublic = true;
 
+    /** @var Collection<int, GameRegistration> */
+    #[ORM\OneToMany(mappedBy: 'game', targetEntity: GameRegistration::class, orphanRemoval: true)]
+    private Collection $registrations;
+
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
 
@@ -68,8 +74,9 @@ class Game
 
     public function __construct()
     {
-        $this->createdAt = new \DateTimeImmutable();
-        $this->updatedAt = new \DateTimeImmutable();
+        $this->createdAt     = new \DateTimeImmutable();
+        $this->updatedAt     = new \DateTimeImmutable();
+        $this->registrations = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -171,6 +178,21 @@ class Game
         $this->isPublic = $isPublic;
 
         return $this;
+    }
+
+    public function getRegistrationCount(): int
+    {
+        return $this->registrations->count();
+    }
+
+    public function getAvailablePlaces(): int
+    {
+        return max(0, $this->maxPlaces - $this->getRegistrationCount());
+    }
+
+    public function isFull(): bool
+    {
+        return $this->getRegistrationCount() >= $this->maxPlaces;
     }
 
     public function getCreatedAt(): \DateTimeImmutable

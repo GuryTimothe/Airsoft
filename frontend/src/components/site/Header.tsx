@@ -1,18 +1,26 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Menu, X } from "lucide-react";
-import { useState } from "react";
-import Link from "next/link";
 import Image from "next/image";
+import Link from "next/link";
+import { useState } from "react";
+import { Menu, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+interface HeaderProps {
+  initialIsAuthenticated: boolean;
+  initialHasAdminAccess: boolean;
+}
 
-export function Header() {
+export function Header({
+  initialIsAuthenticated,
+  initialHasAdminAccess,
+}: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const isAuthenticated = initialIsAuthenticated;
+  const hasAdminAccess = initialHasAdminAccess;
 
   return (
     <header className="sticky top-0 z-50 bg-primary text-primary-foreground">
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-        {/* Logo */}
         <div className="flex items-center gap-2">
           <Image
             src="/images/logo.png"
@@ -26,11 +34,11 @@ export function Header() {
             Muret Airsoft
           </Link>
         </div>
-        {/* Desktop menu */}
+
         <div className="hidden items-center gap-8 md:flex">
           <Link
             href="#"
-            className="text-lg font-medium  transition-colors hover:text-foreground"
+            className="text-lg font-medium transition-colors hover:text-foreground"
           >
             Parties
           </Link>
@@ -44,25 +52,33 @@ export function Header() {
 
           <Link
             href="#"
-            className="text-lg font-medium  transition-colors hover:text-foreground"
+            className="text-lg font-medium transition-colors hover:text-foreground"
           >
             Contact
           </Link>
         </div>
 
-        {/* Auth buttons */}
         <div className="hidden items-center gap-3 md:flex">
-          <Link href="/auth/login">
-            <Button variant="ghost" className="text-lg font-medium">
-              Connexion
-            </Button>
-          </Link>
+          {hasAdminAccess ? (
+            <Link href="/admin">
+              <Button variant="secondary" className="text-lg font-medium">
+                Panel admin
+              </Button>
+            </Link>
+          ) : null}
+
+          {isAuthenticated ? null : (
+            <Link href="/auth/login">
+              <Button variant="ghost" className="text-lg font-medium">
+                Connexion
+              </Button>
+            </Link>
+          )}
         </div>
 
-        {/* Mobile menu button */}
         <button
           className="md:hidden"
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          onClick={() => setMobileMenuOpen((open) => !open)}
           aria-label="Toggle menu"
         >
           {mobileMenuOpen ? (
@@ -73,8 +89,7 @@ export function Header() {
         </button>
       </nav>
 
-      {/* Mobile menu */}
-      {mobileMenuOpen && (
+      {mobileMenuOpen ? (
         <div className="border-t border-border bg-background md:hidden">
           <div className="space-y-4 px-6 py-4">
             <Link
@@ -99,15 +114,25 @@ export function Header() {
             </Link>
 
             <div className="flex gap-2 pt-2">
-              <Link href="/auth/login" className="flex-1">
-                <Button variant="default" className="w-full text-sm">
-                  Connexion
-                </Button>
-              </Link>
+              {hasAdminAccess ? (
+                <Link href="/admin" className="flex-1">
+                  <Button variant="secondary" className="w-full text-sm">
+                    Panel admin
+                  </Button>
+                </Link>
+              ) : null}
+
+              {isAuthenticated ? null : (
+                <Link href="/auth/login" className="flex-1">
+                  <Button variant="default" className="w-full text-sm">
+                    Connexion
+                  </Button>
+                </Link>
+              )}
             </div>
           </div>
         </div>
-      )}
+      ) : null}
     </header>
   );
 }

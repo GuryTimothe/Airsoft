@@ -18,12 +18,44 @@ type RegisterPayload = {
   phone?: string;
 };
 
+function getBrowserCookieValue(name: string): string | null {
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  const prefix = `${name}=`;
+  const match = document.cookie
+    .split(";")
+    .map((value) => value.trim())
+    .find((value) => value.startsWith(prefix));
+
+  if (!match) {
+    return null;
+  }
+
+  try {
+    return decodeURIComponent(match.slice(prefix.length));
+  } catch {
+    return match.slice(prefix.length);
+  }
+}
+
 export function getAuthToken(): string | null {
   if (typeof window === "undefined") {
     return null;
   }
 
-  return window.localStorage.getItem(AUTH_TOKEN_KEY);
+  const localStorageToken = window.localStorage.getItem(AUTH_TOKEN_KEY);
+  if (localStorageToken) {
+    return localStorageToken;
+  }
+
+  const cookieToken = getBrowserCookieValue(AUTH_TOKEN_KEY);
+  if (cookieToken) {
+    window.localStorage.setItem(AUTH_TOKEN_KEY, cookieToken);
+  }
+
+  return cookieToken;
 }
 
 export function setAuthToken(token: string): void {
@@ -46,6 +78,93 @@ export function clearAuthToken(): void {
 
 export function isAuthenticated(): boolean {
   return null !== getAuthToken();
+}
+
+type JwtPayload = {
+  roles?: unknown;
+  role?: unknown;
+};
+
+function parseJwtPayload(token: string | null): JwtPayload | null {
+  if (!token) {
+    return null;
+  }
+
+  const [, payload] = token.split(".");
+  if (!payload) {
+    return null;
+  }
+
+  try {
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const decoded =
+      typeof window === "undefined"
+        ? Buffer.from(normalized, "base64").toString("utf-8")
+        : atob(normalized);
+    const parsed = JSON.parse(decoded) as JwtPayload;
+
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function getRolesFromToken(token: string | null): string[] {
+  const payload = parseJwtPayload(token);
+  if (!payload) {
+    return [];
+  }
+
+  return Array.isArray(payload.roles)
+    ? payload.roles.filter((role): role is string => typeof role === "string")
+    : typeof payload.role === "string"
+      ? [payload.role]
+      : [];
+}
+
+export function getUserIdentifierFromToken(
+  token: string | null,
+): string | null {
+  const candidates = getUserIdentifierCandidatesFromToken(token);
+
+  return candidates[0] ?? null;
+}
+
+export function getUserIdentifierCandidatesFromToken(
+  token: string | null,
+): string[] {
+  const payload = parseJwtPayload(token) as
+    | (JwtPayload & {
+        email?: unknown;
+        username?: unknown;
+        user_identifier?: unknown;
+        sub?: unknown;
+      })
+    | null;
+
+  if (!payload) {
+    return [];
+  }
+
+  const candidates = [
+    payload.email,
+    payload.username,
+    payload.user_identifier,
+    payload.sub,
+  ];
+
+  return candidates
+    .filter((candidate): candidate is string => typeof candidate === "string")
+    .map((candidate) => candidate.trim())
+    .filter((candidate) => candidate !== "");
+}
+
+export function hasAdminAccessToken(): boolean {
+  const roles = getRolesFromToken(getAuthToken());
+
+  return roles.some((role) =>
+    ["ROLE_ADMIN", "ROLE_SUPER_ADMIN", "ROLE_ORGANIZER"].includes(role),
+  );
 }
 
 async function getServerAuthToken(): Promise<string | null> {

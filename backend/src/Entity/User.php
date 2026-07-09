@@ -11,6 +11,8 @@ use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use ApiPlatform\Metadata\Put;
 use App\Repository\UserRepository;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
@@ -74,6 +76,10 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['user:read', 'user:write'])]
     private ?EmergencyContact $emergencyContact = null;
 
+    /** @var Collection<int, GameRegistration> */
+    #[ORM\OneToMany(mappedBy: 'user', targetEntity: GameRegistration::class, orphanRemoval: true)]
+    private Collection $gameRegistrations;
+
     #[ORM\Column(length: 100, nullable: true)]
     #[Groups(['user:read', 'user:write'])]
     private ?string $pseudo = null;
@@ -110,8 +116,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function __construct()
     {
-        $this->createdAt = new \DateTimeImmutable();
-        $this->updatedAt = new \DateTimeImmutable();
+        $this->createdAt         = new \DateTimeImmutable();
+        $this->updatedAt         = new \DateTimeImmutable();
+        $this->gameRegistrations = new ArrayCollection();
     }
 
     public function getId(): ?int
