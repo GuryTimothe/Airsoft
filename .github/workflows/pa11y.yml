@@ -1,0 +1,100 @@
+name: Accessibility Audit (Pa11y CI)
+
+on:
+  push:
+    branches: [ dev, main ]
+  pull_request:
+    branches: [ dev, main ]
+
+jobs:
+  accessibility:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm run build
+
+      - name: Start application
+        run: |
+          cd frontend
+          npm start > /tmp/server.log 2>&1 &
+          sleep 5
+          # Wait for server to be ready
+          for i in {1..30}; do
+            if curl -s http://localhost:3000 > /dev/null; then
+              echo "Server is ready"
+              break
+            fi
+            echo "Waiting for server... ($i/30)"
+            sleep 1
+          done
+
+      - name: Run Pa11y CI accessibility audit
+        run: |
+          cd frontend
+          npm run test:pa11y:ci
+
+      - name: Upload Pa11y report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: pa11y-report
+          path: frontend/pa11y-report.json
+          retention-days: 30
+
+      - name: Comment PR with accessibility results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const report = JSON.parse(fs.readFileSync('frontend/pa11y-report.json', 'utf8'));
+            const totalIssues = report.reduce((sum, page) => sum + page.issues.length, 0);
+            
+            let comment = `## ♿ Accessibility Audit (Pa11y)\n\n`;
+            comment += `**Total Issues**: ${totalIssues}\n\n`;
+            
+            report.forEach(page => {
+              if (page.issues.length > 0) {
+                comment += `### ${page.pageUrl}\n`;
+                comment += `- **Issues**: ${page.issues.length}\n`;
+                page.issues.slice(0, 5).forEach(issue => {
+                  comment += `  - ${issue.type}: ${issue.message}\n`;
+                });
+                if (page.issues.length > 5) {
+                  comment += `  - ... and ${page.issues.length - 5} more\n`;
+                }
+              }
+            });
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+      - name: Fail if critical issues found
+        run: |
+          cd frontend
+          if npm run test:pa11y:ci 2>&1 | grep -q "CRITICAL\|ERROR"; then
+            echo "❌ Critical accessibility issues found"
+            exit 1
+          fi
+          echo "✅ Accessibility audit passed"

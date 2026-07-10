@@ -1,0 +1,22 @@
+{
+  "runners": ["axe", "htmlcs"],
+  "standard": "WCAG2AA",
+  "chromeLaunchConfig": {
+    "args": ["--no-sandbox"]
+  },
+  "urls": [
+    "http://localhost:3000/",
+    "http://localhost:3000/register",
+    "http://localhost:3000/login",
+    "http://localhost:3000/dashboard",
+    "http://localhost:3000/settings",
+    "http://localhost:3000/admin"
+  ],
+  "timeout": 10000,
+  "wait": 2000,
+  "threshold": 3,
+  "axisBrowserVersion": "latest",
+  "log": {
+    "level": "info"
+  }
+}
