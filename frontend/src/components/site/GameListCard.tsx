@@ -6,7 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, MapPin, Euro, Lock, Users } from "lucide-react";
 import Link from "next/link";
-import { getAuthToken, hasAdminAccessToken } from "@/lib/auth";
+import {
+  AUTH_STATE_CHANGE_EVENT,
+  getAuthToken,
+  hasAdminAccessToken,
+} from "@/lib/auth";
 import { getGames, type Game } from "@/lib/game-api";
 import {
   cancelGameRegistration,
@@ -195,17 +199,52 @@ export function GameListCard() {
     };
   }, [fetchData]);
 
+  useEffect(() => {
+    async function handleAuthStateChange(): Promise<void> {
+      const hasToken = getAuthToken() !== null;
+
+      setIsAuthenticated(hasToken);
+      setCanBypassFullCapacity(hasAdminAccessToken());
+
+      if (!hasToken) {
+        setMyRegistrations([]);
+        return;
+      }
+
+      try {
+        const registrations = await getMyGameRegistrations();
+        setMyRegistrations(registrations);
+      } catch {
+        setMyRegistrations([]);
+      }
+    }
+
+    window.addEventListener(AUTH_STATE_CHANGE_EVENT, handleAuthStateChange);
+
+    return () => {
+      window.removeEventListener(
+        AUTH_STATE_CHANGE_EVENT,
+        handleAuthStateChange,
+      );
+    };
+  }, []);
+
   async function handleRegister(gameId: number): Promise<void> {
     setSubmittingId(gameId);
     setError(null);
 
     try {
-      await registerToGame(gameId);
-      const data = await fetchData();
-      setIsAuthenticated(data.hasToken);
-      setCanBypassFullCapacity(data.hasAdminAccess);
-      setGames(data.games);
-      setMyRegistrations(data.registrations);
+      const registration = await registerToGame(gameId);
+      const refreshedGames = await getGames();
+
+      setGames(refreshedGames);
+      setMyRegistrations((current) => {
+        const withoutSameGame = current.filter(
+          (item) => item.gameId !== gameId,
+        );
+
+        return [...withoutSameGame, registration];
+      });
     } catch (err) {
       setError(
         err instanceof Error
@@ -223,11 +262,12 @@ export function GameListCard() {
 
     try {
       await cancelGameRegistration(registrationId);
-      const data = await fetchData();
-      setIsAuthenticated(data.hasToken);
-      setCanBypassFullCapacity(data.hasAdminAccess);
-      setGames(data.games);
-      setMyRegistrations(data.registrations);
+      const refreshedGames = await getGames();
+
+      setGames(refreshedGames);
+      setMyRegistrations((current) =>
+        current.filter((item) => item.id !== registrationId),
+      );
     } catch (err) {
       setError(
         err instanceof Error

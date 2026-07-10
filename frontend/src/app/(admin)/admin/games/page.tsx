@@ -1,16 +1,19 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { getGames, type Game } from "@/lib/game-api";
+import { getGamesPage, type CollectionView, type Game } from "@/lib/game-api";
 import { Plus } from "lucide-react";
 import GameTable from "@/components/admin/GameTable";
 import { GamesExportControls } from "@/components/admin/GamesExportControls";
 
 export default async function GamesPage() {
   let games: Game[] = [];
+  let view: CollectionView | undefined;
   let errorMessage: string | null = null;
 
   try {
-    games = await getGames();
+    const result = await getGamesPage();
+    games = result.games;
+    view = result.view;
   } catch {
     errorMessage = "Impossible de charger les parties.";
   }
@@ -42,7 +45,7 @@ export default async function GamesPage() {
 
       <GamesExportControls />
 
-      <GameTable initialGames={games} />
+      <GameTable initialGames={games} initialView={view} />
     </main>
   );
 }
