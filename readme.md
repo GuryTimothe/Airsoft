@@ -8,7 +8,6 @@
 
 ## 📚 Documentation
 
-**Choisissez votre parcours** :
 
 ### 🧑‍💻 Développeur
 
@@ -44,12 +43,6 @@
 | Document | Contenu |
 |----------|---------|
 | [docs/DEPLOYMENT_PROTOCOL.md](./docs/DEPLOYMENT_PROTOCOL.md) | **CI/CD complet** (GitHub Actions, release automation, rollback) |
-
-### 📋 Rapports
-
-| Document | Contenu |
-|----------|---------|
-| [docs/MISSING_FEATURES_REPORT.md](./docs/MISSING_FEATURES_REPORT.md) | **Gaps vs critères** (effort estimation) |
 
 ---
 
@@ -114,22 +107,15 @@ PostgreSQL 16 (Database)
 | **Langage Backend** | PHP 8.4 | Dernière version stable à date, meilleures performances et sécurité comparé aux versions antérieures |
 | **Authentication** | JWT (Lexik) + RBAC | Approche scalable et stateless, idéale pour une API REST distribuée |
 
-### Alternatives envisagées
-
-- Laravel (PHP) : Plus léger que Symfony mais moins robuste pour un projet complexe
-- Vue.js : Moins moderne que React/Next.js, écosystème plus restreint
-- MySQL : Fonctionnerait mais PostgreSQL offre plus de performance et stabilité
-- Django (Python) : Alternative valide mais complexité pour l'équipe PHP
-
 ---
 
 ## 🐛 Gestion des Bogues
 
 ### Signaler un Bug
 
-1. Vérifier qu'il n'existe pas déjà (rechercher GitHub Issues)
-2. Créer une [nouvelle issue](https://github.com/ton-org/Airsoft/issues/new?template=bug_report.md)
-3. Remplir le template avec :
+1. Vérifier qu'il n'existe pas déjà (rechercher sur notion)
+2. Créer un nouveau ticket sur notion
+3. Remplir le ticket avec :
    - Description claire du problème
    - Étapes pour reproduire
    - Résultat attendu vs réel
@@ -142,7 +128,7 @@ PostgreSQL 16 (Database)
 | **🔴 Critical** | Perte de données, accès non autorisé, API down | 24h | 3 jours |
 | **🟠 Major** | Fonctionnalité ne fonctionne pas, bug sécurité | 3 jours | 1 semaine |
 | **🟡 Minor** | UI glitch, message d'erreur manquant | 1 semaine | 2 semaines |
-| **🟢 Trivial** | Typo, amélioration cosmétique | Ad-hoc | Ad-hoc |
+| **🟢 Improvement** | Typo, amélioration cosmétique | Ad-hoc | Ad-hoc |
 
 ### Workflow
 
@@ -189,13 +175,7 @@ PostgreSQL 16 (Database)
 | **PHPStan** | Level 5 | 0 errors |
 | **ESLint** | ✓ 0 errors | Frontend linting |
 
----
 
-## 🔗 Liens Utiles
-
-- **GitHub Repository** : https://github.com/ton-org/Airsoft
-- **Issues & Bugs** : Utilisez [GitHub Issues](https://github.com/ton-org/Airsoft/issues)
-- **Releases** : [GitHub Releases](https://github.com/ton-org/Airsoft/releases)
 
 ---
 
@@ -225,5 +205,3 @@ chore: update dependencies
 ```
 
 ---
-
-**Last updated** : 2026-07-10

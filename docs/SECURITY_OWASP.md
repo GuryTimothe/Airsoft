@@ -1,7 +1,5 @@
 # OWASP Top 10 (2021) - Couverture Sécurité Implémentée
 
-**Version**: 1.0.0  
-**Date**: 2026-07-10  
 **Référence**: https://owasp.org/Top10/
 
 ---

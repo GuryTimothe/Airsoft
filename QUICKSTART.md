@@ -1,9 +1,19 @@
 # Quick Start Guide - Pour Commencer Rapidement
 
-**Version**: 1.0.0  
-**Last updated**: 2026-07-10
-
 Cette page vous guide rapidement à travers les étapes essentielles pour démarrer avec Airsoft.
+
+---
+
+## ✅ Prérequis
+
+| Outil | Version minimale | Installation |
+|-------|-----------------|-------------|
+| **PHP** | 8.4+ | https://www.php.net/downloads |
+| **Composer** | 2.5+ | https://getcomposer.org |
+| **PostgreSQL** | 13+ | https://www.postgresql.org/download/ |
+| **Node.js** | 18+ | https://nodejs.org |
+| **Symfony CLI** | Latest | https://symfony.com/download |
+| **Git** | 2.30+ | https://git-scm.com |
 
 ---
 
@@ -19,8 +29,19 @@ composer install
 
 # 2. Configurer la BD
 cp .env .env.local
-# Adapter DATABASE_URL si nécessaire
+```
 
+Ouvrir `.env.local` et adapter la ligne `DATABASE_URL` :
+
+```
+# Format PostgreSQL
+DATABASE_URL="postgresql://UTILISATEUR:MOT_DE_PASSE@127.0.0.1:5432/airsoft?serverVersion=16&charset=utf8"
+
+# Exemple
+DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:5432/airsoft?serverVersion=16&charset=utf8"
+```
+
+```bash
 # 3. Créer/migrer la BD
 php bin/console doctrine:database:create
 php bin/console doctrine:migrations:migrate
@@ -65,7 +86,6 @@ npm run dev
 | **Sécurité OWASP** | [docs/SECURITY_OWASP.md](./docs/SECURITY_OWASP.md) | 15 min |
 | **Cas de test (84 tests)** | [docs/TEST_RECIPES.md](./docs/TEST_RECIPES.md) | 20 min |
 | **Accessibilité & Performance** | [docs/ACCESSIBILITY_PERFORMANCE.md](./docs/ACCESSIBILITY_PERFORMANCE.md) | 10 min |
-| **Qu'est-ce qui manque?** | [docs/MISSING_FEATURES_REPORT.md](./docs/MISSING_FEATURES_REPORT.md) | 30 min |
 
 ---
 
@@ -125,29 +145,6 @@ Roles:
 
 *Note: Créer des comptes de test via formulaire d'inscription.*
 
----
-
-## 📊 Status du Projet
-
-```
-✓ API REST fonctionnelle
-✓ Frontend Next.js
-✓ Tests unitaires (52-70%)
-✓ CI/CD GitHub Actions
-✓ Gestion utilisateurs (RBAC)
-✓ Inscriptions aux parties
-✓ Exports CSV
-
-❌ Déploiement production
-❌ Manuals utilisateur
-❌ Audit sécurité complet
-❌ Tests E2E
-❌ Load testing
-```
-
-**Voir [docs/MISSING_FEATURES_REPORT.md](./docs/MISSING_FEATURES_REPORT.md) pour la liste complète.**
-
----
 
 ## 🛠️ Commandes Utiles
 
@@ -308,17 +305,3 @@ php bin/console doctrine:migrations:migrate --env=test
 
 **Q: Puis-je déployer sur Heroku/AWS?**
 Voir [docs/DEPLOYMENT_PROTOCOL.md](./docs/DEPLOYMENT_PROTOCOL.md) section "À Implémenter".
-
----
-
-## 📞 Support
-
-- **Bug report**: GitHub Issues
-- **Feature request**: GitHub Discussions  
-- **Documentation**: Vérifier les fichiers `/docs`
-- **Questions**: Slack/Discord du projet
-
----
-
-**Last updated**: 2026-07-10  
-**Maintainers**: Development Team

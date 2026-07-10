@@ -1,7 +1,5 @@
 # Protocoles de Déploiement Continu et Intégration Continue
-
-**Version**: 1.0.0  
-**Date**: 2026-07-10  
+  
 **Environnements**: Development (dev), Staging, Production (main)
 
 ---

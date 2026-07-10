@@ -1,7 +1,5 @@
 # Cahier de Recettes - Cas de Test Exécutables
 
-**Version**: 1.0.0  
-**Date**: 2026-07-10  
 **Couverture**: Tests fonctionnels, structurels et de sécurité  
 **Objectif**: Document de référence pour exécution manuelle ou automatisée
 

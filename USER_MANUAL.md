@@ -2,7 +2,6 @@
 
 > Guide d'utilisation pour les utilisateurs finaux (joueurs, organisateurs, administrateurs)
 
-**Version** : 1.0.0 | **Date** : 2026-07-10
 
 ---
 
@@ -20,7 +19,7 @@
 2. Remplir le formulaire :
    - **Prénom** : obligatoire
    - **Nom** : obligatoire
-   - **Email** : adresse valide (reçoit confirmation)
+   - **Email** : adresse valide
    - **Date de naissance** : obligatoire (pour calcul majorité)
    - **Mot de passe** : min 8 caractères, 1 majuscule, 1 chiffre
    - **Pseudonyme** : optionnel (nom affiché en partie)
@@ -71,28 +70,25 @@
 
 1. Cliquer sur la partie → **"S'inscrire"**
 2. Confirmer (vérifie si places dispo)
-3. ✅ Inscription validée → Reçoit email de confirmation
-4. Accès ticket : **"Mes inscriptions"** → Affiche QR code
+3. ✅ Inscription validée
 
 ### 3. Annuler son inscription
 
 1. **"Mes inscriptions"** → Sélectionner partie
 2. Cliquer **"Annuler l'inscription"**
-3. ✅ Annulée → Email de confirmation envoyé
+3. ✅ Inscription supprimée
 
 ### 4. Mes inscriptions
 
 - **"Mes inscriptions"** → Liste de toutes mes parties
-- Affiche statut : À venir, En cours, Terminée, Annulée
-- Télécharger ticket (PDF/image)
 
 ---
 
-## 👨‍💼 Organisateur - Gérer une Partie
+## 👨‍💼 Organisateur / Admin - Gérer une Partie
 
 ### 1. Créer une partie
 
-1. Menu **"Mon Espace"** → **"Créer une partie"**
+1. Aller dans la section **"Parties"** → **"Créer une partie"**
 2. Remplir formulaire :
    - **Titre** : nom de la partie
    - **Description** : contexte/règles
@@ -107,28 +103,25 @@
 
 ### 2. Voir les inscriptions
 
-1. **"Mon Espace"** → Ma partie → **"Inscriptions"**
+1. Sélectionner une partie → **"Inscriptions"**
 2. Liste complète des joueurs inscrits
-3. Affiche : nom, email, téléphone, date inscription
+3. Affiche : nom, email, date inscription
 
 ### 3. Marquer la présence
 
-1. **"Inscriptions"** → **"Marquer présence"**
-2. Scanner QR code du joueur OU chercher nom
-3. ✅ Présence enregistrée
-4. Voir résumé : X présents / Y inscrits
+1. **"Inscriptions"** → Cocher la case présence du joueur
+2. ✅ Présence enregistrée
 
 ### 4. Modifier une partie
 
-1. **"Mon Espace"** → Ma partie → **"Éditer"**
+1. Sélectionner une partie → **"Éditer"**
 2. Modifier infos (titre, date, prix, etc.)
 3. Cliquer **"Sauvegarder"**
 
-### 5. Annuler une partie
+### 5. Supprimer une partie
 
-1. **"Mon Espace"** → Ma partie → **"Options"** → **"Annuler"**
-2. Tous les joueurs reçoivent notification
-3. Remboursement automatique si payé
+1. Sélectionner une partie → **"Supprimer"**
+2. Confirmer la suppression
 
 ---
 
@@ -146,7 +139,7 @@
 **Créer utilisateur** :
 1. **"+ Créer"** → Remplir données
 2. Assigner rôle : USER, ORGANIZER
-3. ✅ Créé (lien activation envoyé par email)
+3. ✅ Utilisateur créé
 
 **Éditer utilisateur** :
 1. Cliquer sur user
@@ -175,12 +168,11 @@
 
 ### 4. Configuration App
 
-**"Paramètres"** → Configurer defaults app
+**"Paramètres"** → Configurer les valeurs par défaut
 
-- Adresse siège
-- Prix défaut nouvelle partie
-- Capacité défaut nouvelle partie
-- Horaires d'ouverture
+- Adresse par défaut
+- Prix par défaut nouvelle partie
+- Capacité par défaut nouvelle partie
 
 ### 5. Export Données
 
@@ -196,25 +188,9 @@ Format : CSV (Excel compatible)
 
 ## ❓ FAQ & Dépannage
 
-### Je me suis trompé d'email lors de l'inscription
-
-**Solution** : Aller **"Paramètres"** → **"Email"** → Changer email (vérifie password)
-
-### Je ne reçois pas d'email de confirmation
-
-1. Vérifier dossier **spam/courrier indésirable**
-2. Vérifier email saisi lors inscription
-3. Reclique **"Renvoyer email"** dans Paramètres
-
-### J'ai oublié mon mot de passe
-
-1. Page login → **"Mot de passe oublié?"**
-2. Entrer email → Reçoit lien réinitialisation
-3. Clique lien → Crée nouveau password
-
 ### J'ai pas assez de places pour ma partie
 
-**Solution** : **"Mon Espace"** → Ma partie → **"Éditer"** → Augmenter "Places max"
+**Solution** : Aller sur la partie → **"Éditer"** → Augmenter "Places max"
 
 ### Comment exporter la liste des joueurs?
 
@@ -229,15 +205,3 @@ Attendre annulation d'une inscription ou augmenter capacité
 ### Comment marquer absence après une partie?
 
 **Organisateur** : **"Inscriptions"** → Ne rien faire (absence = non marqué présent)
-
----
-
-## 📱 Aide & Support
-
-- **Email** : support@airsoft.example.com
-- **Horaires** : Lun-Ven 9h-17h
-- **Temps réponse** : < 24h
-
----
-
-**Dernière mise à jour** : 2026-07-10
