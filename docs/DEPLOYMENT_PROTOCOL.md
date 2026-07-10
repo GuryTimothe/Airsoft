@@ -44,12 +44,12 @@ Developer Push → GitHub Events → Workflows
 | 3 | **PHP-CS-Fixer Check** | `composer fix:check` | Code style | 0 errors |
 | 4 | **PHPStan Analyse** | `php ./vendor/bin/phpstan` | Analyse statique Level 5 | 0 errors |
 | 5 | **PHPUnit Tests** | `php bin/console test` | Tests unitaires | 133 tests ✓, 312 assertions |
-| 6 | **Coverage Report** | `--coverage-text` | Code coverage | ≥ 52.86% (actuellement) |
+| 6 | **Coverage Report** | `--coverage-text` | Code coverage | Actuel 52.86% (cible 70%) |
 
 **Seuils Minimums** :
 - PHPStan: 0 errors (level 5 = strict)
 - PHPUnit: 0 failures
-- Code Coverage: ≥ 50% recommandé (actuellement 52.86%)
+- Code Coverage: Actuel 52.86% — cible 70% (amélioration planifiée)
 
 **Configuration** :
 - PHP version: `8.4`

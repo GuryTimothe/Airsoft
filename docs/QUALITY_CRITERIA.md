@@ -6,11 +6,12 @@
 
 **Cible** : > 70% couverture code
 
-| Composant | Outil | Cible | Commande | Vérification |
-|-----------|-------|-------|----------|-------------|
-| **Backend PHP** | PHPUnit | > 70% | `php bin/console test` | À chaque commit |
-| **Frontend TS/React** | Jest | > 70% | `npm test` | À chaque commit |
-| **Coverage Report** | Tout | > 70% global | CI/CD logs | À chaque merge |
+| Composant | Outil | Cible | Actuel | Statut |
+|-----------|-------|-------|--------|--------|
+| **Backend PHP** | PHPUnit | > 70% | 52.86% | ⚠️ En dessous cible |
+| **Frontend TS/React** | Jest | > 70% | 70.62% | ✅ Atteint |
+
+> ⚠️ **Note** : La couverture backend (52.86%) est inférieure à la cible (70%). Amélioration planifiée.
 
 **Exécution locale** :
 

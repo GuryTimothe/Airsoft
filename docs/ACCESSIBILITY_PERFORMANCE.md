@@ -160,12 +160,14 @@ npm run build && npm start & && npm run test:pa11y && npm run test:a11y
 
 ## Lighthouse Metrics Target
 
-| Metric | Target | Current | Status |
-|--------|--------|---------|--------|
-| **Performance** | > 80 | ⏳ Measured | Tracking |
-| **Accessibility (WCAG AA)** | > 90 | 90+ | ✅ Met |
-| **Best Practices** | > 85 | ⏳ Measured | Tracking |
-| **SEO** | > 80 | ⏳ Measured | Tracking |
+| Metric | Target | Status | Notes |
+|--------|--------|--------|-------|
+| **Performance** | > 80 | ✅ Enforced CI/CD | Threshold configuré dans `lighthouse.config.js` |
+| **Accessibility (WCAG AA)** | > 90 | ✅ Enforced CI/CD | Threshold configuré + Pa11y WCAG2AA |
+| **Best Practices** | > 85 | ✅ Enforced CI/CD | Threshold configuré dans `lighthouse.config.js` |
+| **SEO** | > 80 | ✅ Enforced CI/CD | Threshold configuré dans `lighthouse.config.js` |
+
+> Scores exacts mesurés en production à chaque déploiement via `.github/workflows/lighthouse.yml`.
 
 ---
 
