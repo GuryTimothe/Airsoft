@@ -135,4 +135,38 @@ final class UserUpdateProcessorTest extends TestCase
 
         $this->assertSame($data, $processor->process($data, new Patch(), context: ['previous_data' => $previous]));
     }
+
+    public function testThrowsWhenNoPreviousData(): void
+    {
+        $data = (new User())->setRole('ROLE_USER');
+        $actor = (new User())->setRole('ROLE_ADMIN');
+
+        $persistProcessor = $this->createMock(ProcessorInterface::class);
+        $persistProcessor->expects($this->never())->method('process');
+
+        $security = $this->createMock(Security::class);
+        $security->method('getUser')->willReturn($actor);
+
+        $processor = new UserUpdateProcessor($persistProcessor, $security);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $processor->process($data, new Patch(), context: []);
+    }
+
+    public function testThrowsWhenNoAuthenticatedUser(): void
+    {
+        $previous = (new User())->setRole('ROLE_USER')->setPassword('hash');
+        $data = (new User())->setRole('ROLE_USER')->setPassword('hash');
+
+        $persistProcessor = $this->createMock(ProcessorInterface::class);
+        $persistProcessor->expects($this->never())->method('process');
+
+        $security = $this->createMock(Security::class);
+        $security->method('getUser')->willReturn(null);
+
+        $processor = new UserUpdateProcessor($persistProcessor, $security);
+
+        $this->expectException(\Symfony\Component\Security\Core\Exception\AccessDeniedException::class);
+        $processor->process($data, new Patch(), context: ['previous_data' => $previous]);
+    }
 }

@@ -4,6 +4,11 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 export const AUTH_TOKEN_KEY = "ma_access_token";
 export const AUTH_STATE_CHANGE_EVENT = "auth-state-changed";
 
+/**
+ * Build full API URL from relative path
+ * @param path - Relative API path (e.g., "/api/users")
+ * @returns Full URL
+ */
 function buildUrl(path: string): string {
   return `${API_BASE_URL}${path}`;
 }
@@ -19,6 +24,12 @@ type RegisterPayload = {
   phone?: string;
 };
 
+/**
+ * Get cookie value by name
+ * Safe for server and client rendering
+ * @param name - Cookie name
+ * @returns Cookie value or null if not found
+ */
 function getBrowserCookieValue(name: string): string | null {
   if (typeof document === "undefined") {
     return null;
@@ -35,6 +46,11 @@ function getBrowserCookieValue(name: string): string | null {
   }
 
   try {
+    /**
+     * Get current auth token from localStorage or cookies
+     * Syncs cookie to localStorage if found
+     * @returns Auth token or null if not authenticated
+     */
     return decodeURIComponent(match.slice(prefix.length));
   } catch {
     return match.slice(prefix.length);

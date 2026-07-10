@@ -2,9 +2,9 @@ name: Accessibility Audit (Pa11y CI)
 
 on:
   push:
-    branches: [ dev, main ]
+    branches: [dev, main]
   pull_request:
-    branches: [ dev, main ]
+    branches: [dev, main]
 
 jobs:
   accessibility:
@@ -16,8 +16,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
@@ -66,10 +66,10 @@ jobs:
             const fs = require('fs');
             const report = JSON.parse(fs.readFileSync('frontend/pa11y-report.json', 'utf8'));
             const totalIssues = report.reduce((sum, page) => sum + page.issues.length, 0);
-            
+
             let comment = `## ♿ Accessibility Audit (Pa11y)\n\n`;
             comment += `**Total Issues**: ${totalIssues}\n\n`;
-            
+
             report.forEach(page => {
               if (page.issues.length > 0) {
                 comment += `### ${page.pageUrl}\n`;
@@ -82,7 +82,7 @@ jobs:
                 }
               }
             });
-            
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
