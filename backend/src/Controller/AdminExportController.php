@@ -129,7 +129,7 @@ final class AdminExportController extends AbstractController
                     $user->getDateOfBirth()->format('Y-m-d'),
                     $this->isMinor($user) ? '1' : '0',
                     $user->getRole(),
-                    $user->canSeePrivate() ? '1' : '0',
+                    $user->getCanSeePrivate() ? '1' : '0',
                     $user->getEmergencyContactLastname()      ?? '',
                     $user->getEmergencyContactFirstname()     ?? '',
                     $user->getEmergencyContactEmail()         ?? '',

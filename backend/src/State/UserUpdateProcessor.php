@@ -14,6 +14,8 @@ use Symfony\Component\Security\Core\Exception\AccessDeniedException;
  */
 class UserUpdateProcessor implements ProcessorInterface
 {
+    private const PRIVATE_ACCESS_ROLES = ['ROLE_ORGANIZER', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN'];
+
     private static ?\ReflectionProperty $passwordProperty = null;
 
     /**
@@ -46,6 +48,10 @@ class UserUpdateProcessor implements ProcessorInterface
 
         if ('ROLE_ADMIN' === $actor->getRole() && !\in_array($data->getRole(), ['ROLE_USER', 'ROLE_ORGANIZER'], true)) {
             throw new AccessDeniedException('Admins can only assign ROLE_USER or ROLE_ORGANIZER.');
+        }
+
+        if (\in_array($data->getRole(), self::PRIVATE_ACCESS_ROLES, true)) {
+            $data->setCanSeePrivate(true);
         }
 
         return $this->persistProcessor->process($data, $operation, $uriVariables, $context);

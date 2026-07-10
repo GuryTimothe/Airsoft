@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { login, registerUser } from "@/lib/auth";
 import { serializeEmergencyContact } from "@/lib/emergency-contact";
+import { getCurrentUser } from "@/lib/user-api";
 import {
   loginSchema,
   registerSchema,
@@ -166,9 +167,15 @@ export default function AuthForm({ mode = "login" }: Props) {
       };
 
       await login(loginInput);
+      const currentUser = await getCurrentUser();
+      const shouldOpenAdminDashboard =
+        currentUser.role === "ROLE_ADMIN" ||
+        currentUser.role === "ROLE_SUPER_ADMIN" ||
+        currentUser.role === "ROLE_ORGANIZER";
+
       setStatus({ type: "success", message: "Connexion réussie." });
       reset();
-      router.push("/admin");
+      router.push(shouldOpenAdminDashboard ? "/admin" : "/");
       router.refresh();
     } catch (error) {
       const message =
