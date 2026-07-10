@@ -46,10 +46,10 @@ describe("user-api", () => {
       }),
     });
 
-    const users = await getUsers();
+    const result = await getUsers();
 
-    expect(users).toHaveLength(1);
-    expect(users[0]).toMatchObject({
+    expect(result.users).toHaveLength(1);
+    expect(result.users[0]).toMatchObject({
       id: 1,
       lastname: "Martin",
       firstname: "Alex",

@@ -40,6 +40,18 @@ export interface UpdateUserPayload {
   adminNotes?: string | null;
 }
 
+export interface CollectionView {
+  first?: string;
+  last?: string;
+  next?: string;
+  previous?: string;
+}
+
+export interface UsersResult {
+  users: User[];
+  view?: CollectionView;
+}
+
 export interface UpdateMyProfilePayload {
   lastname?: string;
   firstname?: string;
@@ -215,9 +227,13 @@ function normalizeSelfUserUpdateResult(data: unknown): SelfUserUpdateResult {
   };
 }
 
-export async function getUsers(): Promise<User[]> {
+export async function getUsers(page?: number): Promise<UsersResult> {
   const headers = await getAuthHeaders();
-  const response = await fetch(buildUrl("/api/users"), {
+  const url =
+    page && page > 1
+      ? buildUrl(`/api/users?page=${page}`)
+      : buildUrl("/api/users");
+  const response = await fetch(url, {
     cache: "no-store",
     headers,
   });
@@ -239,7 +255,17 @@ export async function getUsers(): Promise<User[]> {
     items = data["items"];
   }
 
-  return items.map((item) => normalizeUser(item));
+  const rawView = data["view"] as Record<string, string> | undefined;
+  const view: CollectionView | undefined = rawView
+    ? {
+        first: rawView["first"],
+        last: rawView["last"],
+        next: rawView["next"],
+        previous: rawView["previous"],
+      }
+    : undefined;
+
+  return { users: items.map((item) => normalizeUser(item)), view };
 }
 
 export async function updateUser(
