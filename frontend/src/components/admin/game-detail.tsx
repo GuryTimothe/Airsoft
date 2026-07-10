@@ -82,7 +82,7 @@ export function GameDetail({ gameId }: GameDetailProps) {
     let usersData: User[] = [];
 
     try {
-      [registrationData, usersData] = await Promise.all([
+      [registrationData, { users: usersData }] = await Promise.all([
         getGameRegistrationsByGameId(gameId),
         getUsers(),
       ]);

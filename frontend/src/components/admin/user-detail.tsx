@@ -78,6 +78,7 @@ export function UserDetail({ userId }: UserDetailProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -194,9 +195,12 @@ export function UserDetail({ userId }: UserDetailProps) {
             </Link>
           </Button>
 
-          <Dialog>
+          <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
             <DialogTrigger asChild>
-              <Button variant="destructive">
+              <Button
+                variant="destructive"
+                onClick={() => setDeleteDialogOpen(true)}
+              >
                 <Trash2 className="mr-2 h-4 w-4" />
                 Supprimer
               </Button>
@@ -209,7 +213,10 @@ export function UserDetail({ userId }: UserDetailProps) {
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>
-                <Button variant="outline" onClick={() => undefined}>
+                <Button
+                  variant="outline"
+                  onClick={() => setDeleteDialogOpen(false)}
+                >
                   Annuler
                 </Button>
                 <Button

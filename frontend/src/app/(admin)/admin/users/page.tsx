@@ -3,15 +3,18 @@ import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import UserTable from "@/components/admin/UserTable";
 import { UsersExportControls } from "@/components/admin/UsersExportControls";
-import { getUsers, type User } from "@/lib/user-api";
+import { getUsers, type CollectionView, type User } from "@/lib/user-api";
 
 export default async function UsersPage() {
   let users: User[] = [];
+  let initialView: CollectionView | undefined;
   let errorMessage: string | null = null;
   const referenceDateIso = new Date().toISOString();
 
   try {
-    users = await getUsers();
+    const result = await getUsers();
+    users = result.users;
+    initialView = result.view;
   } catch {
     errorMessage = "Impossible de charger les utilisateurs.";
   }
@@ -45,7 +48,11 @@ export default async function UsersPage() {
 
       <UsersExportControls />
 
-      <UserTable initialUsers={users} referenceDateIso={referenceDateIso} />
+      <UserTable
+        initialUsers={users}
+        initialView={initialView}
+        referenceDateIso={referenceDateIso}
+      />
     </main>
   );
 }

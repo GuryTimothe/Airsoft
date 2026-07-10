@@ -78,30 +78,6 @@ export function Header({
             Muret Airsoft
           </Link>
         </div>
-
-        <div className="hidden items-center gap-8 md:flex">
-          <Link
-            href="#"
-            className="text-lg font-medium transition-colors hover:text-foreground"
-          >
-            Parties
-          </Link>
-
-          <Link
-            href="#"
-            className="text-lg font-medium transition-colors hover:text-foreground"
-          >
-            À propos
-          </Link>
-
-          <Link
-            href="#"
-            className="text-lg font-medium transition-colors hover:text-foreground"
-          >
-            Contact
-          </Link>
-        </div>
-
         <div className="hidden items-center gap-3 md:flex">
           <Link href={authHref}>
             <Button variant="ghost" className="text-lg font-medium">

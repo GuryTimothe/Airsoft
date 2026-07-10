@@ -13,10 +13,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Eye, PencilLine } from "lucide-react";
-import { type User, type UserRole } from "@/lib/user-api";
+import {
+  getUsers,
+  type CollectionView,
+  type User,
+  type UserRole,
+} from "@/lib/user-api";
 
 type UserTableProps = {
   initialUsers: User[];
+  initialView?: CollectionView;
   referenceDateIso: string;
 };
 
@@ -57,15 +63,40 @@ function computeAge(dateOfBirth: string, referenceDateIso: string): number {
 
 export default function UserTable({
   initialUsers,
+  initialView,
   referenceDateIso,
 }: UserTableProps) {
   const [roleFilter, setRoleFilter] = useState<UserRole | "all">("all");
   const [privateFilter, setPrivateFilter] = useState<"all" | "yes" | "no">(
     "all",
   );
+  const [users, setUsers] = useState<User[]>(initialUsers);
+  const [view, setView] = useState<CollectionView | undefined>(initialView);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageLoading, setPageLoading] = useState(false);
+
+  function extractPage(url?: string): number | null {
+    if (!url) return null;
+    const match = url.match(/[?&]page=(\d+)/);
+    return match ? Number(match[1]) : null;
+  }
+
+  const lastPage = extractPage(view?.last) ?? (view ? currentPage : null);
+
+  async function goToPage(page: number) {
+    setPageLoading(true);
+    try {
+      const result = await getUsers(page);
+      setUsers(result.users);
+      setView(result.view);
+      setCurrentPage(page);
+    } finally {
+      setPageLoading(false);
+    }
+  }
 
   const filteredUsers = useMemo(() => {
-    return [...initialUsers]
+    return [...users]
       .filter((user) => {
         if (roleFilter !== "all" && user.role !== roleFilter) {
           return false;
@@ -82,7 +113,7 @@ export default function UserTable({
         return true;
       })
       .sort((a, b) => a.lastname.localeCompare(b.lastname, "fr"));
-  }, [initialUsers, privateFilter, roleFilter]);
+  }, [users, privateFilter, roleFilter]);
 
   return (
     <div className="space-y-4">
@@ -182,6 +213,30 @@ export default function UserTable({
           })}
         </TableBody>
       </Table>
+
+      {lastPage !== null && lastPage > 1 ? (
+        <div className="flex items-center justify-center gap-2 pt-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={pageLoading || currentPage <= 1}
+            onClick={() => goToPage(currentPage - 1)}
+          >
+            Précédent
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            Page {currentPage} / {lastPage}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={pageLoading || currentPage >= lastPage}
+            onClick={() => goToPage(currentPage + 1)}
+          >
+            Suivant
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }
