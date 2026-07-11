@@ -40,7 +40,13 @@ final class AdminExportController extends AbstractController
     #[Route('/games/{id}/registrations.csv', methods: ['GET'], requirements: ['id' => '\\d+'])]
     public function exportGameRegistrations(int $id): StreamedResponse
     {
-        $this->denyAccessUnlessGranted('ROLE_ADMIN');
+        if (
+            !$this->isGranted('ROLE_ADMIN')
+            && !$this->isGranted('ROLE_SUPER_ADMIN')
+            && !$this->isGranted('ROLE_ORGANIZER')
+        ) {
+            $this->denyAccessUnlessGranted('ROLE_ADMIN');
+        }
 
         $game = $this->gameRepository->find($id);
         if (!$game instanceof Game) {

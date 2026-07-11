@@ -250,14 +250,9 @@ export async function getMyGameRegistrations(): Promise<GameRegistration[]> {
 
   if (response.ok) {
     const payload = await response.json();
-    const items = extractItems(payload).map((item) =>
-      normalizeGameRegistration(item),
-    );
-
-    return filterToCurrentUser(items);
+    return extractItems(payload).map((item) => normalizeGameRegistration(item));
   }
 
-  // Fallback for environments where the custom /mine operation is unavailable.
   const all = await fetchAllRegistrations(headers);
 
   return filterToCurrentUser(all);
@@ -345,7 +340,7 @@ export async function updateGameRegistrationPresence(
     "Content-Type": "application/merge-patch+json",
   });
   const response = await fetch(
-    buildUrl(`/api/game_registrations/${registrationId}/presence`),
+    buildUrl(`/api/game_registrations/${registrationId}`),
     {
       method: "PATCH",
       headers,

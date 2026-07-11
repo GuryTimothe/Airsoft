@@ -20,11 +20,11 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ApiResource(
     paginationItemsPerPage: 15,
     operations: [
-        new Get(),
-        new GetCollection(),
-        new Post(security: "is_granted('ROLE_ADMIN')"),
-        new Put(security: "is_granted('ROLE_ADMIN')"),
-        new Delete(security: "is_granted('ROLE_ADMIN')"),
+        new Get(security: "is_granted('VIEW_GAME', object)"),
+        new GetCollection(security: "is_granted('LIST_GAMES')"),
+        new Post(security: "is_granted('CREATE_GAME')"),
+        new Put(security: "is_granted('UPDATE_GAME', object)"),
+        new Delete(security: "is_granted('DELETE_GAME', object)"),
     ]
 )]
 class Game

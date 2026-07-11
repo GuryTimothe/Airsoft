@@ -122,7 +122,6 @@ function toBoolean(value: unknown): boolean {
 function normalizeUser(data: unknown): User {
   const d = data as Record<string, unknown>;
   const get = (key: string) => d[key];
-  const role = (get("role") as UserRole) ?? "ROLE_USER";
   const canSeePrivateRaw =
     get("canSeePrivate") ?? get("can_see_private") ?? get("CanSeePrivate");
   const rawEmergencyContact =

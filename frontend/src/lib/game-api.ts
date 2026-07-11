@@ -36,6 +36,18 @@ export interface GamePayload {
   isPublic: boolean;
 }
 
+export interface CollectionView {
+  first?: string;
+  last?: string;
+  next?: string;
+  previous?: string;
+}
+
+export interface GamesResult {
+  games: Game[];
+  view?: CollectionView;
+}
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 function buildUrl(path: string) {
@@ -74,9 +86,13 @@ function normalizeGame(data: unknown): Game {
   };
 }
 
-export async function getGames(): Promise<Game[]> {
+export async function getGamesPage(page?: number): Promise<GamesResult> {
   const headers = await getAuthHeaders();
-  const response = await fetch(buildUrl("/api/games"), {
+  const url =
+    page && page > 1
+      ? buildUrl(`/api/games?page=${page}`)
+      : buildUrl("/api/games");
+  const response = await fetch(url, {
     cache: "no-store",
     headers,
   });
@@ -101,7 +117,23 @@ export async function getGames(): Promise<Game[]> {
     items = data["items"];
   }
 
-  return items.map((it) => normalizeGame(it));
+  const rawView = data["view"] as Record<string, string> | undefined;
+  const view: CollectionView | undefined = rawView
+    ? {
+        first: rawView["first"],
+        last: rawView["last"],
+        next: rawView["next"],
+        previous: rawView["previous"],
+      }
+    : undefined;
+
+  return { games: items.map((it) => normalizeGame(it)), view };
+}
+
+export async function getGames(): Promise<Game[]> {
+  const { games } = await getGamesPage();
+
+  return games;
 }
 
 export async function getGame(id: number): Promise<Game> {

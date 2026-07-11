@@ -40,7 +40,12 @@ class GameRegistrationVisibilityExtension implements QueryCollectionExtensionInt
 
     private function restrictToCurrentUserForNonAdmin(QueryBuilder $queryBuilder, string $resourceClass): void
     {
-        if (GameRegistration::class !== $resourceClass || $this->security->isGranted('ROLE_ADMIN')) {
+        if (
+            GameRegistration::class !== $resourceClass
+            || $this->security->isGranted('ROLE_ADMIN')
+            || $this->security->isGranted('ROLE_SUPER_ADMIN')
+            || $this->security->isGranted('ROLE_ORGANIZER')
+        ) {
             return;
         }
 
