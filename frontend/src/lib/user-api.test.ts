@@ -1,4 +1,5 @@
 import {
+  deleteCurrentUser,
   createUser,
   deleteUser,
   getCurrentUser,
@@ -185,6 +186,12 @@ describe("user-api", () => {
         firstname: "Lina",
         email: "lina@example.com",
         dateOfBirth: "1994-09-03",
+        emergencyContact: {
+          lastname: "Bernard",
+          firstname: "Marie",
+          email: "marie@example.com",
+          phone: "0700000000",
+        },
         role: "ROLE_USER",
         canSeePrivate: false,
       }),
@@ -197,6 +204,12 @@ describe("user-api", () => {
       expect.objectContaining({ cache: "no-store" }),
     );
     expect(user.role).toBe("ROLE_USER");
+    expect(user.emergencyContact).toEqual({
+      lastname: "Bernard",
+      firstname: "Marie",
+      email: "marie@example.com",
+      phone: "0700000000",
+    });
   });
 
   it("creates a user", async () => {
@@ -319,6 +332,17 @@ describe("user-api", () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("/api/users/8"),
+      expect.objectContaining({ method: "DELETE" }),
+    );
+  });
+
+  it("deletes the current user from /api/me", async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true });
+
+    await deleteCurrentUser();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/api/me"),
       expect.objectContaining({ method: "DELETE" }),
     );
   });

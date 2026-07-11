@@ -2,11 +2,7 @@
 
 namespace App\Entity;
 
-use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
-use ApiPlatform\Metadata\ApiFilter;
 use ApiPlatform\Metadata\ApiResource;
-use ApiPlatform\Metadata\Get;
-use ApiPlatform\Metadata\GetCollection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Annotation\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
@@ -16,38 +12,34 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ApiResource(
     normalizationContext: ['groups' => ['user:read']],
     denormalizationContext: ['groups' => ['user:write']],
-    operations: [
-        new Get(security: "is_granted('ROLE_ADMIN')"),
-        new GetCollection(security: "is_granted('ROLE_ADMIN')"),
-    ]
+    operations: []
 )]
-#[ApiFilter(SearchFilter::class, properties: ['user.id' => 'exact'])]
 class EmergencyContact
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['user:read'])]
+    #[Groups(['user:read', 'user:write', 'user:self:write', 'user:me:read'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 255)]
     #[Assert\Length(max: 255)]
-    #[Groups(['user:read', 'user:write'])]
+    #[Groups(['user:read', 'user:write', 'user:self:write', 'user:me:read'])]
     private string $lastname = '';
 
     #[ORM\Column(length: 255)]
     #[Assert\Length(max: 255)]
-    #[Groups(['user:read', 'user:write'])]
+    #[Groups(['user:read', 'user:write', 'user:self:write', 'user:me:read'])]
     private string $firstname = '';
 
     #[ORM\Column(length: 255)]
     #[Assert\Email]
-    #[Groups(['user:read', 'user:write'])]
+    #[Groups(['user:read', 'user:write', 'user:self:write', 'user:me:read'])]
     private string $email = '';
 
     #[ORM\Column(length: 20)]
     #[Assert\Length(max: 20)]
-    #[Groups(['user:read', 'user:write'])]
+    #[Groups(['user:read', 'user:write', 'user:self:write', 'user:me:read'])]
     private string $phone = '';
 
     #[ORM\OneToOne(inversedBy: 'emergencyContact', targetEntity: User::class)]

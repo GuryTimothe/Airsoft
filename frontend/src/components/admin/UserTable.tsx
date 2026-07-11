@@ -19,6 +19,7 @@ import {
   type User,
   type UserRole,
 } from "@/lib/user-api";
+import { getAuthToken, getRolesFromToken } from "@/lib/auth";
 
 type UserTableProps = {
   initialUsers: User[];
@@ -66,6 +67,10 @@ export default function UserTable({
   initialView,
   referenceDateIso,
 }: UserTableProps) {
+  const actorRoles = getRolesFromToken(getAuthToken());
+  const isAdminOnlyActor =
+    actorRoles.includes("ROLE_ADMIN") &&
+    !actorRoles.includes("ROLE_SUPER_ADMIN");
   const [roleFilter, setRoleFilter] = useState<UserRole | "all">("all");
   const [privateFilter, setPrivateFilter] = useState<"all" | "yes" | "no">(
     "all",
@@ -169,6 +174,9 @@ export default function UserTable({
             const fullName = `${user.firstname} ${user.lastname}`.trim();
             const age = computeAge(user.dateOfBirth, referenceDateIso);
             const isMinor = age < 18;
+            const isElevatedTarget =
+              user.role === "ROLE_ADMIN" || user.role === "ROLE_SUPER_ADMIN";
+            const canEditTarget = !(isAdminOnlyActor && isElevatedTarget);
 
             return (
               <TableRow key={user.id}>
@@ -200,12 +208,25 @@ export default function UserTable({
                       </Link>
                     </Button>
 
-                    <Button asChild size="sm" variant="outline">
-                      <Link href={`/admin/users/${user.id}/edit`}>
+                    {canEditTarget ? (
+                      <Button asChild size="sm" variant="outline">
+                        <Link href={`/admin/users/${user.id}/edit`}>
+                          <PencilLine className="mr-2 h-4 w-4" />
+                          Modifier
+                        </Link>
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled
+                        title="Un admin ne peut modifier que les organisateurs et utilisateurs."
+                      >
                         <PencilLine className="mr-2 h-4 w-4" />
                         Modifier
-                      </Link>
-                    </Button>
+                      </Button>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>

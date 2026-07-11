@@ -38,7 +38,10 @@ export default function AuthForm({ mode = "login" }: Props) {
     reset,
     setValue,
     control,
-  } = useForm<Record<string, unknown>>({ resolver, mode: "onTouched" });
+  } = useForm<Record<string, unknown>>({
+    resolver: resolver as never,
+    mode: "onTouched",
+  });
 
   const watchedDateOfBirth = String(
     useWatch({ control, name: "dateOfBirth" }) ?? "",
@@ -135,15 +138,12 @@ export default function AuthForm({ mode = "login" }: Props) {
 
     if (mode === "register") {
       const reg = data as RegisterInput;
-      const isMinor = computeAge(reg.dateOfBirth) < 18;
-      const emergencyContact = isMinor
-        ? serializeEmergencyContact({
-            lastname: reg.guardianLastname?.trim() ?? "",
-            firstname: reg.guardianFirstname?.trim() ?? "",
-            email: reg.guardianEmail?.trim() ?? "",
-            phone: reg.guardianPhone?.trim() ?? "",
-          })
-        : null;
+      const emergencyContact = serializeEmergencyContact({
+        lastname: reg.guardianLastname?.trim() ?? "",
+        firstname: reg.guardianFirstname?.trim() ?? "",
+        email: reg.guardianEmail?.trim() ?? "",
+        phone: reg.guardianPhone?.trim() ?? "",
+      });
 
       try {
         await submitRegister(

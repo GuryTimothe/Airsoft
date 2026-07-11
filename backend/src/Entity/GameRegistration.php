@@ -6,7 +6,6 @@ use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
 use ApiPlatform\Metadata\ApiFilter;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Delete;
-use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
@@ -24,7 +23,6 @@ use Symfony\Component\Serializer\Annotation\Groups;
 #[ApiResource(
     normalizationContext: ['groups' => ['game_registration:read']],
     operations: [
-        new Get(security: "is_granted('ROLE_ADMIN') or object.getUser() == user"),
         new GetCollection(security: "is_granted('IS_AUTHENTICATED_FULLY')"),
         new GetCollection(
             uriTemplate: '/game_registrations/mine',
@@ -37,11 +35,11 @@ use Symfony\Component\Serializer\Annotation\Groups;
             processor: GameRegistrationCreateProcessor::class,
         ),
         new Patch(
-            security: "is_granted('ROLE_ADMIN')",
+            security: "is_granted('PATCH_GAME_REGISTRATION', object)",
             input: GameRegistrationPresenceInput::class,
             processor: GameRegistrationPresenceProcessor::class,
         ),
-        new Delete(security: "is_granted('ROLE_ADMIN') or object.getUser() == user"),
+        new Delete(security: "is_granted('DELETE_GAME_REGISTRATION', object)"),
     ]
 )]
 #[ApiFilter(SearchFilter::class, properties: ['game.id' => 'exact', 'user.id' => 'exact', 'user.email' => 'exact'])]

@@ -57,7 +57,7 @@ class GameRegistrationCreateProcessor implements ProcessorInterface
             throw new NotFoundHttpException('Partie introuvable.');
         }
 
-        if (!$game->isPublic() && !$this->security->isGranted('ROLE_ADMIN') && !$user->getCanSeePrivate()) {
+        if (!$this->security->isGranted('REGISTER_GAME', $game)) {
             throw new AccessDeniedHttpException('Vous ne pouvez pas vous inscrire à cette partie privée.');
         }
 

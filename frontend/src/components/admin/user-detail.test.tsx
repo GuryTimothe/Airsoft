@@ -13,16 +13,19 @@ jest.mock("@/lib/user-api", () => ({
   deleteUser: jest.fn(),
 }));
 
-jest.mock("@/lib/emergency-contact-api", () => ({
-  getEmergencyContactByUserId: jest.fn(),
+jest.mock("@/lib/auth", () => ({
+  getAuthToken: jest.fn(),
+  getRolesFromToken: jest.fn(),
 }));
 
 import { getUser } from "@/lib/user-api";
-import { getEmergencyContactByUserId } from "@/lib/emergency-contact-api";
+import { getAuthToken, getRolesFromToken } from "@/lib/auth";
 
 describe("UserDetail", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    (getAuthToken as jest.Mock).mockReturnValue(null);
+    (getRolesFromToken as jest.Mock).mockReturnValue([]);
   });
 
   it("renders emergency contact card when a contact exists", async () => {
@@ -36,12 +39,12 @@ describe("UserDetail", () => {
       canSeePrivate: false,
       pseudo: null,
       phone: null,
-    });
-    (getEmergencyContactByUserId as jest.Mock).mockResolvedValue({
-      lastname: "Micheline",
-      firstname: "Michel",
-      email: "testmail2@mail.comm",
-      phone: "0123456789",
+      emergencyContact: {
+        lastname: "Micheline",
+        firstname: "Michel",
+        email: "testmail2@mail.comm",
+        phone: "0123456789",
+      },
     });
 
     render(<UserDetail userId={3} />);
@@ -65,7 +68,6 @@ describe("UserDetail", () => {
       pseudo: null,
       phone: null,
     });
-    (getEmergencyContactByUserId as jest.Mock).mockResolvedValue(null);
 
     render(<UserDetail userId={1} />);
 
@@ -93,9 +95,6 @@ describe("UserDetail", () => {
         phone: "0600000000",
       },
     });
-    (getEmergencyContactByUserId as jest.Mock).mockRejectedValue(
-      new Error("lookup failed"),
-    );
 
     render(<UserDetail userId={7} />);
 
@@ -104,5 +103,29 @@ describe("UserDetail", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Contact d'urgence")).toBeInTheDocument();
     expect(screen.getByText("marc@example.com")).toBeInTheDocument();
+  });
+
+  it("disables edit and delete actions for admin actor on elevated targets", async () => {
+    (getAuthToken as jest.Mock).mockReturnValue("token");
+    (getRolesFromToken as jest.Mock).mockReturnValue(["ROLE_ADMIN"]);
+    (getUser as jest.Mock).mockResolvedValue({
+      id: 11,
+      firstname: "Ada",
+      lastname: "Admin",
+      email: "ada@example.com",
+      dateOfBirth: "1990-01-01",
+      role: "ROLE_SUPER_ADMIN",
+      canSeePrivate: true,
+      pseudo: null,
+      phone: null,
+    });
+
+    render(<UserDetail userId={11} />);
+
+    expect(
+      await screen.findByText("Informations principales"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Modifier" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Supprimer" })).toBeDisabled();
   });
 });

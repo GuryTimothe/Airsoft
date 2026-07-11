@@ -29,11 +29,11 @@ import {
   UserRound,
   PencilLine,
 } from "lucide-react";
-import { getEmergencyContactByUserId } from "@/lib/emergency-contact-api";
 import {
   parseEmergencyContact,
   type EmergencyContactFields,
 } from "@/lib/emergency-contact";
+import { getAuthToken, getRolesFromToken } from "@/lib/auth";
 
 interface UserDetailProps {
   userId: number;
@@ -79,6 +79,10 @@ export function UserDetail({ userId }: UserDetailProps) {
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const actorRoles = getRolesFromToken(getAuthToken());
+  const isAdminOnlyActor =
+    actorRoles.includes("ROLE_ADMIN") &&
+    !actorRoles.includes("ROLE_SUPER_ADMIN");
 
   useEffect(() => {
     let active = true;
@@ -104,16 +108,6 @@ export function UserDetail({ userId }: UserDetailProps) {
         );
 
         setEmergencyContact(hasFallbackEmergency ? fallbackEmergency : null);
-
-        try {
-          const emergencyData = await getEmergencyContactByUserId(userId);
-
-          if (active && emergencyData) {
-            setEmergencyContact(emergencyData);
-          }
-        } catch {
-          // Keep profile usable even if emergency-contact filter endpoint fails.
-        }
       } catch (err) {
         if (active) {
           setError(
@@ -174,6 +168,9 @@ export function UserDetail({ userId }: UserDetailProps) {
 
   const age = computeAge(user.dateOfBirth);
   const hasEmergencyContact = Boolean(emergencyContact);
+  const isElevatedTarget =
+    user.role === "ROLE_ADMIN" || user.role === "ROLE_SUPER_ADMIN";
+  const canManageTarget = !(isAdminOnlyActor && isElevatedTarget);
 
   return (
     <div className="space-y-6">
@@ -188,17 +185,35 @@ export function UserDetail({ userId }: UserDetailProps) {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Button asChild variant="outline">
-            <Link href={`/admin/users/${user.id}/edit`}>
+          {canManageTarget ? (
+            <Button asChild variant="outline">
+              <Link href={`/admin/users/${user.id}/edit`}>
+                <PencilLine className="mr-2 h-4 w-4" />
+                Modifier
+              </Link>
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              disabled
+              title="Un admin ne peut modifier que les organisateurs et utilisateurs."
+            >
               <PencilLine className="mr-2 h-4 w-4" />
               Modifier
-            </Link>
-          </Button>
+            </Button>
+          )}
 
           <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
             <DialogTrigger asChild>
               <Button
                 variant="destructive"
+                disabled={!canManageTarget}
+                title={
+                  canManageTarget
+                    ? undefined
+                    : "Un admin ne peut supprimer que les organisateurs et utilisateurs."
+                }
                 onClick={() => setDeleteDialogOpen(true)}
               >
                 <Trash2 className="mr-2 h-4 w-4" />

@@ -58,6 +58,7 @@ export interface UpdateMyProfilePayload {
   dateOfBirth?: string;
   pseudo?: string | null;
   phone?: string | null;
+  emergencyContact?: EmergencyContactFields | null;
 }
 
 export interface UpdateMyEmailPayload {
@@ -122,7 +123,6 @@ function toBoolean(value: unknown): boolean {
 function normalizeUser(data: unknown): User {
   const d = data as Record<string, unknown>;
   const get = (key: string) => d[key];
-  const role = (get("role") as UserRole) ?? "ROLE_USER";
   const canSeePrivateRaw =
     get("canSeePrivate") ?? get("can_see_private") ?? get("CanSeePrivate");
   const rawEmergencyContact =
@@ -390,6 +390,18 @@ export async function createUser(payload: CreateUserPayload): Promise<User> {
   }
 
   return normalizeUser(await response.json());
+}
+
+export async function deleteCurrentUser(): Promise<void> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(buildUrl("/api/me"), {
+    method: "DELETE",
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseApiErrorMessage(response));
+  }
 }
 
 export async function deleteUser(id: number): Promise<void> {

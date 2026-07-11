@@ -20,14 +20,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { CalendarDays, Eye, Users } from "lucide-react";
-import { type Game } from "@/lib/game-api";
+import { CalendarDays, Eye, Pencil, Users } from "lucide-react";
+import { getGamesPage, type CollectionView, type Game } from "@/lib/game-api";
 
 type VisibilityFilter = "all" | "public" | "private";
 type SortOption = "date" | "people" | "paf";
 
 type GameTableProps = {
   initialGames: Game[];
+  initialView?: CollectionView;
 };
 
 function formatDate(date: string) {
@@ -38,16 +39,43 @@ function formatDate(date: string) {
   });
 }
 
-export default function GameTable({ initialGames }: GameTableProps) {
+export default function GameTable({
+  initialGames,
+  initialView,
+}: GameTableProps) {
   const [visibility, setVisibility] = useState<VisibilityFilter>("all");
   const [dateFilter, setDateFilter] = useState<string>("");
   const [sortBy, setSortBy] = useState<SortOption>("date");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [games, setGames] = useState<Game[]>(initialGames);
+  const [view, setView] = useState<CollectionView | undefined>(initialView);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageLoading, setPageLoading] = useState(false);
+
+  function extractPage(url?: string): number | null {
+    if (!url) return null;
+    const match = url.match(/[?&]page=(\d+)/);
+    return match ? Number(match[1]) : null;
+  }
+
+  const lastPage = extractPage(view?.last) ?? (view ? currentPage : null);
+
+  async function goToPage(page: number) {
+    setPageLoading(true);
+    try {
+      const result = await getGamesPage(page);
+      setGames(result.games);
+      setView(result.view);
+      setCurrentPage(page);
+    } finally {
+      setPageLoading(false);
+    }
+  }
 
   const filteredGames = useMemo(() => {
     const selectedDate = dateFilter ? new Date(dateFilter) : null;
 
-    const filtered = initialGames.filter((game) => {
+    const filtered = games.filter((game) => {
       if (visibility === "public" && !game.isPublic) {
         return false;
       }
@@ -80,7 +108,7 @@ export default function GameTable({ initialGames }: GameTableProps) {
 
       return sortDirection === "asc" ? result : -result;
     });
-  }, [initialGames, visibility, dateFilter, sortBy, sortDirection]);
+  }, [games, visibility, dateFilter, sortBy, sortDirection]);
 
   return (
     <Card>
@@ -169,57 +197,90 @@ export default function GameTable({ initialGames }: GameTableProps) {
             Aucune partie ne correspond aux filtres.
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Titre</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Lieu</TableHead>
-                <TableHead>Places</TableHead>
-                <TableHead>PAF</TableHead>
-                <TableHead>Statut</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredGames.map((game) => (
-                <TableRow key={game.id}>
-                  <TableCell className="font-medium">{game.title}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                      {formatDate(game.startDateTime)}
-                    </div>
-                  </TableCell>
-                  <TableCell>{game.address}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Users className="h-4 w-4 text-muted-foreground" />
-                      {game.maxPlaces}
-                    </div>
-                  </TableCell>
-                  <TableCell>{game.price.toFixed(2)} €</TableCell>
-                  <TableCell>
-                    <Badge variant={game.isPublic ? "default" : "outline"}>
-                      {game.isPublic ? "Publique" : "Privée"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <GameRegistrationsExportButton gameId={game.id} />
-
-                      <Button asChild size="sm" variant="outline">
-                        <Link href={`/admin/games/${game.id}`}>
-                          <Eye className="mr-2 h-4 w-4" />
-                          Voir
-                        </Link>
-                      </Button>
-                    </div>
-                  </TableCell>
+          <>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Titre</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Lieu</TableHead>
+                  <TableHead>Places</TableHead>
+                  <TableHead>PAF</TableHead>
+                  <TableHead>Statut</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filteredGames.map((game) => (
+                  <TableRow key={game.id}>
+                    <TableCell className="font-medium">{game.title}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                        {formatDate(game.startDateTime)}
+                      </div>
+                    </TableCell>
+                    <TableCell>{game.address}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                        {game.maxPlaces}
+                      </div>
+                    </TableCell>
+                    <TableCell>{game.price.toFixed(2)} €</TableCell>
+                    <TableCell>
+                      <Badge variant={game.isPublic ? "default" : "outline"}>
+                        {game.isPublic ? "Publique" : "Privée"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <GameRegistrationsExportButton gameId={game.id} />
+
+                        <Button asChild size="sm" variant="outline">
+                          <Link href={`/admin/games/${game.id}`}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            Voir
+                          </Link>
+                        </Button>
+
+                        <Button asChild size="sm" variant="outline">
+                          <Link href={`/admin/games/${game.id}/edit`}>
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Modifier
+                          </Link>
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+
+            {lastPage !== null && lastPage > 1 ? (
+              <div className="flex items-center justify-center gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={pageLoading || currentPage <= 1}
+                  onClick={() => goToPage(currentPage - 1)}
+                >
+                  Précédent
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  Page {currentPage} / {lastPage}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={pageLoading || currentPage >= lastPage}
+                  onClick={() => goToPage(currentPage + 1)}
+                >
+                  Suivant
+                </Button>
+              </div>
+            ) : null}
+          </>
         )}
       </CardContent>
     </Card>
