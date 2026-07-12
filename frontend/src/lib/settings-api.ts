@@ -52,56 +52,29 @@ export async function getAppSettings(): Promise<AppSetting | null> {
     headers,
   });
 
+  if (response.status === 404) {
+    return null;
+  }
+
   if (!response.ok) {
     throw new Error("Impossible de charger les parametres");
   }
 
   const data = await response.json();
-  let items: unknown[] = [];
-
-  if (Array.isArray(data)) {
-    items = data;
-  } else if (Array.isArray(data["hydra:member"])) {
-    items = data["hydra:member"];
-  } else if (Array.isArray(data["member"])) {
-    items = data["member"];
-  }
-
-  if (items.length === 0) {
+  if (null === data || Array.isArray(data)) {
     return null;
   }
 
-  return normalizeSettings(items[0]);
-}
-
-export async function createAppSettings(
-  payload: AppSettingPayload,
-): Promise<AppSetting> {
-  const headers = await getAuthHeaders({
-    "Content-Type": "application/ld+json",
-  });
-  const response = await fetch(buildUrl("/api/app_settings"), {
-    method: "POST",
-    headers,
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(errorText || "Impossible de creer les parametres");
-  }
-
-  return normalizeSettings(await response.json());
+  return normalizeSettings(data);
 }
 
 export async function updateAppSettings(
-  id: number,
   payload: AppSettingPayload,
 ): Promise<AppSetting> {
   const headers = await getAuthHeaders({
     "Content-Type": "application/merge-patch+json",
   });
-  const response = await fetch(buildUrl(`/api/app_settings/${id}`), {
+  const response = await fetch(buildUrl("/api/app_settings"), {
     method: "PATCH",
     headers,
     body: JSON.stringify(payload),
