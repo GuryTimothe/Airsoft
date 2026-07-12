@@ -145,7 +145,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\OneToOne(mappedBy: 'user', targetEntity: EmergencyContact::class, cascade: ['persist', 'remove'], orphanRemoval: true)]
     #[ApiProperty(readableLink: true, writableLink: true)]
     #[Assert\Valid]
-    #[Groups(['user:read', 'user:write'])]
+    #[Groups(['user:read', 'user:write', 'user:self:write', 'user:me:read'])]
     private ?EmergencyContact $emergencyContact = null;
 
     /** @var Collection<int, GameRegistration> */
@@ -259,30 +259,31 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
+    #[Groups(['user:read', 'user:me:read'])]
     public function getEmergencyContact(): ?EmergencyContact
     {
         return $this->emergencyContact;
     }
 
-    #[Groups(['user:read'])]
+    #[Groups(['user:read', 'user:me:read'])]
     public function getEmergencyContactLastname(): ?string
     {
         return $this->emergencyContact?->getLastname();
     }
 
-    #[Groups(['user:read'])]
+    #[Groups(['user:read', 'user:me:read'])]
     public function getEmergencyContactFirstname(): ?string
     {
         return $this->emergencyContact?->getFirstname();
     }
 
-    #[Groups(['user:read'])]
+    #[Groups(['user:read', 'user:me:read'])]
     public function getEmergencyContactEmail(): ?string
     {
         return $this->emergencyContact?->getEmail();
     }
 
-    #[Groups(['user:read'])]
+    #[Groups(['user:read', 'user:me:read'])]
     public function getEmergencyContactPhone(): ?string
     {
         return $this->emergencyContact?->getPhone();
@@ -424,7 +425,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->updatedAt = new \DateTimeImmutable();
     }
 
-    #[Assert\Callback]
+    #[Assert\Callback(groups: ['Default', 'user:create', 'user:admin:update', 'user:self:general'])]
     public function validateEmergencyContactForMinor(
         ExecutionContextInterface $context,
     ): void {

@@ -39,7 +39,6 @@ import {
   serializeEmergencyContact,
   type EmergencyContactFields,
 } from "@/lib/emergency-contact";
-import { getEmergencyContactByUserId } from "@/lib/emergency-contact-api";
 
 interface UserFormProps {
   userId?: number;
@@ -125,26 +124,10 @@ function toFormValues(user?: User): UserFormValues {
   };
 }
 
-function applyEmergencyContactToValues(
-  values: UserFormValues,
-  emergency: EmergencyContactFields | null,
-): UserFormValues {
-  if (!emergency) {
-    return values;
-  }
-
-  return {
-    ...values,
-    emergencyLastname: emergency.lastname,
-    emergencyFirstname: emergency.firstname,
-    emergencyEmail: emergency.email,
-    emergencyPhone: emergency.phone,
-  };
-}
-
 export function UserForm({ userId }: UserFormProps) {
   const router = useRouter();
   const [values, setValues] = useState<UserFormValues>(emptyValues);
+  const [targetRole, setTargetRole] = useState<UserRole | null>(null);
   const [loading, setLoading] = useState(Boolean(userId));
   const [actorRole, setActorRole] = useState<UserRole | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -215,18 +198,9 @@ export function UserForm({ userId }: UserFormProps) {
         }
 
         // Pre-fill form from user payload so edit remains usable even if
-        // emergency-contact lookup fails.
+        // relation shape differs across API responses.
         setValues(toFormValues(user));
-
-        try {
-          const emergency = await getEmergencyContactByUserId(userId);
-
-          if (active && emergency) {
-            setValues((prev) => applyEmergencyContactToValues(prev, emergency));
-          }
-        } catch {
-          // Keep fallback values already parsed from user payload.
-        }
+        setTargetRole(user.role);
       } catch (err) {
         if (active) {
           setError(
@@ -248,6 +222,10 @@ export function UserForm({ userId }: UserFormProps) {
   }, [userId]);
 
   const isAdminActor = actorRole === "ROLE_ADMIN";
+  const isAdminBlockedOnTarget =
+    Boolean(userId) &&
+    isAdminActor &&
+    isElevatedRole(targetRole ?? "ROLE_USER");
   const roleOptions = isAdminActor
     ? assignableRolesByAdmin
     : assignableRolesBySuperAdmin;
@@ -256,6 +234,14 @@ export function UserForm({ userId }: UserFormProps) {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+
+    if (isAdminBlockedOnTarget) {
+      setError(
+        "Un admin peut modifier ou supprimer uniquement les organisateurs et utilisateurs classiques.",
+      );
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -335,6 +321,13 @@ export function UserForm({ userId }: UserFormProps) {
       return;
     }
 
+    if (isAdminBlockedOnTarget) {
+      setError(
+        "Un admin peut modifier ou supprimer uniquement les organisateurs et utilisateurs classiques.",
+      );
+      return;
+    }
+
     setError(null);
     setDeleting(true);
 
@@ -370,6 +363,13 @@ export function UserForm({ userId }: UserFormProps) {
             {error ? (
               <p className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
                 {error}
+              </p>
+            ) : null}
+
+            {isAdminBlockedOnTarget ? (
+              <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+                Un admin peut modifier ou supprimer uniquement les organisateurs
+                et les utilisateurs classiques.
               </p>
             ) : null}
 
@@ -630,7 +630,10 @@ export function UserForm({ userId }: UserFormProps) {
             </div>
 
             <div className="flex flex-wrap gap-3">
-              <Button type="submit" disabled={submitting}>
+              <Button
+                type="submit"
+                disabled={submitting || isAdminBlockedOnTarget}
+              >
                 {submitting
                   ? "Enregistrement..."
                   : userId
@@ -654,6 +657,12 @@ export function UserForm({ userId }: UserFormProps) {
                   <Button
                     type="button"
                     variant="destructive"
+                    disabled={isAdminBlockedOnTarget}
+                    title={
+                      isAdminBlockedOnTarget
+                        ? "Un admin ne peut supprimer que les organisateurs et utilisateurs."
+                        : undefined
+                    }
                     onClick={() => setDeleteDialogOpen(true)}
                   >
                     <Trash2 className="mr-2 h-4 w-4" />

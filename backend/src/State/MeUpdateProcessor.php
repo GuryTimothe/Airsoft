@@ -4,9 +4,11 @@ namespace App\State;
 
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
+use App\Entity\EmergencyContact;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
+use Symfony\Component\HttpFoundation\RequestStack;
 
 /**
  * @implements ProcessorInterface<User, User>
@@ -19,6 +21,7 @@ class MeUpdateProcessor implements ProcessorInterface
     public function __construct(
         private EntityManagerInterface $entityManager,
         private Security $security,
+        private RequestStack $requestStack,
     ) {
     }
 
@@ -63,6 +66,33 @@ class MeUpdateProcessor implements ProcessorInterface
 
             $property->setValue($target, $property->getValue($source));
         }
+
+        $emergencyContactProperty = $this->getWritableProperty('emergencyContact');
+        if (!$this->wasEmergencyContactPatched($source, $emergencyContactProperty)) {
+            return;
+        }
+
+        /** @var EmergencyContact|null $incomingEmergencyContact */
+        $incomingEmergencyContact = $emergencyContactProperty->getValue($source);
+
+        if (null === $incomingEmergencyContact) {
+            if ($this->isMinor($target)) {
+                throw new \InvalidArgumentException('Le contact d\'urgence est obligatoire pour un mineur.');
+            }
+
+            $target->setEmergencyContact(null);
+
+            return;
+        }
+
+        $targetEmergencyContact = $target->getEmergencyContact() ?? new EmergencyContact();
+        $targetEmergencyContact
+            ->setLastname($incomingEmergencyContact->getLastname())
+            ->setFirstname($incomingEmergencyContact->getFirstname())
+            ->setEmail($incomingEmergencyContact->getEmail())
+            ->setPhone($incomingEmergencyContact->getPhone());
+
+        $target->setEmergencyContact($targetEmergencyContact);
     }
 
     private function getWritableProperty(string $propertyName): \ReflectionProperty
@@ -74,5 +104,29 @@ class MeUpdateProcessor implements ProcessorInterface
         }
 
         return self::$updatableProperties[$propertyName];
+    }
+
+    private function wasEmergencyContactPatched(User $source, \ReflectionProperty $property): bool
+    {
+        $request = $this->requestStack->getCurrentRequest();
+        if (null !== $request) {
+            try {
+                $payload = $request->toArray();
+
+                return \array_key_exists('emergencyContact', $payload);
+            } catch (\JsonException) {
+                return false;
+            }
+        }
+
+        return $property->isInitialized($source) && null !== $property->getValue($source);
+    }
+
+    private function isMinor(User $user): bool
+    {
+        $today     = new \DateTimeImmutable('today');
+        $birthDate = \DateTimeImmutable::createFromInterface($user->getDateOfBirth());
+
+        return $birthDate->diff($today)->y < 18;
     }
 }

@@ -1,6 +1,13 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import UserTable from "./UserTable";
 import { type User } from "@/lib/user-api";
+
+jest.mock("@/lib/auth", () => ({
+  getAuthToken: jest.fn(),
+  getRolesFromToken: jest.fn(),
+}));
+
+import { getAuthToken, getRolesFromToken } from "@/lib/auth";
 
 const users: User[] = [
   {
@@ -30,9 +37,24 @@ const users: User[] = [
     role: "ROLE_ORGANIZER",
     canSeePrivate: true,
   },
+  {
+    id: 4,
+    lastname: "Boss",
+    firstname: "Sonia",
+    email: "sonia@example.com",
+    dateOfBirth: "1988-07-11",
+    role: "ROLE_SUPER_ADMIN",
+    canSeePrivate: true,
+  },
 ];
 
 describe("UserTable", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (getAuthToken as jest.Mock).mockReturnValue(null);
+    (getRolesFromToken as jest.Mock).mockReturnValue([]);
+  });
+
   it("renders users, highlights minors, and filters by role/private access", () => {
     render(
       <UserTable
@@ -66,5 +88,48 @@ describe("UserTable", () => {
     expect(screen.getByText("Lucas Durand")).toBeInTheDocument();
     expect(screen.queryByText("Alex Martin")).not.toBeInTheDocument();
     expect(screen.queryByText("Nina Roux")).not.toBeInTheDocument();
+  });
+
+  it("disables edit for admin actor on admin and super admin rows only", () => {
+    (getAuthToken as jest.Mock).mockReturnValue("token");
+    (getRolesFromToken as jest.Mock).mockReturnValue(["ROLE_ADMIN"]);
+
+    render(
+      <UserTable
+        initialUsers={users}
+        referenceDateIso="2026-07-08T00:00:00.000Z"
+      />,
+    );
+
+    const adminRow = screen.getByText("Alex Martin").closest("tr");
+    const superAdminRow = screen.getByText("Sonia Boss").closest("tr");
+    const organizerRow = screen.getByText("Nina Roux").closest("tr");
+    const userRow = screen.getByText("Lucas Durand").closest("tr");
+
+    expect(adminRow).not.toBeNull();
+    expect(superAdminRow).not.toBeNull();
+    expect(organizerRow).not.toBeNull();
+    expect(userRow).not.toBeNull();
+
+    expect(
+      within(adminRow as HTMLElement).getByRole("button", {
+        name: "Modifier",
+      }),
+    ).toBeDisabled();
+    expect(
+      within(superAdminRow as HTMLElement).getByRole("button", {
+        name: "Modifier",
+      }),
+    ).toBeDisabled();
+    expect(
+      within(organizerRow as HTMLElement).getByRole("link", {
+        name: "Modifier",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(userRow as HTMLElement).getByRole("link", {
+        name: "Modifier",
+      }),
+    ).toBeInTheDocument();
   });
 });

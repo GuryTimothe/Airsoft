@@ -58,6 +58,7 @@ export interface UpdateMyProfilePayload {
   dateOfBirth?: string;
   pseudo?: string | null;
   phone?: string | null;
+  emergencyContact?: EmergencyContactFields | null;
 }
 
 export interface UpdateMyEmailPayload {
@@ -389,6 +390,18 @@ export async function createUser(payload: CreateUserPayload): Promise<User> {
   }
 
   return normalizeUser(await response.json());
+}
+
+export async function deleteCurrentUser(): Promise<void> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(buildUrl("/api/me"), {
+    method: "DELETE",
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseApiErrorMessage(response));
+  }
 }
 
 export async function deleteUser(id: number): Promise<void> {
