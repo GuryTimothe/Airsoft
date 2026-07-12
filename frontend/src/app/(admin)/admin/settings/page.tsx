@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import {
-  createAppSettings,
   getAppSettings,
   updateAppSettings,
   type AppSetting,
@@ -34,7 +33,6 @@ function toFormValues(setting: AppSetting): SettingsValues {
 
 export default function SettingsPage() {
   const [values, setValues] = useState<SettingsValues>(defaultValues);
-  const [settingsId, setSettingsId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -49,7 +47,6 @@ export default function SettingsPage() {
           return;
         }
 
-        setSettingsId(settings.id);
         setValues(toFormValues(settings));
       })
       .catch(() => {
@@ -83,11 +80,8 @@ export default function SettingsPage() {
     };
 
     try {
-      const saved = settingsId
-        ? await updateAppSettings(settingsId, payload)
-        : await createAppSettings(payload);
+      const saved = await updateAppSettings(payload);
 
-      setSettingsId(saved.id);
       setValues(toFormValues(saved));
       setMessage("Parametres enregistres avec succes.");
     } catch (err) {
