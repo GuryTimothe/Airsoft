@@ -17,10 +17,10 @@ type SettingsValues = {
   defaultMaxPlaces: string;
 };
 
-const defaultValues: SettingsValues = {
-  defaultAddress: "Terrain principal",
-  defaultPrice: "10",
-  defaultMaxPlaces: "24",
+const initialValues: SettingsValues = {
+  defaultAddress: "",
+  defaultPrice: "",
+  defaultMaxPlaces: "",
 };
 
 function toFormValues(setting: AppSetting): SettingsValues {
@@ -32,8 +32,9 @@ function toFormValues(setting: AppSetting): SettingsValues {
 }
 
 export default function SettingsPage() {
-  const [values, setValues] = useState<SettingsValues>(defaultValues);
+  const [values, setValues] = useState<SettingsValues>(initialValues);
   const [loading, setLoading] = useState(true);
+  const [hasLoadedSettings, setHasLoadedSettings] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -48,12 +49,11 @@ export default function SettingsPage() {
         }
 
         setValues(toFormValues(settings));
+        setHasLoadedSettings(true);
       })
       .catch(() => {
         if (active) {
-          setError(
-            "Impossible de charger les parametres, valeurs locales utilisees.",
-          );
+          setError("Impossible de charger les parametres.");
         }
       })
       .finally(() => {
@@ -119,54 +119,59 @@ export default function SettingsPage() {
             </p>
           ) : null}
 
-          <form className="space-y-4" onSubmit={handleSubmit}>
-            <div className="space-y-2">
-              <Label htmlFor="defaultPrice">PAF par defaut (€)</Label>
-              <Input
-                id="defaultPrice"
-                type="number"
-                min="0"
-                step="0.01"
-                value={values.defaultPrice}
-                onChange={(event) =>
-                  setValues({ ...values, defaultPrice: event.target.value })
-                }
-                required
-              />
-            </div>
+          {hasLoadedSettings ? (
+            <form className="space-y-4" onSubmit={handleSubmit}>
+              <div className="space-y-2">
+                <Label htmlFor="defaultPrice">PAF par defaut (€)</Label>
+                <Input
+                  id="defaultPrice"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={values.defaultPrice}
+                  onChange={(event) =>
+                    setValues({ ...values, defaultPrice: event.target.value })
+                  }
+                  required
+                />
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="defaultMaxPlaces">
-                Nombre de joueurs par defaut
-              </Label>
-              <Input
-                id="defaultMaxPlaces"
-                type="number"
-                min="1"
-                value={values.defaultMaxPlaces}
-                onChange={(event) =>
-                  setValues({ ...values, defaultMaxPlaces: event.target.value })
-                }
-                required
-              />
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="defaultMaxPlaces">
+                  Nombre de joueurs par defaut
+                </Label>
+                <Input
+                  id="defaultMaxPlaces"
+                  type="number"
+                  min="1"
+                  value={values.defaultMaxPlaces}
+                  onChange={(event) =>
+                    setValues({
+                      ...values,
+                      defaultMaxPlaces: event.target.value,
+                    })
+                  }
+                  required
+                />
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="defaultAddress">Lieu par defaut</Label>
-              <Input
-                id="defaultAddress"
-                value={values.defaultAddress}
-                onChange={(event) =>
-                  setValues({ ...values, defaultAddress: event.target.value })
-                }
-                required
-              />
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="defaultAddress">Lieu par defaut</Label>
+                <Input
+                  id="defaultAddress"
+                  value={values.defaultAddress}
+                  onChange={(event) =>
+                    setValues({ ...values, defaultAddress: event.target.value })
+                  }
+                  required
+                />
+              </div>
 
-            <Button className="mt-4" type="submit" disabled={saving}>
-              {saving ? "Sauvegarde..." : "Sauvegarder"}
-            </Button>
-          </form>
+              <Button className="mt-4" type="submit" disabled={saving}>
+                {saving ? "Sauvegarde..." : "Sauvegarder"}
+              </Button>
+            </form>
+          ) : null}
         </CardContent>
       </Card>
     </main>

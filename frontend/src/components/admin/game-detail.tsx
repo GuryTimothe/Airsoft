@@ -29,6 +29,7 @@ import {
   updateGameRegistrationPresence,
   type GameRegistration,
 } from "@/lib/game-registration-api";
+import { formatWallClockDateTime } from "@/lib/date-time";
 import { getUsers, type User } from "@/lib/user-api";
 import { GameRegistrationsExportButton } from "@/components/admin/GameRegistrationsExportButton";
 import { CalendarDays, MapPin, PencilLine, Trash2, Users } from "lucide-react";
@@ -354,7 +355,7 @@ export function GameDetail({ gameId }: GameDetailProps) {
               <div>
                 <p className="font-medium">Date et heure</p>
                 <p className="text-muted-foreground">
-                  {new Date(game.startDateTime).toLocaleString("fr-FR", {
+                  {formatWallClockDateTime(game.startDateTime, {
                     dateStyle: "full",
                     timeStyle: "short",
                   })}

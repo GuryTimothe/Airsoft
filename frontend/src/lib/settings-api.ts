@@ -21,19 +21,59 @@ function buildUrl(path: string): string {
   return `${API_BASE_URL}${path}`;
 }
 
+function asRecord(data: unknown): Record<string, unknown> | null {
+  if (typeof data !== "object" || data === null || Array.isArray(data)) {
+    return null;
+  }
+
+  return data as Record<string, unknown>;
+}
+
+function firstHydraMember(data: unknown): Record<string, unknown> | null {
+  const root = asRecord(data);
+  if (!root) {
+    return null;
+  }
+
+  const member = root["hydra:member"];
+  if (!Array.isArray(member) || member.length === 0) {
+    return root;
+  }
+
+  return asRecord(member[0]);
+}
+
 function normalizeSettings(data: unknown): AppSetting {
-  const d = data as Record<string, unknown>;
+  const d = firstHydraMember(data);
+  if (!d) {
+    throw new Error("Format de reponse invalide pour les parametres");
+  }
+
   const get = (key: string) => d[key];
+
+  const defaultAddressRaw = get("defaultAddress") ?? get("default_address");
+  const defaultPriceRaw = get("defaultPrice") ?? get("default_price");
+  const defaultMaxPlacesRaw =
+    get("defaultMaxPlaces") ?? get("default_max_places");
+
+  const defaultAddress =
+    typeof defaultAddressRaw === "string" ? defaultAddressRaw : null;
+  const defaultPrice = Number(defaultPriceRaw);
+  const defaultMaxPlaces = Number(defaultMaxPlacesRaw);
+
+  if (
+    !defaultAddress ||
+    !Number.isFinite(defaultPrice) ||
+    !Number.isFinite(defaultMaxPlaces)
+  ) {
+    throw new Error("Parametres recus incomplets ou invalides");
+  }
 
   return {
     id: Number(get("id") ?? 0),
-    defaultAddress: String(
-      get("defaultAddress") ?? get("default_address") ?? "Terrain principal",
-    ),
-    defaultPrice: Number(get("defaultPrice") ?? get("default_price") ?? 10),
-    defaultMaxPlaces: Number(
-      get("defaultMaxPlaces") ?? get("default_max_places") ?? 24,
-    ),
+    defaultAddress,
+    defaultPrice,
+    defaultMaxPlaces,
     createdAt:
       (get("createdAt") as string) ??
       (get("created_at") as string) ??
@@ -61,7 +101,7 @@ export async function getAppSettings(): Promise<AppSetting | null> {
   }
 
   const data = await response.json();
-  if (null === data || Array.isArray(data)) {
+  if (null === data) {
     return null;
   }
 

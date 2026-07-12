@@ -50,6 +50,7 @@ export interface CollectionView {
 export interface UsersResult {
   users: User[];
   view?: CollectionView;
+  totalItems?: number;
 }
 
 export interface UpdateMyProfilePayload {
@@ -255,7 +256,9 @@ export async function getUsers(page?: number): Promise<UsersResult> {
     items = data["items"];
   }
 
-  const rawView = data["view"] as Record<string, string> | undefined;
+  const rawView =
+    (data["hydra:view"] as Record<string, string> | undefined) ??
+    (data["view"] as Record<string, string> | undefined);
   const view: CollectionView | undefined = rawView
     ? {
         first: rawView["first"],
@@ -265,7 +268,13 @@ export async function getUsers(page?: number): Promise<UsersResult> {
       }
     : undefined;
 
-  return { users: items.map((item) => normalizeUser(item)), view };
+  const totalItems = Number(data["hydra:totalItems"] ?? data["totalItems"]);
+
+  return {
+    users: items.map((item) => normalizeUser(item)),
+    view,
+    totalItems: Number.isFinite(totalItems) ? totalItems : undefined,
+  };
 }
 
 export async function updateUser(

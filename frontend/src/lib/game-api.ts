@@ -46,6 +46,7 @@ export interface CollectionView {
 export interface GamesResult {
   games: Game[];
   view?: CollectionView;
+  totalItems?: number;
 }
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -117,7 +118,9 @@ export async function getGamesPage(page?: number): Promise<GamesResult> {
     items = data["items"];
   }
 
-  const rawView = data["view"] as Record<string, string> | undefined;
+  const rawView =
+    (data["hydra:view"] as Record<string, string> | undefined) ??
+    (data["view"] as Record<string, string> | undefined);
   const view: CollectionView | undefined = rawView
     ? {
         first: rawView["first"],
@@ -127,7 +130,13 @@ export async function getGamesPage(page?: number): Promise<GamesResult> {
       }
     : undefined;
 
-  return { games: items.map((it) => normalizeGame(it)), view };
+  const totalItems = Number(data["hydra:totalItems"] ?? data["totalItems"]);
+
+  return {
+    games: items.map((it) => normalizeGame(it)),
+    view,
+    totalItems: Number.isFinite(totalItems) ? totalItems : undefined,
+  };
 }
 
 export async function getGames(): Promise<Game[]> {
