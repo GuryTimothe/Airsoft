@@ -5,6 +5,7 @@ on:
     branches: [dev, main]
   pull_request:
     branches: [dev, main]
+  workflow_call:
 
 jobs:
   accessibility:
@@ -52,7 +53,7 @@ jobs:
 
       - name: Upload Pa11y report
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: pa11y-report
           path: frontend/pa11y-report.json
