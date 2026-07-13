@@ -446,4 +446,349 @@ describe("user-api", () => {
     expect(result.user.email).toBe("alex@example.com");
     expect(result.token).toBe("rotated.jwt.token");
   });
+
+  // ── Error paths ──────────────────────────────────────────────────────────
+
+  it("throws when getUsers fails", async () => {
+    fetchMock.mockResolvedValueOnce({ ok: false, text: async () => "" });
+    await expect(getUsers()).rejects.toThrow(
+      "Impossible de charger les utilisateurs",
+    );
+  });
+
+  it("throws when getUser fails", async () => {
+    fetchMock.mockResolvedValueOnce({ ok: false, json: async () => ({}) });
+    await expect(getUser(99)).rejects.toThrow(
+      "Impossible de charger l'utilisateur",
+    );
+  });
+
+  it("throws when getCurrentUser fails", async () => {
+    fetchMock.mockResolvedValueOnce({ ok: false, json: async () => ({}) });
+    await expect(getCurrentUser()).rejects.toThrow(
+      "Impossible de charger l'utilisateur courant",
+    );
+  });
+
+  it("throws when createUser fails with text body", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      text: async () => "Email already taken",
+    });
+    await expect(
+      createUser({
+        lastname: "X",
+        firstname: "Y",
+        email: "x@y.com",
+        password: "pass",
+        dateOfBirth: "1990-01-01",
+      }),
+    ).rejects.toThrow("Email already taken");
+  });
+
+  it("throws when updateUser fails", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      text: async () => "Forbidden",
+    });
+    await expect(updateUser(1, { role: "ROLE_ADMIN" })).rejects.toThrow(
+      "Forbidden",
+    );
+  });
+
+  it("throws when deleteUser fails", async () => {
+    fetchMock.mockResolvedValueOnce({ ok: false, json: async () => ({}) });
+    await expect(deleteUser(1)).rejects.toThrow(
+      "Impossible de supprimer l'utilisateur",
+    );
+  });
+
+  it("throws when deleteCurrentUser fails with detail message", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({ detail: "Non autorisé." }),
+    });
+    await expect(deleteCurrentUser()).rejects.toThrow("Non autorisé.");
+  });
+
+  it("throws when updateMyProfile fails", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({ message: "Validation échouée." }),
+    });
+    await expect(updateMyProfile({ firstname: "X" })).rejects.toThrow(
+      "Validation échouée.",
+    );
+  });
+
+  it("throws when updateMyEmail fails with violations", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({
+        violations: [{ message: "Email invalide." }],
+      }),
+    });
+    await expect(
+      updateMyEmail({ email: "bad", currentPassword: "pw" }),
+    ).rejects.toThrow("Email invalide.");
+  });
+
+  it("throws when updateMyPassword fails with generic error", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({}),
+    });
+    await expect(
+      updateMyPassword({ currentPassword: "old", newPassword: "new123" }),
+    ).rejects.toThrow("Une erreur est survenue.");
+  });
+
+  // ── Normalisation edge cases ──────────────────────────────────────────────
+
+  it("handles getUsers with member array format", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        member: [
+          {
+            id: 10,
+            lastname: "Test",
+            firstname: "User",
+            email: "t@t.com",
+            dateOfBirth: "1990-01-01",
+            role: "ROLE_USER",
+            canSeePrivate: false,
+          },
+        ],
+      }),
+    });
+
+    const result = await getUsers();
+    expect(result.users).toHaveLength(1);
+  });
+
+  it("handles getUsers with items array format and pagination view", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        items: [
+          {
+            id: 11,
+            lastname: "P",
+            firstname: "Q",
+            email: "pq@t.com",
+            dateOfBirth: "1991-02-02",
+            role: "ROLE_USER",
+            canSeePrivate: false,
+          },
+        ],
+        "hydra:view": { next: "/api/users?page=2", last: "/api/users?page=5" },
+        "hydra:totalItems": 50,
+      }),
+    });
+
+    const result = await getUsers(1);
+    expect(result.users).toHaveLength(1);
+    expect(result.view?.next).toContain("page=2");
+    expect(result.totalItems).toBe(50);
+  });
+
+  it("handles JSON parse error when fetching users", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => {
+        throw new Error("Invalid JSON");
+      },
+    });
+
+    await expect(getUsers()).rejects.toThrow();
+  });
+
+  it("handles fetch error when getting users", async () => {
+    fetchMock.mockRejectedValueOnce(new Error("Network error"));
+
+    await expect(getUsers()).rejects.toThrow("Network error");
+  });
+
+  it("handles HTTP error when getting current user", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({ detail: "User not found" }),
+    });
+
+    await expect(getCurrentUser()).rejects.toThrow(
+      "Impossible de charger l'utilisateur courant",
+    );
+  });
+
+  it("handles HTTP error when creating user", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      text: async () => "Email already exists",
+    });
+
+    await expect(
+      createUser({
+        firstname: "Test",
+        lastname: "User",
+        email: "test@example.com",
+        password: "Password123",
+        dateOfBirth: "1990-01-01",
+        role: "ROLE_USER",
+      }),
+    ).rejects.toThrow("Email already exists");
+  });
+
+  it("handles HTTP error when updating email", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({ message: "Email update failed" }),
+    });
+
+    await expect(
+      updateMyEmail(
+        { email: "new@example.com", password: "Password123" },
+        "token",
+      ),
+    ).rejects.toThrow("Email update failed");
+  });
+
+  it("handles HTTP error when updating password", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({ detail: "Invalid password" }),
+    });
+
+    await expect(
+      updateMyPassword(
+        {
+          oldPassword: "OldPass123",
+          newPassword: "NewPass123",
+          newPasswordConfirmation: "NewPass123",
+        },
+        "token",
+      ),
+    ).rejects.toThrow("Invalid password");
+  });
+
+  it("handles JSON parse error when deleting user", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      json: async () => {
+        throw new Error("Invalid JSON");
+      },
+    });
+
+    await expect(deleteUser(1, "token")).rejects.toThrow();
+  });
+
+  it("handles fetch error when updating profile", async () => {
+    fetchMock.mockRejectedValueOnce(new Error("Network error"));
+
+    await expect(
+      updateMyProfile(
+        {
+          firstname: "Updated",
+          lastname: "Name",
+          dateOfBirth: "1990-01-01",
+        },
+        "token",
+      ),
+    ).rejects.toThrow("Network error");
+  });
+
+  it("handles violations array in error response", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({
+        violations: [
+          {
+            message: "Validation failed",
+            propertyPath: "email",
+          },
+        ],
+      }),
+    });
+
+    await expect(
+      updateMyEmail({ email: "invalid", password: "Pass123" }, "token"),
+    ).rejects.toThrow("Validation failed");
+  });
+
+  it("handles getUsers with plain array response", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => [
+        {
+          id: 12,
+          lastname: "A",
+          firstname: "B",
+          email: "ab@t.com",
+          dateOfBirth: "1992-03-03",
+          role: "ROLE_USER",
+          canSeePrivate: false,
+        },
+      ],
+    });
+
+    const result = await getUsers();
+    expect(result.users).toHaveLength(1);
+  });
+
+  it("normalises canSeePrivate from numeric value", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        id: 30,
+        lastname: "Num",
+        firstname: "Test",
+        email: "num@t.com",
+        dateOfBirth: "1990-01-01",
+        role: "ROLE_USER",
+        canSeePrivate: 1,
+      }),
+    });
+
+    const user = await getUser(30);
+    expect(user.canSeePrivate).toBe(true);
+  });
+
+  it("normalises canSeePrivate from string true", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        id: 31,
+        lastname: "Str",
+        firstname: "Test",
+        email: "str@t.com",
+        dateOfBirth: "1990-01-01",
+        role: "ROLE_USER",
+        canSeePrivate: "true",
+      }),
+    });
+
+    const user = await getUser(31);
+    expect(user.canSeePrivate).toBe(true);
+  });
+
+  it("maps createdAt and updatedAt from API response", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        id: 32,
+        lastname: "T",
+        firstname: "U",
+        email: "tu@t.com",
+        dateOfBirth: "1990-01-01",
+        role: "ROLE_USER",
+        canSeePrivate: false,
+        createdAt: "2026-01-01T00:00:00+00:00",
+        updatedAt: "2026-06-01T00:00:00+00:00",
+      }),
+    });
+
+    const user = await getUser(32);
+    expect(user.createdAt).toBe("2026-01-01T00:00:00+00:00");
+    expect(user.updatedAt).toBe("2026-06-01T00:00:00+00:00");
+  });
 });

@@ -41,5 +41,7 @@ export async function getEmergencyContactByUserId(
     return null;
   }
 
-  return parseEmergencyContact(items[0] as unknown as string | EmergencyContactFields | null | undefined);
+  return parseEmergencyContact(
+    items[0] as unknown as string | EmergencyContactFields | null | undefined,
+  );
 }

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { GameListCard } from "./GameListCard";
 import { getGames } from "@/lib/game-api";
 import { getMyGameRegistrations } from "@/lib/game-registration-api";
@@ -19,6 +19,7 @@ jest.mock("@/lib/game-registration-api", () => ({
 }));
 
 jest.mock("@/lib/auth", () => ({
+  AUTH_STATE_CHANGE_EVENT: "auth-state-changed",
   getAuthToken: jest.fn(),
   getUserIdentifierCandidatesFromToken: jest.fn(),
   hasAdminAccessToken: jest.fn(),
@@ -141,5 +142,112 @@ describe("GameListCard", () => {
     expect(
       screen.getByRole("button", { name: "S'inscrire à Forêt" }),
     ).toBeEnabled();
+  });
+
+  it("shows 'Complet' disabled button for regular user when game is full", async () => {
+    mockedGetAuthToken.mockReturnValue("token");
+    mockedHasAdminAccessToken.mockReturnValue(false);
+    mockedGetGames.mockResolvedValueOnce([
+      {
+        id: 1,
+        title: "Forêt",
+        description: "Partie en forêt",
+        startDateTime: new Date(Date.now() + 86400000).toISOString(),
+        address: "Domaine de la Forêt",
+        price: 15,
+        maxPlaces: 5,
+        registrationCount: 5,
+        availablePlaces: 0,
+        full: true,
+        isPublic: true,
+      },
+    ]);
+
+    render(<GameListCard />);
+
+    await waitFor(() => {
+      const buttons = screen.getAllByText("Complet");
+      const disabledButton = buttons.find(
+        (el) => el.tagName === "BUTTON" || el.closest("button"),
+      );
+      expect(disabledButton).toBeDefined();
+    });
+    expect(
+      screen.getByRole("button", { name: "Forêt est complet" }),
+    ).toBeDisabled();
+  });
+
+  it("shows cancel button when user is already registered", async () => {
+    mockedGetAuthToken.mockReturnValue("token");
+    mockedHasAdminAccessToken.mockReturnValue(false);
+    mockedGetMyGameRegistrations.mockResolvedValueOnce([
+      {
+        id: 42,
+        gameId: 1,
+        userId: 1,
+        userFirstname: "Jean",
+        userLastname: "Dupont",
+        userEmail: "jean@test.com",
+        userAge: 30,
+        isPresent: false,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+
+    render(<GameListCard />);
+
+    await screen.findByText("Annuler l'inscription");
+    expect(
+      screen.getByRole("button", { name: "Annuler l'inscription à Forêt" }),
+    ).toBeInTheDocument();
+  });
+
+  it("handles register action successfully", async () => {
+    const { registerToGame } = await import("@/lib/game-registration-api");
+    const mockedRegisterToGame = registerToGame as jest.MockedFunction<
+      typeof registerToGame
+    >;
+
+    mockedGetAuthToken.mockReturnValue("token");
+    mockedHasAdminAccessToken.mockReturnValue(false);
+    mockedRegisterToGame.mockResolvedValue({
+      id: 99,
+      gameId: 1,
+      userId: 1,
+      userFirstname: "Jean",
+      userLastname: "Dupont",
+      userEmail: "jean@test.com",
+      userAge: 30,
+      isPresent: false,
+      createdAt: new Date().toISOString(),
+    });
+
+    render(<GameListCard />);
+
+    await screen.findByRole("button", { name: "S'inscrire à Forêt" });
+    fireEvent.click(screen.getByRole("button", { name: "S'inscrire à Forêt" }));
+
+    await waitFor(() => {
+      expect(mockedRegisterToGame).toHaveBeenCalledWith(1);
+    });
+  });
+
+  it("shows error when games cannot be loaded", async () => {
+    mockedGetGames.mockRejectedValueOnce(new Error("Serveur indisponible"));
+
+    render(<GameListCard />);
+
+    expect(await screen.findByText("Serveur indisponible")).toBeInTheDocument();
+  });
+
+  it("shows 'Se connecter' link button for unauthenticated user", async () => {
+    mockedGetAuthToken.mockReturnValue(null);
+
+    render(<GameListCard />);
+
+    await screen.findByText("Forêt");
+    expect(
+      screen.getByText("Se connecter pour s'inscrire"),
+    ).toBeInTheDocument();
   });
 });

@@ -13,6 +13,11 @@ import {
   hasAdminAccessToken,
 } from "@/lib/auth";
 
+type HeaderProps = {
+  initialIsAuthenticated: boolean;
+  initialHasAdminAccess: boolean;
+};
+
 export function Header({
   initialIsAuthenticated,
   initialHasAdminAccess,

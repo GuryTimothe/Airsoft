@@ -36,39 +36,45 @@ ROLE_USER
 
 #### Voter Security (Fine-grained)
 
-**Fichier**: `src/Security/Voter/UserVoter.php`
+**Fichiers** :
+- `src/Security/Voter/UserVoter.php` — gestion des utilisateurs
+- `src/Security/Voter/GameVoter.php` — accès et création de parties
+- `src/Security/Voter/GameRegistrationVoter.php` — inscriptions aux parties
+- `src/Security/Voter/AppSettingVoter.php` — paramètres application
 
-Contrôles spécifiques par opération:
-
-```php
-// Exemples de règles:
-- VIEW_ALL_USERS: "is_granted('ROLE_ADMIN')"
-- DELETE_USER: "is_granted('ROLE_ADMIN')"
-- CREATE_USER: "is_granted('ROLE_ADMIN')"
-- UPDATE_USER: "is_granted('ROLE_ADMIN')"
-```
-
-**Coverage**: 100% (5/5 methods tested)
-
-#### Object-level Security
-
-Accès aux ressources propres:
+Contrôles spécifiques par opération :
 
 ```php
-// User peut voir son propre profil
-GET /api/users/me  // Works
-GET /api/users/other-id  // Forbidden unless ADMIN
+// UserVoter
+- VIEW_ALL_USERS:  ROLE_ADMIN requis
+- DELETE_USER:     ROLE_ADMIN requis (ne peut pas supprimer ADMIN/SUPER_ADMIN)
+- CREATE_USER:     ROLE_ADMIN requis (ne peut pas créer ADMIN/SUPER_ADMIN)
+- UPDATE_USER:     ROLE_ADMIN requis
 
-// User peut supprimer sa propre inscription
-DELETE /api/game_registrations/5  // Works si user == owner
-DELETE /api/game_registrations/other  // Forbidden
+// GameVoter
+- LIST_GAMES:      Public (tous)
+- VIEW_GAME:       Public si isPublic=true, sinon canSeePrivate || ADMIN
+- CREATE_GAME:     ROLE_ADMIN || ROLE_ORGANIZER || ROLE_SUPER_ADMIN
+- UPDATE_GAME:     Idem CREATE
+- DELETE_GAME:     Idem CREATE
+
+// GameRegistrationVoter
+- REGISTER_GAME:          isPublic || canSeePrivate || ROLE_ADMIN
+- DELETE_GAME_REGISTRATION: owner || ROLE_ADMIN || ROLE_ORGANIZER
+- PATCH_GAME_REGISTRATION:  ROLE_ADMIN || ROLE_ORGANIZER || ROLE_SUPER_ADMIN
+
+// AppSettingVoter
+- MANAGE_APP_SETTINGS: ROLE_ADMIN || ROLE_SUPER_ADMIN
 ```
+
+**Couverture voters** : 100% (UserVoter, GameVoter, AppSettingVoter) — GameRegistrationVoter 91.89% lignes
 
 #### Tests
 
-- ✓ `tests/Security/Voter/UserVoterTest.php` (100% coverage)
-- ✓ 15+ test cases pour authorization
-- ✓ Tests: non-User tokens, unknown attributes, subject type mismatch
+- ✓ `tests/Security/Voter/UserVoterTest.php` (100% coverage, 25 tests)
+- ✓ `tests/Security/Voter/GameVoterTest.php` (100% coverage, 13 tests)
+- ✓ `tests/Security/Voter/GameRegistrationVoterTest.php` (91.89% coverage, 12 tests)
+- ✓ `tests/Security/Voter/AppSettingVoterTest.php` (100% coverage, 6 tests)
 
 ### ❌ Non Implémenté
 
@@ -236,12 +242,13 @@ class GameRegistrationInput {
 
 | Threat | Mitigation | Status |
 |--------|-----------|--------|
-| Unauthorized game registration | RBAC + voter | ✓ |
-| User privilege escalation | Role hierarchy | ✓ |
-| Data leakage (password in response) | Serializer groups | ✓ |
-| Game full while registering (race condition) | Atomic check | To verify |
-| Account takeover | JWT + password hash | ✓ |
-| Unauthorized CSV export | ADMIN-only endpoints | ✓ |
+| Unauthorized game registration | RBAC + GameRegistrationVoter | ✓ Testé |
+| User privilege escalation | Role hierarchy + UserVoter | ✓ Testé |
+| Data leakage (password in response) | Serializer groups | ✓ Testé |
+| Game full while registering (race condition) | Contrôle atomique avant persist | ✓ Implémenté |
+| Account takeover | JWT + password hash bcrypt | ✓ Testé |
+| Unauthorized CSV export | ADMIN-only endpoints + AppSettingVoter | ✓ Testé |
+| Partie privée accédée par user non autorisé | GameVoter + GameVisibilityExtension | ✓ Testé |
 
 #### Security Requirements Built-in
 
@@ -410,6 +417,8 @@ feat: ajouter export Excel
 fix: corriger validation email
 ```
 
+**Branch Protection** : Branche `main` protégée — PRs obligatoires, CI doit passer avant merge.
+
 **Code Signing**: Not enforced
 
 ### ❌ Non Implémenté
@@ -428,17 +437,19 @@ fix: corriger validation email
 **Logging Framework**: Symfony Monolog
 
 ```php
-// Logs written to: var/log/
-// Can include: errors, warnings, auth events
+// Logs écrits dans : var/log/
+// Niveaux : error, warning, info, debug
+// Erreurs HTTP 4xx/5xx loguées automatiquement par Symfony
 ```
 
-**What should be logged** (Not fully implemented):
+**Ce qui est logué actuellement** :
 
-- ✓ Errors & exceptions
-- ✗ Authentication events (login attempts, failures)
-- ✗ Authorization failures (denied access)
-- ✗ Admin actions (user edits, exports)
-- ✗ Data changes (audit trail)
+- ✓ Erreurs & exceptions (Symfony default)
+- ✓ Requêtes HTTP en dev mode
+- ✗ Événements d'authentification (login attempts, failures)
+- ✗ Échecs d'autorisation (denied access)
+- ✗ Actions admin (modifications utilisateurs, exports)
+- ✗ Modifications de données (audit trail)
 
 **GitHub Actions Logging**:
 
@@ -482,18 +493,18 @@ fix: corriger validation email
 
 | OWASP Flaw | Implémenté | Partiellement | À Faire | Evidence |
 |------------|-----------|--------------|---------|----------|
-| A1 - Broken Access Control | ✓ | - | - | Voter, RBAC |
-| A2 - Cryptographic Failures | ✓ | - | HTTPS | Bcrypt, JWT |
-| A3 - Injection | ✓ | - | XSS headers | Doctrine ORM |
-| A4 - Insecure Design | - | ✓ | - | Architecture review needed |
-| A5 - Security Misconfiguration | ✓ | - | Headers | .env, CORS |
-| A6 - Vulnerable Components | ✓ | - | Auto updates | composer/npm latest |
-| A7 - Authentication Failures | ✓ | - | Rate limit | JWT auth |
-| A8 - Integrity Failures | - | ✓ | - | Conv. Commits |
-| A9 - Logging & Monitoring | - | ✓ | Audit logs | Monolog basic |
+| A1 - Broken Access Control | ✓ | - | - | UserVoter, GameVoter, GameRegistrationVoter, AppSettingVoter |
+| A2 - Cryptographic Failures | ✓ | - | HTTPS prod | Bcrypt, JWT nonce rotation |
+| A3 - Injection | ✓ | - | XSS headers CSP | Doctrine ORM, Symfony Validator |
+| A4 - Insecure Design | ✓ | - | Formal STRIDE | 5 processors de sécurité, race-condition traitée |
+| A5 - Security Misconfiguration | ✓ | - | Security headers prod | .env, CORS restrictif |
+| A6 - Vulnerable Components | ✓ | - | Auto updates | composer/npm versions stables |
+| A7 - Authentication Failures | ✓ | - | Rate limiting | JWT auth, token rotation |
+| A8 - Integrity Failures | - | ✓ | Signed commits | Conventional Commits + branch protection |
+| A9 - Logging & Monitoring | - | ✓ | Audit logs | Monolog erreurs, logs CI/CD |
 | A10 - SSRF | ✓ | - | - | N/A |
 
-**Overall Coverage**: 60% fully implemented, 20% partial, 20% missing
+**Overall Coverage**: 70% fully implemented, 20% partial, 10% missing
 
 ---
 

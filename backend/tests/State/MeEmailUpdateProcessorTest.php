@@ -172,4 +172,37 @@ final class MeEmailUpdateProcessorTest extends TestCase
 
         $this->assertInstanceOf(MeUpdateOutput::class, $result);
     }
+
+    public function testThrowsWhenNoUserResolvable(): void
+    {
+        $payload = new MeEmailUpdateInput();
+
+        $entityManager  = $this->createMock(EntityManagerInterface::class);
+        $passwordHasher = $this->createMock(UserPasswordHasherInterface::class);
+        $jwtManager     = $this->createMock(JWTTokenManagerInterface::class);
+
+        $security = $this->createMock(Security::class);
+        $security->method('getUser')->willReturn(null);
+
+        $processor = new MeEmailUpdateProcessor($entityManager, $passwordHasher, $jwtManager, $security);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $processor->process($payload, new Patch(uriTemplate: '/me/email'), context: []);
+    }
+
+    public function testThrowsWhenPreviousDataIsNotUser(): void
+    {
+        $payload = new MeEmailUpdateInput();
+
+        $entityManager  = $this->createMock(EntityManagerInterface::class);
+        $passwordHasher = $this->createMock(UserPasswordHasherInterface::class);
+        $jwtManager     = $this->createMock(JWTTokenManagerInterface::class);
+        $security       = $this->createMock(Security::class);
+
+        $processor = new MeEmailUpdateProcessor($entityManager, $passwordHasher, $jwtManager, $security);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Previous user state is invalid.');
+        $processor->process($payload, new Patch(uriTemplate: '/me/email'), context: ['previous_data' => new \stdClass()]);
+    }
 }

@@ -156,4 +156,40 @@ final class GameTest extends TestCase
 
         $this->assertNull($game->getDescription());
     }
+
+    public function testStartDateInPastFailsValidation(): void
+    {
+        $validator = \Symfony\Component\Validator\Validation::createValidatorBuilder()
+            ->enableAttributeMapping()
+            ->getValidator();
+
+        $game = $this->createGame();
+        $game->setStartDateTime(new \DateTimeImmutable('-1 day'));
+
+        $violations = $validator->validate($game);
+
+        $paths = [];
+        foreach ($violations as $v) {
+            $paths[] = $v->getPropertyPath();
+        }
+        $this->assertContains('startDateTime', $paths);
+    }
+
+    public function testStartDateTodayOrFuturePassesValidation(): void
+    {
+        $validator = \Symfony\Component\Validator\Validation::createValidatorBuilder()
+            ->enableAttributeMapping()
+            ->getValidator();
+
+        $game = $this->createGame();
+        $game->setStartDateTime(new \DateTimeImmutable('+1 week'));
+
+        $violations = $validator->validate($game);
+
+        $paths = [];
+        foreach ($violations as $v) {
+            $paths[] = $v->getPropertyPath();
+        }
+        $this->assertNotContains('startDateTime', $paths);
+    }
 }

@@ -139,6 +139,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column(type: 'date')]
     #[Assert\NotNull(groups: ['user:create', 'user:admin:update', 'user:self:general'])]
+    #[Assert\LessThanOrEqual('today', message: "La date de naissance ne peut pas \u00eatre dans le futur.", groups: ['user:create', 'user:admin:update', 'user:self:general'])]
     #[Groups(['user:read', 'user:write', 'user:self:write', 'user:me:read'])]
     private \DateTimeInterface $dateOfBirth;
 

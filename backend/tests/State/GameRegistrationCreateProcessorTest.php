@@ -45,7 +45,11 @@ final class GameRegistrationCreateProcessorTest extends TestCase
     ): GameRegistrationCreateProcessor {
         $security = $this->createMock(Security::class);
         $security->method('getUser')->willReturn($user);
-        $security->method('isGranted')->willReturnCallback(function (string $attr) use ($isAdmin) {
+        $security->method('isGranted')->willReturnCallback(function (string $attr, mixed $subject = null) use ($isAdmin) {
+            if ('REGISTER_GAME' === $attr) {
+                return $subject instanceof Game && ($subject->isPublic() || $isAdmin);
+            }
+
             return $isAdmin && \in_array($attr, ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN'], true);
         });
 
@@ -165,7 +169,9 @@ final class GameRegistrationCreateProcessorTest extends TestCase
 
         $security = $this->createMock(Security::class);
         $security->method('getUser')->willReturn($user);
-        $security->method('isGranted')->willReturn(false);
+        $security->method('isGranted')->willReturnCallback(function (string $attr, mixed $subject = null) {
+            return 'REGISTER_GAME' === $attr && $subject instanceof Game && $subject->isPublic();
+        });
 
         $validator = $this->createMock(ValidatorInterface::class);
         $validator->method('validate')->willReturn(new ConstraintViolationList());
@@ -200,7 +206,9 @@ final class GameRegistrationCreateProcessorTest extends TestCase
 
         $security = $this->createMock(Security::class);
         $security->method('getUser')->willReturn($user);
-        $security->method('isGranted')->willReturn(false);
+        $security->method('isGranted')->willReturnCallback(function (string $attr, mixed $subject = null) {
+            return 'REGISTER_GAME' === $attr && $subject instanceof Game && $subject->isPublic();
+        });
 
         $validator = $this->createMock(ValidatorInterface::class);
         $validator->method('validate')->willReturn(new ConstraintViolationList());
