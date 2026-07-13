@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/table";
 import { CalendarDays, Eye, Pencil, Users } from "lucide-react";
 import { getGamesPage, type CollectionView, type Game } from "@/lib/game-api";
+import { formatWallClockDateTime } from "@/lib/date-time";
 
 type VisibilityFilter = "all" | "public" | "private";
 type SortOption = "date" | "people" | "paf";
@@ -32,10 +33,9 @@ type GameTableProps = {
 };
 
 function formatDate(date: string) {
-  return new Date(date).toLocaleString("fr-FR", {
+  return formatWallClockDateTime(date, {
     dateStyle: "medium",
     timeStyle: "short",
-    timeZone: "Europe/Paris",
   });
 }
 

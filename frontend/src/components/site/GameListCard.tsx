@@ -19,6 +19,7 @@ import {
   type GameRegistration,
 } from "@/lib/game-registration-api";
 import gameBanner from "@/assets/images/game-banner.jpg";
+import { formatWallClockDateTime } from "@/lib/date-time";
 
 interface Party {
   id: number;
@@ -303,7 +304,6 @@ export function GameListCard() {
           new Date(a.startDateTime).getTime() -
           new Date(b.startDateTime).getTime(),
       )
-      .slice(0, 3)
       .map((game) =>
         mapGameToParty(game, registrationsByGameId.get(game.id) ?? null),
       );
@@ -330,7 +330,7 @@ export function GameListCard() {
           {upcomingGames.map((party) => {
             const spotsLeft = Math.max(0, party.maxPlayers - party.players);
 
-            const formattedDate = new Date(party.date).toLocaleString("fr-FR", {
+            const formattedDate = formatWallClockDateTime(party.date, {
               weekday: "long",
               day: "numeric",
               month: "long",
