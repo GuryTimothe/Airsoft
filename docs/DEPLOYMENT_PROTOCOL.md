@@ -9,10 +9,14 @@
 ### 1.1 Architecture Générale
 
 ```
-Developer Push → GitHub Events → Workflows
-                                    ├─ backend-ci.yml (PHP 8.4)
-                                    ├─ frontend-ci.yml (Node 20)
-                                    └─ Parallel Execution
+Developer Push → GitHub Events → ci-cd.yml
+                                    ├─ backend-ci.yml (PHP 8.4)  ─┐
+                                    ├─ frontend-ci.yml (Node 20)  ─┤ Parallèle
+                                    │                               │
+                                    │       ┌───────────────────────┘
+                                    ├─ lighthouse.yml (needs: frontend)
+                                    ├─ pa11y.yml (needs: lighthouse)
+                                    └─ release.yml (needs: all, si main)
                                            ↓
                                     [Pass] → [Release Automation]
                                     [Fail] → [Block Merge + Alert]
@@ -20,12 +24,13 @@ Developer Push → GitHub Events → Workflows
 
 ### 1.2 Flux d'Intégration
 
-1. **Trigger** : Push sur branche (`**`) ou PR
-2. **Jobs Parallèles** :
-   - `backend-ci.yml` - Tests et linting PHP
-   - `frontend-ci.yml` - Linting, tests, build Next.js
-3. **Dépendance** : Release workflow s'exécute APRÈS backend + frontend (si main)
-4. **Résultat** : ✓ Tous tests passent → Merge autorisé | ✗ Fail → PR bloquée
+1. **Trigger** : Push sur toutes branches (`**`)
+2. **Jobs** :
+   - `backend-ci.yml` + `frontend-ci.yml` — **Parallèle**
+   - `lighthouse.yml` — **Après** frontend (needs: frontend)
+   - `pa11y.yml` — **Après** lighthouse (needs: lighthouse)
+   - `release.yml` — **Après tout** (si branche `main` uniquement)
+3. **Résultat** : ✓ Tous tests passent → Release possible | ✗ Fail → Job bloqué
 
 **Fichier config** : `.github/workflows/ci-cd.yml`
 
@@ -40,14 +45,12 @@ Developer Push → GitHub Events → Workflows
 | 1 | Setup PHP | shivammathur/setup-php@v2 | PHP 8.4 + extensions | PHP disponible |
 | 2 | Composer Install | `composer install` | Dépendances | vendor/ populé |
 | 3 | **PHP-CS-Fixer Check** | `composer fix:check` | Code style | 0 errors |
-| 4 | **PHPStan Analyse** | `php ./vendor/bin/phpstan` | Analyse statique Level 5 | 0 errors |
-| 5 | **PHPUnit Tests** | `php bin/console test` | Tests unitaires | 222 tests ✓, 469 assertions |
-| 6 | **Coverage Report** | `--coverage-text` | Code coverage | 70.35% ✅ (cible 70%) |
+| 4 | **PHPStan Analyse** | `vendor/bin/phpstan analyse -c phpstan.neon.dist` | Analyse statique Level 5 | 0 errors |
+| 5 | **PHPUnit Tests** | `vendor/bin/phpunit` | Tests unitaires | 269 tests ✓, 0 failures |
 
 **Seuils Minimums** :
 - PHPStan: 0 errors (level 5 = strict)
 - PHPUnit: 0 failures
-- Code Coverage: 70.35% — cible 70% ✅
 
 **Configuration** :
 - PHP version: `8.4`
@@ -68,9 +71,9 @@ php vendor/bin/phpunit --coverage-html coverage/
 ```
 
 **Couverture Actuelle**:
-- Lines: 52.86% (434/821)
-- Methods: 69.66% (124/178)
-- Classes: 35.71% (10/28)
+- Lines: **71.73%** (cible 70% ✅)
+- Methods: 85%
+- Classes: 66.67%
 
 ### 1.4 Frontend CI Workflow
 
@@ -84,20 +87,18 @@ php vendor/bin/phpunit --coverage-html coverage/
 | 2 | npm install | `npm install` | Dépendances | node_modules/ populé |
 | 3 | **ESLint Check** | `npm run lint` | Linting TypeScript/React | 0 errors |
 | 4 | **Prettier Format Check** | `npm run format:check` | Formatting | 0 unformatted files |
-| 5 | **Jest Tests** | `npm test` | Tests unitaires | All tests ✓ |
-| 6 | **TypeScript Compile** | `npm run build` | Build production | Build succeeds |
+| 5 | **Jest Tests** | `npm test` | Tests unitaires | 227 tests ✓, 0 failures |
 
 **Seuils Minimums** :
 - ESLint: 0 errors
 - Prettier: 100% formatted
 - Jest: All tests pass
-- TypeScript: No compilation errors
 
 **Configuration** :
 - Node version: `20`
 - Package Manager: npm 10+
 - Testing Framework: Jest
-- Test Coverage: ≥ 70% (actuellement 70.62%)
+- Test Coverage: ≥ 70% (actuellement **78.73%** ✅)
 
 #### Test Coverage
 
@@ -115,8 +116,7 @@ npm run lint
 ```
 
 **Couverture Actuelle**:
-- Coverage: 70.62% (global)
-- Auth module: 60.37%
+- Coverage: **78.73%** (global, 227 tests)
 
 ### 1.5 Conditions de Validation
 
@@ -615,13 +615,248 @@ docker-compose pull && docker-compose up -d
 
 ---
 
-## 8. Timeline & Roadmap
+## 8. Manuel d'Upgrade et Migrations (C2.4.1)
+
+### 8.1 Processus de Mise à Jour
+
+#### Mise à Jour Locale (Développement)
+
+**Prérequis** : Application arrêtée, branche `main` à jour
+
+```bash
+# 1. Récupérer les derniers changements
+git fetch origin
+git checkout main
+git pull origin main
+
+# 2. Mettre à jour dépendances
+cd backend
+composer install --prefer-dist  # Production-ready lockfile
+php bin/console doctrine:migrations:migrate
+
+cd ../frontend
+npm install --prefer-exact  # Exact versions
+npm run build  # Vérifier build compile
+
+# 3. Redémarrer l'application
+cd ../backend
+symfony serve -d
+cd ../frontend
+npm run dev
+
+# 4. Vérifier fonctionnalité
+curl http://localhost:8000/api/games  # Backend OK?
+open http://localhost:3000             # Frontend accessible?
+```
+
+#### Mise à Jour Production (Déploiement)
+
+**Processus** : Décrit en section 2 (CI/CD automated)
+
+```
+1. Merge PR vers main → GitHub Actions déclenche
+2. Tests backend + frontend run
+3. Build containers (si Docker configuré)
+4. Deploy automatic (si workflow configuré)
+5. Health checks
+6. Monitoring alertes (si non-blocking)
+```
+
+### 8.2 Migrations Base de Données
+
+**Localisation** : `backend/migrations/`
+
+**Framework** : Doctrine Migrations
+
+#### Structure Migration
+
+```php
+// backend/migrations/Version20260713000000.php
+namespace DoctrineMigrations;
+
+use Doctrine\DBAL\Schema\Schema;
+use Doctrine\Migrations\AbstractMigration;
+
+final class Version20260713000000 extends AbstractMigration {
+    public function getDescription(): string {
+        return 'Add status column to games table';
+    }
+
+    public function up(Schema $schema): void {
+        $this->addSql('ALTER TABLE game ADD COLUMN status VARCHAR(50) NOT NULL DEFAULT \'pending\'');
+    }
+
+    public function down(Schema $schema): void {
+        $this->addSql('ALTER TABLE game DROP COLUMN status');
+    }
+}
+```
+
+#### Générer Nouvelle Migration
+
+```bash
+cd backend
+
+# 1. Modifier une Entity (ex: src/Entity/Game.php)
+# Ajouter propriété: private string $status = 'pending';
+
+# 2. Générer migration automatiquement
+php bin/console doctrine:migrations:diff
+
+# 3. Migration créée : backend/migrations/VersionXXX.php
+
+# 4. Vérifier avant appliquer
+cat migrations/VersionXXX.php  # Revue SQL généré
+
+# 5. Appliquer (dev local)
+php bin/console doctrine:migrations:migrate
+
+# 6. Tester l'appli
+php bin/console test  # Tests doivent passer
+
+# 7. Commit migration
+git add migrations/
+git commit -m "migration(db): add status column to games"
+```
+
+#### Appliquer en Production
+
+```bash
+# Exécuté automatiquement par deploy workflow (À configurer)
+php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
+
+# OU manuel
+ssh prod-server
+cd /app
+php bin/console doctrine:migrations:migrate
+# Rollback si needed:
+# php bin/console doctrine:migrations:migrate --first Version20260713000000
+```
+
+### 8.3 Breaking Changes & Dépendances
+
+#### Dépendances Critiques
+
+| Package | Changement Mineur | Changement Majeur | Action |
+|---------|------------------|------------------|--------|
+| **Symfony** | 7.4.x | 8.0.0 | PR required, test intensif |
+| **PHP** | 8.4.x | 9.0 | Maj PHP-FPM + code review |
+| **Node.js** | 20.x | 22.x | Vérifier compat packages |
+| **PostgreSQL** | 16.x | 17.0 | Dump/restore + testing |
+| **API Platform** | 4.3.x | 5.0.0 | API peut changer, tester |
+
+#### Frontend Breaking Changes (API)
+
+```typescript
+// Vérifier dans src/lib/api-client.ts si API endpoints changent
+// Exemple breaking change:
+// OLD: GET /api/games  (retourne array)
+// NEW: GET /api/games  (retourne {data: array, total: number})
+
+// Fix: Ajuster lib/api-client.ts + tests + composants
+```
+
+#### Backend Breaking Changes (API)
+
+```php
+// Vérifier dans docs/API_REFERENCE.md si endpoints changent
+// Exemple breaking change:
+// OLD: POST /api/login (retourne token)
+// NEW: POST /api/login (retourne {token, user})
+
+// Teste: PHPUnit tests doivent fail et à updater
+```
+
+### 8.4 Rollback Procedure
+
+**Scénario** : Upgrade déploié mais erreur détectée → Rollback
+
+#### Option 1: Git Revert (Recommandé)
+
+```bash
+# Production server
+ssh prod-server
+cd /app
+
+# Voir commits récents
+git log --oneline -5
+
+# Revert le dernier commit
+git revert HEAD --no-edit
+
+# Redémarrer app
+docker-compose down && docker-compose up -d
+# OU
+php bin/console cache:clear
+symfony serve -d
+
+# Vérifier
+curl http://prod.airsoft.com/api/health
+```
+
+#### Option 2: Tag Checkout (Fallback)
+
+```bash
+# Si Git revert complexe
+git checkout v1.2.0  # Retour à version précédente
+git push origin main --force-with-lease
+
+# Redéployer
+# CI/CD re-triggers automatiquement
+```
+
+#### Option 3: Database Rollback (Si migration cassée)
+
+```bash
+# EMERGENCY ONLY - Data risk!
+
+# Restaurer backup pré-migration
+pg_restore -d airsoft_prod /backups/airsoft_prod_20260713_0800.dump
+
+# Revert code en même temps
+git checkout v1.2.0
+```
+
+### 8.5 Checklist Avant/Après Upgrade
+
+**Avant Upgrade** :
+- [ ] Backup database complète: `pg_dump -Fc airsoft_prod > backup.dump`
+- [ ] Tous tests passent localement
+- [ ] Release notes lues (breaking changes?)
+- [ ] Dépendances critiques vérifiées (Symfony, PHP version)
+- [ ] Staging testé avec nouvelle version
+- [ ] Rollback plan documenté
+- [ ] Slack notification: "Upgrade en cours..."
+
+**Après Upgrade** :
+- [ ] Health check: API responds correctly
+- [ ] UI loads without errors
+- [ ] Authentification fonctionne (JWT token OK)
+- [ ] Database queries performantes
+- [ ] Logs (var/log) pas d'erreurs
+- [ ] Monitoring: No error spike
+- [ ] Features critiques testées (game registration, login, etc.)
+- [ ] Slack notification: "Upgrade completed"
+
+### 8.6 Versions Actuelles & Support
+
+| Composant | Version | Release | EOL | Status |
+|-----------|---------|---------|-----|--------|
+| **PHP** | 8.4.22 | Nov 2024 | Nov 2026 | ✓ Active |
+| **Symfony** | 7.4.0 | Nov 2024 | Nov 2027 | ✓ LTS |
+| **Node.js** | 20.x | Apr 2023 | Apr 2025 | ✓ Active |
+| **Next.js** | 16.2.6 | Jan 2025 | Ongoing | ✓ Latest |
+| **PostgreSQL** | 16 | Oct 2023 | Oct 2028 | ✓ Supported |
+
+---
+
+## 9. Timeline & Roadmap
 
 ### Phase 1: Développement (Complété ✓)
 
 - ✓ Feature branches & PR reviews
 - ✓ PHP + JavaScript CI/CD
-- ✓ Unit tests (backend 52.86%, frontend 70.62%)
+- ✓ Unit tests (backend 71.73% / 269 tests, frontend 78.73% / 227 tests)
 - ✓ Code analysis (PHPStan, ESLint)
 - ✓ Release automation (release-please)
 

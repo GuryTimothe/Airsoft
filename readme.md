@@ -167,9 +167,9 @@ PostgreSQL 16 (Database)
 
 | Élément | Status | Details |
 |---------|--------|---------|
-| **Tests Backend** | 52.86% | 133 tests passing (target: 70%) |
-| **Tests Frontend** | 70.62% | 74 tests passing |
-| **CI/CD** | ✓ Active | GitHub Actions (backend + frontend) |
+| **Tests Backend** | 71.73% | 269 tests passing (cible: 70% ✅) |
+| **Tests Frontend** | 78.73% | 227 tests passing (cible: 70% ✅) |
+| **CI/CD** | ✓ Active | GitHub Actions (backend + frontend + lighthouse + pa11y) |
 | **API Documentation** | ✓ Complete | 53 endpoints documentés |
 | **Lighthouse** | 90+ | Performance, accessibility, best practices |
 | **PHPStan** | Level 5 | 0 errors |
@@ -179,7 +179,130 @@ PostgreSQL 16 (Database)
 
 ---
 
-## 📝 Contribution
+## � Plan de Gestion des Bogues (C2.3.2)
+
+### 1. Signaler un Bug
+
+**Processus** :
+
+1. **Vérifier** que le bug n'existe pas déjà (rechercher sur GitHub Issues ou Notion)
+2. **Créer ticket** avec template standard :
+   ```
+   Title: [TYPE] Description concise
+   
+   Description:
+   - Comportement observé
+   - Comportement attendu
+   - Étapes pour reproduire
+   
+   Environnement:
+   - OS
+   - Navigateur (si frontend)
+   - Version app
+   
+   Screenshots/Logs:
+   - Attacher captures écran ou logs erreur
+   ```
+3. **Assigner label** : `bug`, `severity:critical`, etc.
+4. **Notifier équipe** : mentionner développeurs
+
+### 2. Classification et SLA
+
+| Severity | Examples | Impact User | SLA Triage | SLA Fix | SLA Deploy |
+|----------|----------|-------------|-----------|---------|-----------|
+| 🔴 **Critical** | Perte données, API down, accès non-autorisé, app crash | Total (aucun accès) | 24h | 3 jours | Immediate |
+| 🟠 **Major** | Feature ne fonctionne pas, bug sécurité, données incorrectes | Bloquant (workaround possible) | 3 jours | 1 semaine | 1-2 jours |
+| 🟡 **Minor** | UI glitch, message manquant, performance légèrement dégradée | Non-bloquant | 1 semaine | 2 semaines | À combiner |
+| 🟢 **Trivial** | Typo, amélioration cosmétique, suggestion | Cosmétique | Ad-hoc | Ad-hoc | Backlog |
+
+### 3. Workflow de Correction
+
+```
+┌─────────────────────────────────────────────┐
+│ 1. BUG SIGNALÉ                              │
+│    Issue créée + label severity             │
+└──────────────────┬──────────────────────────┘
+                   │
+┌──────────────────▼──────────────────────────┐
+│ 2. TRIAGE (Jour 1-3 selon severity)         │
+│    - Confirmer bug (repro steps OK?)        │
+│    - Estimer impact                         │
+│    - Assigner priorité                      │
+│    - Assigner développeur                   │
+└──────────────────┬──────────────────────────┘
+                   │
+┌──────────────────▼──────────────────────────┐
+│ 3. DÉVELOPPEMENT                            │
+│    - Créer branche: fix/ticket-id-slug     │
+│    - Écrire test (reproduisant bug)        │
+│    - Fixer le code                         │
+│    - Commit conventional: fix(domain): msg │
+│    - Pousser vers GitHub                   │
+└──────────────────┬──────────────────────────┘
+                   │
+┌──────────────────▼──────────────────────────┐
+│ 4. CODE REVIEW + VALIDATION                 │
+│    - PR créée (auto-liée à issue)          │
+│    - Tests automatiques (CI/CD)             │
+│    - Review par au moins 1 dev              │
+│    - QA valide dans staging (si major+)    │
+│    - Approver + merge                       │
+└──────────────────┬──────────────────────────┘
+                   │
+┌──────────────────▼──────────────────────────┐
+│ 5. RELEASE ET MONITORING                    │
+│    - Fix inclus dans prochaine version      │
+│    - Déploiement production                 │
+│    - Monitoring (error rate)                │
+│    - Clôturer issue si stable               │
+└─────────────────────────────────────────────┘
+```
+
+### 4. Analyse des Anomalies (Détection)
+
+| Méthode | Outil | Fréquence | Seuil d'Alerte |
+|---------|-------|-----------|----------------|
+| **Tests CI/CD** | GitHub Actions | À chaque push | ✗ 1 test fail |
+| **Couverture** | Jest + PHPUnit | À chaque merge | < 70% |
+| **Lint** | ESLint + PHPStan | À chaque push | > 0 erreur |
+| **Performance** | Lighthouse | 1x par semaine | < 50 Perf score |
+| **Logs** | Symfony Monolog | En production | Error rate > 1% |
+| **Monitoring** | GitHub Actions logs | Après deploy | ✗ Workflow fail |
+
+### 5. Corrections et Améliorations Associées
+
+Lors du fix :
+
+1. **Amélioration de test** :
+   - Ajouter cas limites testé + validé
+   - Augmenter couverture si applicable
+   - Documenter comportement attendu
+
+2. **Documentation** :
+   - Commenter pourquoi (business logic)
+   - Linker issue dans commits
+   - Ajouter à changelog si user-facing
+
+3. **Prévention similaires** :
+   - Audit code connexe pour patterns similaires
+   - Proposer refactor si technique pourrie
+   - Éduquer l'équipe (review comment)
+
+### 6. Métriques de Suivi
+
+Mesurer efficacité du processus :
+
+```
+- Mean Time To Triage (MTTT): Temps signalement → assignation
+- Mean Time To Fix (MTTF): Temps signalement → merge fix
+- Mean Time To Deploy (MTTD): Temps fix → production
+- Bug Recurrence Rate: % bugs similaires futurs
+- Severity Trend: Evolution bugs par mois
+```
+
+---
+
+## �📝 Contribution
 
 Avant de committer :
 

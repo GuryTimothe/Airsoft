@@ -331,7 +331,6 @@ npm audit
 
 ## 6. A06:2021 - Vulnerable & Outdated Components
 
-### ✓ Partially Implémenté
 
 **Dependency Tracking**:
 
