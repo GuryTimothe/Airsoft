@@ -21,18 +21,29 @@ jobs:
         run: |
           cd frontend
           npm start > /tmp/server.log 2>&1 &
-          sleep 3
-          # Wait for server to be ready
-          for i in {1..60}; do
-            if curl -s http://localhost:3000 > /dev/null 2>&1; then
+          SERVER_PID=$!
+          echo "Server PID: $SERVER_PID"
+          sleep 5
+          # Wait for server to be ready with verbose output
+          for i in {1..120}; do
+            if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200\|404"; then
               echo "✓ Server is ready on http://localhost:3000"
               break
             fi
-            echo "Waiting for server ($i/60)..."
+            if [ $((i % 10)) -eq 0 ]; then
+              echo "Waiting for server... ($i/120s)"
+              tail -5 /tmp/server.log || true
+            fi
             sleep 1
           done
-          # Show server logs
-          tail -20 /tmp/server.log || true
+          # Verify server is still running
+          if ! ps -p $SERVER_PID > /dev/null; then
+            echo "❌ Server died during startup"
+            cat /tmp/server.log
+            exit 1
+          fi
+          echo "✓ Server is running with PID $SERVER_PID"
+          curl -s http://localhost:3000 | head -50
         env:
           NEXT_PUBLIC_API_URL: http://localhost:3000
 
@@ -42,6 +53,19 @@ jobs:
           uploadArtifacts: false
           temporaryPublicStorage: true
           configPath: "./frontend/lighthouse.config.js"
+
+      - name: Debug Lighthouse results
+        if: always()
+        run: |
+          echo "Checking for Lighthouse results..."
+          if [ -f "./lhci-results/manifest.json" ]; then
+            echo "✓ manifest.json found"
+            cat ./lhci-results/manifest.json | head -50
+          else
+            echo "❌ manifest.json not found"
+            find . -name "manifest.json" -o -name "*.json" | grep -i lhci || echo "No LHCI results found"
+          fi
+          ls -la ./lhci-results/ 2>&1 || echo "lhci-results directory not found"
 
       - name: Save Lighthouse Results
         if: always()
