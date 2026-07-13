@@ -31,6 +31,8 @@ export default function AuthForm({ mode = "login" }: Props) {
 
   const resolver = zodResolver(mode === "login" ? loginSchema : registerSchema);
 
+  type FormData = LoginInput | RegisterInput;
+
   const {
     register,
     handleSubmit,
@@ -38,10 +40,13 @@ export default function AuthForm({ mode = "login" }: Props) {
     reset,
     setValue,
     control,
-  } = useForm<Record<string, unknown>>({
-    resolver: resolver as never,
-    mode: "onTouched",
-  });
+  } = useForm<FormData>({ resolver, mode: "onTouched" });
+
+  // Type-safe error access based on mode
+  const getError = (field: string): string | undefined => {
+    const error = (errors as Record<string, { message?: string }>)?.[field];
+    return error?.message;
+  };
 
   const watchedDateOfBirth = String(
     useWatch({ control, name: "dateOfBirth" }) ?? "",
@@ -229,18 +234,18 @@ export default function AuthForm({ mode = "login" }: Props) {
                 className="mt-1 w-full rounded border border-border bg-transparent px-3 py-2"
                 placeholder="Dupont"
                 autoComplete="family-name"
-                aria-invalid={!!errors.lastname}
+                aria-invalid={!!getError("lastname")}
                 aria-describedby={
-                  errors.lastname ? "lastname-error" : undefined
+                  getError("lastname") ? "lastname-error" : undefined
                 }
               />
-              {errors.lastname && (
+              {getError("lastname") && (
                 <div
                   id="lastname-error"
                   role="alert"
                   className="text-sm text-destructive"
                 >
-                  {errors.lastname.message}
+                  {getError("lastname")}
                 </div>
               )}
             </div>
@@ -258,18 +263,18 @@ export default function AuthForm({ mode = "login" }: Props) {
                 className="mt-1 w-full rounded border border-border bg-transparent px-3 py-2"
                 placeholder="Jean"
                 autoComplete="given-name"
-                aria-invalid={!!errors.firstname}
+                aria-invalid={!!getError("firstname")}
                 aria-describedby={
-                  errors.firstname ? "firstname-error" : undefined
+                  getError("firstname") ? "firstname-error" : undefined
                 }
               />
-              {errors.firstname && (
+              {getError("firstname") && (
                 <div
                   id="firstname-error"
                   role="alert"
                   className="text-sm text-destructive"
                 >
-                  {errors.firstname.message}
+                  {getError("firstname")}
                 </div>
               )}
             </div>
@@ -290,16 +295,16 @@ export default function AuthForm({ mode = "login" }: Props) {
             placeholder="you@exemple.com"
             type="email"
             autoComplete="username"
-            aria-invalid={!!errors.email}
-            aria-describedby={errors.email ? "email-error" : undefined}
+            aria-invalid={!!getError("email")}
+            aria-describedby={getError("email") ? "email-error" : undefined}
           />
-          {errors.email && (
+          {getError("email") && (
             <div
               id="email-error"
               role="alert"
               className="text-sm text-destructive"
             >
-              {errors.email.message}
+              {getError("email")}
             </div>
           )}
         </div>
@@ -320,16 +325,18 @@ export default function AuthForm({ mode = "login" }: Props) {
             autoComplete={
               mode === "login" ? "current-password" : "new-password"
             }
-            aria-invalid={!!errors.password}
-            aria-describedby={errors.password ? "password-error" : undefined}
+            aria-invalid={!!getError("password")}
+            aria-describedby={
+              getError("password") ? "password-error" : undefined
+            }
           />
-          {errors.password && (
+          {getError("password") && (
             <div
               id="password-error"
               role="alert"
               className="text-sm text-destructive"
             >
-              {errors.password.message}
+              {getError("password")}
             </div>
           )}
         </div>
@@ -350,16 +357,18 @@ export default function AuthForm({ mode = "login" }: Props) {
                 type="password"
                 placeholder="••••••••"
                 autoComplete="new-password"
-                aria-invalid={!!errors.confirm}
-                aria-describedby={errors.confirm ? "confirm-error" : undefined}
+                aria-invalid={!!getError("confirm")}
+                aria-describedby={
+                  getError("confirm") ? "confirm-error" : undefined
+                }
               />
-              {errors.confirm && (
+              {getError("confirm") && (
                 <div
                   id="confirm-error"
                   role="alert"
                   className="text-sm text-destructive"
                 >
-                  {errors.confirm.message}
+                  {getError("confirm")}
                 </div>
               )}
             </div>
@@ -377,18 +386,18 @@ export default function AuthForm({ mode = "login" }: Props) {
                 className="mt-1 w-full rounded border border-border bg-transparent px-3 py-2"
                 type="date"
                 autoComplete="bday"
-                aria-invalid={!!errors.dateOfBirth}
+                aria-invalid={!!getError("dateOfBirth")}
                 aria-describedby={
-                  errors.dateOfBirth ? "dateOfBirth-error" : undefined
+                  getError("dateOfBirth") ? "dateOfBirth-error" : undefined
                 }
               />
-              {errors.dateOfBirth && (
+              {getError("dateOfBirth") && (
                 <div
                   id="dateOfBirth-error"
                   role="alert"
                   className="text-sm text-destructive"
                 >
-                  {errors.dateOfBirth.message}
+                  {getError("dateOfBirth")}
                 </div>
               )}
             </div>
@@ -406,16 +415,18 @@ export default function AuthForm({ mode = "login" }: Props) {
                 className="mt-1 w-full rounded border border-border bg-transparent px-3 py-2"
                 placeholder="MonPseudo"
                 autoComplete="nickname"
-                aria-invalid={!!errors.pseudo}
-                aria-describedby={errors.pseudo ? "pseudo-error" : undefined}
+                aria-invalid={!!getError("pseudo")}
+                aria-describedby={
+                  getError("pseudo") ? "pseudo-error" : undefined
+                }
               />
-              {errors.pseudo && (
+              {getError("pseudo") && (
                 <div
                   id="pseudo-error"
                   role="alert"
                   className="text-sm text-destructive"
                 >
-                  {errors.pseudo.message}
+                  {getError("pseudo")}
                 </div>
               )}
             </div>
@@ -434,16 +445,16 @@ export default function AuthForm({ mode = "login" }: Props) {
                 placeholder="0612345678"
                 autoComplete="tel"
                 inputMode="tel"
-                aria-invalid={!!errors.phone}
-                aria-describedby={errors.phone ? "phone-error" : undefined}
+                aria-invalid={!!getError("phone")}
+                aria-describedby={getError("phone") ? "phone-error" : undefined}
               />
-              {errors.phone && (
+              {getError("phone") && (
                 <div
                   id="phone-error"
                   role="alert"
                   className="text-sm text-destructive"
                 >
-                  {errors.phone.message}
+                  {getError("phone")}
                 </div>
               )}
             </div>
@@ -470,20 +481,20 @@ export default function AuthForm({ mode = "login" }: Props) {
                   {...register("guardianLastname")}
                   className="mt-1 w-full rounded border border-border bg-transparent px-3 py-2"
                   autoComplete="family-name"
-                  aria-invalid={!!errors.guardianLastname}
+                  aria-invalid={!!getError("guardianLastname")}
                   aria-describedby={
-                    errors.guardianLastname
+                    getError("guardianLastname")
                       ? "guardianLastname-error"
                       : undefined
                   }
                 />
-                {errors.guardianLastname && (
+                {getError("guardianLastname") && (
                   <div
                     id="guardianLastname-error"
                     role="alert"
                     className="text-sm text-destructive"
                   >
-                    {errors.guardianLastname.message}
+                    {getError("guardianLastname")}
                   </div>
                 )}
               </div>
@@ -500,20 +511,20 @@ export default function AuthForm({ mode = "login" }: Props) {
                   {...register("guardianFirstname")}
                   className="mt-1 w-full rounded border border-border bg-transparent px-3 py-2"
                   autoComplete="given-name"
-                  aria-invalid={!!errors.guardianFirstname}
+                  aria-invalid={!!getError("guardianFirstname")}
                   aria-describedby={
-                    errors.guardianFirstname
+                    getError("guardianFirstname")
                       ? "guardianFirstname-error"
                       : undefined
                   }
                 />
-                {errors.guardianFirstname && (
+                {getError("guardianFirstname") && (
                   <div
                     id="guardianFirstname-error"
                     role="alert"
                     className="text-sm text-destructive"
                   >
-                    {errors.guardianFirstname.message}
+                    {getError("guardianFirstname")}
                   </div>
                 )}
               </div>
@@ -531,18 +542,20 @@ export default function AuthForm({ mode = "login" }: Props) {
                   className="mt-1 w-full rounded border border-border bg-transparent px-3 py-2"
                   type="email"
                   autoComplete="email"
-                  aria-invalid={!!errors.guardianEmail}
+                  aria-invalid={!!getError("guardianEmail")}
                   aria-describedby={
-                    errors.guardianEmail ? "guardianEmail-error" : undefined
+                    getError("guardianEmail")
+                      ? "guardianEmail-error"
+                      : undefined
                   }
                 />
-                {errors.guardianEmail && (
+                {getError("guardianEmail") && (
                   <div
                     id="guardianEmail-error"
                     role="alert"
                     className="text-sm text-destructive"
                   >
-                    {errors.guardianEmail.message}
+                    {getError("guardianEmail")}
                   </div>
                 )}
               </div>
@@ -560,18 +573,20 @@ export default function AuthForm({ mode = "login" }: Props) {
                   className="mt-1 w-full rounded border border-border bg-transparent px-3 py-2"
                   autoComplete="tel"
                   inputMode="tel"
-                  aria-invalid={!!errors.guardianPhone}
+                  aria-invalid={!!getError("guardianPhone")}
                   aria-describedby={
-                    errors.guardianPhone ? "guardianPhone-error" : undefined
+                    getError("guardianPhone")
+                      ? "guardianPhone-error"
+                      : undefined
                   }
                 />
-                {errors.guardianPhone && (
+                {getError("guardianPhone") && (
                   <div
                     id="guardianPhone-error"
                     role="alert"
                     className="text-sm text-destructive"
                   >
-                    {errors.guardianPhone.message}
+                    {getError("guardianPhone")}
                   </div>
                 )}
               </div>

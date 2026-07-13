@@ -83,22 +83,72 @@ final class MeUpdateProcessorTest extends TestCase
         $this->assertSame('old@example.com', $result->getEmail());
     }
 
-    public function testGeneralUpdateCanExplicitlyRemoveEmergencyContactForAdult(): void
+    public function testResolvesUserFromSecurityWhenNoPreviousData(): void
+    {
+        $user = (new User())->setFirstname('Zoro');
+        $actor = (new User())->setFirstname('Old');
+
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->expects($this->once())->method('flush');
+
+        $security = $this->createMock(Security::class);
+        $security->method('getUser')->willReturn($actor);
+
+        $processor = $this->createProcessor($entityManager, $security);
+
+        $result = $processor->process($user, new Patch(uriTemplate: '/me'), context: []);
+
+        $this->assertSame($actor, $result);
+        $this->assertSame('Zoro', $result->getFirstname());
+    }
+
+    public function testThrowsWhenNoUserResolvable(): void
     {
         $user = new User();
 
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+
+        $security = $this->createMock(Security::class);
+        $security->method('getUser')->willReturn(null);
+
+        $processor = $this->createProcessor($entityManager, $security);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $processor->process($user, new Patch(uriTemplate: '/me'), context: []);
+    }
+
+    public function testThrowsWhenPreviousDataIsNotUser(): void
+    {
+        $user = new User();
+
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $security      = $this->createMock(Security::class);
+        $processor     = $this->createProcessor($entityManager, $security);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Previous user state is invalid.');
+
+        $processor->process($user, new Patch(uriTemplate: '/me'), context: ['previous_data' => new \stdClass()]);
+    }
+
+    public function testUpdatesEmergencyContactWhenPatched(): void
+    {
+        $incoming = (new \App\Entity\EmergencyContact())
+            ->setLastname('Martin')
+            ->setFirstname('Paul')
+            ->setEmail('paul@test.com')
+            ->setPhone('0612345678');
+
+        $source = new User();
+
+        $ref = new \ReflectionProperty(User::class, 'emergencyContact');
+        $ref->setAccessible(true);
+        $ref->setValue($source, $incoming);
+
         $previous = (new User())
-            ->setFirstname('Old')
-            ->setLastname('Name')
-            ->setEmail('old@example.com')
+            ->setFirstname('Alice')
+            ->setLastname('Doe')
             ->setDateOfBirth(new \DateTimeImmutable('1990-01-01'));
-        $previous->setEmergencyContact(
-            (new \App\Entity\EmergencyContact())
-                ->setLastname('Parent')
-                ->setFirstname('Paul')
-                ->setEmail('parent@example.com')
-                ->setPhone('0600000000')
-        );
 
         $entityManager = $this->createMock(EntityManagerInterface::class);
         $entityManager->expects($this->once())->method('flush');
@@ -106,18 +156,55 @@ final class MeUpdateProcessorTest extends TestCase
         $security = $this->createMock(Security::class);
         $security->method('getUser')->willReturn($previous);
 
-        $request = Request::create(
+        $request = \Symfony\Component\HttpFoundation\Request::create(
             '/api/me',
             'PATCH',
-            server: ['CONTENT_TYPE' => 'application/merge-patch+json'],
-            content: json_encode(['emergencyContact' => null], JSON_THROW_ON_ERROR),
+            [],
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json'],
+            json_encode(['emergencyContact' => ['lastname' => 'Martin', 'firstname' => 'Paul', 'email' => 'paul@test.com', 'phone' => '0612345678']]) ?: ''
+        );
+
+        $processor = $this->createProcessor($entityManager, $security, $request);
+        $result    = $processor->process($source, new Patch(uriTemplate: '/me'), context: ['previous_data' => $previous]);
+
+        $this->assertNotNull($result->getEmergencyContact());
+        $this->assertSame('Martin', $result->getEmergencyContact()->getLastname());
+        $this->assertSame('Paul', $result->getEmergencyContact()->getFirstname());
+    }
+
+    public function testThrowsWhenRemovingEmergencyContactFromMinor(): void
+    {
+        // Set emergencyContact to null in source (removing it)
+        $source = new User();
+        // DO NOT initialize emergencyContact so it stays unset in the source
+        // But we need the request body to signal it was patched
+
+        $minor = (new User())
+            ->setFirstname('Junior')
+            ->setLastname('Doe')
+            ->setDateOfBirth(new \DateTimeImmutable(date('Y-m-d', strtotime('-15 years'))));
+
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $security      = $this->createMock(Security::class);
+        $security->method('getUser')->willReturn($minor);
+
+        $request = \Symfony\Component\HttpFoundation\Request::create(
+            '/api/me',
+            'PATCH',
+            [],
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json'],
+            json_encode(['emergencyContact' => null]) ?: ''
         );
 
         $processor = $this->createProcessor($entityManager, $security, $request);
 
-        $result = $processor->process($user, new Patch(uriTemplate: '/me'), context: ['previous_data' => $previous]);
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('obligatoire pour un mineur');
 
-        $this->assertSame($previous, $result);
-        $this->assertNull($result->getEmergencyContact());
+        $processor->process($source, new Patch(uriTemplate: '/me'), context: ['previous_data' => $minor]);
     }
 }

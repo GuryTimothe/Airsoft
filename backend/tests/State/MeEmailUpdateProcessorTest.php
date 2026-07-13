@@ -117,4 +117,92 @@ final class MeEmailUpdateProcessorTest extends TestCase
         $this->assertSame('new@example.com', $result->user->getEmail());
         $this->assertSame('new.jwt.token', $result->token);
     }
+
+    public function testEmailUpdateFailsWhenEmailIsEmpty(): void
+    {
+        $payload = new MeEmailUpdateInput();
+        $payload->email = '';
+        $payload->currentPassword = 'good-password';
+        $actor = (new User())
+            ->setPassword('hashed-password')
+            ->setEmail('old@example.com');
+
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->expects($this->never())->method('flush');
+
+        $passwordHasher = $this->createMock(UserPasswordHasherInterface::class);
+        $passwordHasher->method('isPasswordValid')->willReturn(true);
+
+        $jwtManager = $this->createMock(JWTTokenManagerInterface::class);
+        $security = $this->createMock(Security::class);
+        $security->method('getUser')->willReturn($actor);
+
+        $processor = new MeEmailUpdateProcessor($entityManager, $passwordHasher, $jwtManager, $security);
+
+        $this->expectException(ValidationException::class);
+        $processor->process($payload, new Patch(uriTemplate: '/me/email'), context: [
+            'previous_data' => $actor,
+        ]);
+    }
+
+    public function testResolvesUserFromSecurityWhenNoPreviousData(): void
+    {
+        $payload = new MeEmailUpdateInput();
+        $payload->email = 'new@example.com';
+        $payload->currentPassword = 'good-password';
+        $actor = (new User())
+            ->setPassword('hashed-password')
+            ->setEmail('old@example.com');
+
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->expects($this->once())->method('flush');
+
+        $passwordHasher = $this->createMock(UserPasswordHasherInterface::class);
+        $passwordHasher->method('isPasswordValid')->willReturn(true);
+
+        $jwtManager = $this->createMock(JWTTokenManagerInterface::class);
+        $jwtManager->method('create')->willReturn('token');
+
+        $security = $this->createMock(Security::class);
+        $security->method('getUser')->willReturn($actor);
+
+        $processor = new MeEmailUpdateProcessor($entityManager, $passwordHasher, $jwtManager, $security);
+
+        $result = $processor->process($payload, new Patch(uriTemplate: '/me/email'), context: []);
+
+        $this->assertInstanceOf(MeUpdateOutput::class, $result);
+    }
+
+    public function testThrowsWhenNoUserResolvable(): void
+    {
+        $payload = new MeEmailUpdateInput();
+
+        $entityManager  = $this->createMock(EntityManagerInterface::class);
+        $passwordHasher = $this->createMock(UserPasswordHasherInterface::class);
+        $jwtManager     = $this->createMock(JWTTokenManagerInterface::class);
+
+        $security = $this->createMock(Security::class);
+        $security->method('getUser')->willReturn(null);
+
+        $processor = new MeEmailUpdateProcessor($entityManager, $passwordHasher, $jwtManager, $security);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $processor->process($payload, new Patch(uriTemplate: '/me/email'), context: []);
+    }
+
+    public function testThrowsWhenPreviousDataIsNotUser(): void
+    {
+        $payload = new MeEmailUpdateInput();
+
+        $entityManager  = $this->createMock(EntityManagerInterface::class);
+        $passwordHasher = $this->createMock(UserPasswordHasherInterface::class);
+        $jwtManager     = $this->createMock(JWTTokenManagerInterface::class);
+        $security       = $this->createMock(Security::class);
+
+        $processor = new MeEmailUpdateProcessor($entityManager, $passwordHasher, $jwtManager, $security);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Previous user state is invalid.');
+        $processor->process($payload, new Patch(uriTemplate: '/me/email'), context: ['previous_data' => new \stdClass()]);
+    }
 }

@@ -98,4 +98,98 @@ final class UserTest extends TestCase
 
         $this->assertSame(0, $adultViolations->count());
     }
+
+    public function testGetUserIdentifier(): void
+    {
+        $user = (new User())->setEmail('test@example.com');
+        $this->assertSame('test@example.com', $user->getUserIdentifier());
+    }
+
+    public function testEraseCredentialsDoesNothing(): void
+    {
+        $user = (new User())->setPassword('secret');
+        $user->eraseCredentials();
+        $this->assertSame('secret', $user->getPassword());
+    }
+
+    public function testIsCanSeePrivate(): void
+    {
+        $user = (new User())->setCanSeePrivate(true);
+        $this->assertTrue($user->isCanSeePrivate());
+        $user->setCanSeePrivate(false);
+        $this->assertFalse($user->isCanSeePrivate());
+    }
+
+    public function testSetEmergencyContactClearsOldUserReference(): void
+    {
+        $user    = new User();
+        $contact = (new \App\Entity\EmergencyContact())
+            ->setLastname('A')->setFirstname('B')->setEmail('c@d.com')->setPhone('0600000000');
+        $user->setEmergencyContact($contact);
+
+        // Now clear it
+        $user->setEmergencyContact(null);
+        $this->assertNull($user->getEmergencyContact());
+    }
+
+    public function testGetRolesAlwaysIncludesRoleUser(): void
+    {
+        $user = (new User())->setRole('ROLE_ADMIN');
+        $roles = $user->getRoles();
+        $this->assertContains('ROLE_USER', $roles);
+        $this->assertContains('ROLE_ADMIN', $roles);
+    }
+
+    public function testGetRolesNoDuplicatesForRoleUser(): void
+    {
+        $user  = (new User())->setRole('ROLE_USER');
+        $roles = $user->getRoles();
+        $this->assertSame(1, count(array_unique($roles)));
+    }
+
+    public function testDateOfBirthInFutureFailsValidation(): void
+    {
+        $validator = \Symfony\Component\Validator\Validation::createValidatorBuilder()
+            ->enableAttributeMapping()
+            ->getValidator();
+
+        $user = new User();
+        $user->setLastname('Doe');
+        $user->setFirstname('John');
+        $user->setEmail('john@example.com');
+        $user->setPassword('secret');
+        $user->setDateOfBirth(new \DateTimeImmutable('+5 years'));
+        $user->setRole('ROLE_USER');
+
+        $violations = $validator->validate($user, null, ['user:create']);
+
+        $paths = [];
+        foreach ($violations as $v) {
+            $paths[] = $v->getPropertyPath();
+        }
+        $this->assertContains('dateOfBirth', $paths);
+    }
+
+    public function testDateOfBirthInPastPassesValidation(): void
+    {
+        $validator = \Symfony\Component\Validator\Validation::createValidatorBuilder()
+            ->enableAttributeMapping()
+            ->getValidator();
+
+        $user = new User();
+        $user->setLastname('Doe');
+        $user->setFirstname('John');
+        $user->setEmail('john@example.com');
+        $user->setPassword('secret');
+        $user->setDateOfBirth(new \DateTimeImmutable('-20 years'));
+        $user->setRole('ROLE_USER');
+
+        $violations = $validator->validate($user, null, ['user:create']);
+
+        $paths = [];
+        foreach ($violations as $v) {
+            $paths[] = $v->getPropertyPath();
+        }
+        $this->assertNotContains('dateOfBirth', $paths);
+    }
 }

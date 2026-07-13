@@ -43,6 +43,7 @@ class Game
 
     #[ORM\Column(type: 'datetime')]
     #[Assert\NotNull]
+    #[Assert\GreaterThanOrEqual('today', message: "La date de la partie doit \u00eatre aujourd'hui ou dans le futur.")]
     private \DateTimeInterface $startDateTime;
 
     #[ORM\Column(type: 'string', length: 255)]

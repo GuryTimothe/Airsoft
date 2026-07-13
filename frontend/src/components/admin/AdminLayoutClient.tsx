@@ -30,11 +30,15 @@ export function AdminLayoutClient({
 
   return (
     <div className="flex h-screen">
-      <Sidebar open={sidebarOpen} onToggle={() => setSidebarOpen((v) => !v)} />
+      <Sidebar
+        open={sidebarOpen}
+        userRole={null}
+        onToggle={() => setSidebarOpen((v) => !v)}
+      />
       <div className="flex flex-1 flex-col">
         <Header onToggleSidebar={() => setSidebarOpen((v) => !v)} />
         <main className="flex-1 overflow-auto p-4">{children}</main>
-        <Footer />
+        <Footer userRole={null} />
       </div>
     </div>
   );

@@ -41,6 +41,23 @@ final class AppSettingVoterTest extends TestCase
         $this->assertSame(-1, $voter->vote($this->createToken($actor), null, [AppSettingVoter::MANAGE_APP_SETTINGS]));
     }
 
+    public function testUnsupportedAttributeIsAbstained(): void
+    {
+        $voter = new AppSettingVoter();
+        $actor = (new User())->setRole('ROLE_ADMIN');
+
+        $this->assertSame(0, $voter->vote($this->createToken($actor), null, ['UNSUPPORTED_ATTRIBUTE']));
+    }
+
+    public function testUnauthenticatedUserCannotManageAppSettings(): void
+    {
+        $voter  = new AppSettingVoter();
+        $token  = $this->createMock(TokenInterface::class);
+        $token->method('getUser')->willReturn(null);
+
+        $this->assertSame(-1, $voter->vote($token, null, [AppSettingVoter::MANAGE_APP_SETTINGS]));
+    }
+
     private function createToken(User $user): TokenInterface
     {
         $token = $this->createMock(TokenInterface::class);

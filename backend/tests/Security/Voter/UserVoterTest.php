@@ -201,6 +201,34 @@ final class UserVoterTest extends TestCase
         $this->assertSame(-1, $voter->vote($this->createToken($actor), $target, [UserVoter::UPDATE_USER]));
     }
 
+    public function testReturnsDeniedWhenTokenUserIsNotEntity(): void
+    {
+        $voter = new UserVoter();
+        $nonEntityUser = $this->createMock(\Symfony\Component\Security\Core\User\UserInterface::class);
+
+        $token = $this->createMock(TokenInterface::class);
+        $token->method('getUser')->willReturn($nonEntityUser);
+
+        $this->assertSame(-1, $voter->vote($token, null, [UserVoter::VIEW_ALL_USERS]));
+    }
+
+    public function testReturnsDeniedForUnknownAttribute(): void
+    {
+        $voter = new UserVoter();
+        $actor = (new User())->setRole('ROLE_ADMIN');
+
+        $this->assertSame(0, $voter->vote($this->createToken($actor), null, ['UNKNOWN_ATTRIBUTE']));
+    }
+
+    public function testDeleteUserRequiresUserSubject(): void
+    {
+        $voter = new UserVoter();
+        $actor = (new User())->setRole('ROLE_ADMIN');
+
+        // DELETE_USER with a non-User subject => supports() returns false => abstain
+        $this->assertSame(0, $voter->vote($this->createToken($actor), 'not-a-user', [UserVoter::DELETE_USER]));
+    }
+
     private function createToken(User $user): TokenInterface
     {
         $token = $this->createMock(TokenInterface::class);

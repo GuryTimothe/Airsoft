@@ -18,9 +18,17 @@ jobs:
       php-version: 8.4
       working-directory: backend
 
+  lighthouse:
+    needs: [frontend]
+    uses: ./.github/workflows/lighthouse.yml
+
+  pa11y:
+    needs: [lighthouse]
+    uses: ./.github/workflows/pa11y.yml
+
   release:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    needs: [frontend, backend]
+    needs: [frontend, backend, lighthouse, pa11y]
     uses: ./.github/workflows/release.yml
     with:
       node-version: 20

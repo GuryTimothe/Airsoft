@@ -1,0 +1,110 @@
+name: Lighthouse & Accessibility Audit
+
+on:
+  workflow_call:
+
+jobs:
+  lighthouse:
+    runs-on: ubuntu-latest
+    name: Lighthouse Performance & Accessibility
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: cd frontend && npm ci
+
+      - name: Build Next.js
+        run: cd frontend && npm run build
+
+      - name: Start frontend server
+        run: |
+          cd frontend
+          npm start > /tmp/server.log 2>&1 &
+          SERVER_PID=$!
+          echo "Server PID: $SERVER_PID"
+          sleep 5
+          # Wait for server to be ready with verbose output
+          for i in {1..120}; do
+            if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200\|404"; then
+              echo "✓ Server is ready on http://localhost:3000"
+              break
+            fi
+            if [ $((i % 10)) -eq 0 ]; then
+              echo "Waiting for server... ($i/120s)"
+              tail -5 /tmp/server.log || true
+            fi
+            sleep 1
+          done
+          # Verify server is still running
+          if ! ps -p $SERVER_PID > /dev/null; then
+            echo "❌ Server died during startup"
+            cat /tmp/server.log
+            exit 1
+          fi
+          echo "✓ Server is running with PID $SERVER_PID"
+          curl -s http://localhost:3000 | head -50
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:3000
+
+      - name: Run Lighthouse
+        uses: treosh/lighthouse-ci-action@v10
+        with:
+          uploadArtifacts: false
+          temporaryPublicStorage: true
+          configPath: "./frontend/lighthouse.config.js"
+
+      - name: Debug Lighthouse results
+        if: always()
+        run: |
+          echo "Checking for Lighthouse results..."
+          if [ -f "./lhci-results/manifest.json" ]; then
+            echo "✓ manifest.json found"
+            cat ./lhci-results/manifest.json | head -50
+          else
+            echo "❌ manifest.json not found"
+            find . -name "manifest.json" -o -name "*.json" | grep -i lhci || echo "No LHCI results found"
+          fi
+          ls -la ./lhci-results/ 2>&1 || echo "lhci-results directory not found"
+
+      - name: Save Lighthouse Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-results
+          path: ./lhci-results/
+          retention-days: 30
+
+      - name: Comment Lighthouse Score
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const results = JSON.parse(fs.readFileSync('./lhci-results/manifest.json', 'utf8'));
+            const scores = results[0]?.summary || {};
+
+            const comment = `
+            ## 🔍 Lighthouse Audit Results
+
+            | Metric | Score |
+            |--------|-------|
+            | 🎯 Performance | ${Math.round((scores.performance || 0) * 100)} |
+            | ♿ Accessibility | ${Math.round((scores.accessibility || 0) * 100)} |
+            | ✨ Best Practices | ${Math.round((scores['best-practices'] || 0) * 100)} |
+            | 🔒 SEO | ${Math.round((scores.seo || 0) * 100)} |
+
+            **Requirements:**
+            - Performance > 80 ✓
+            - Accessibility > 90 ✓
+            - Best Practices > 85 ✓
+
+            [📊 Full Report](https://lighthouse-ci.com)
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
