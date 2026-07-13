@@ -2,7 +2,12 @@
   "runners": ["axe", "htmlcs"],
   "standard": "WCAG2AA",
   "chromeLaunchConfig": {
-    "args": ["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu", "--single-process"]
+    "args": [
+      "--no-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+      "--single-process"
+    ]
   },
   "urls": [
     "http://localhost:3000/",
