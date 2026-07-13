@@ -20,8 +20,19 @@ jobs:
       - name: Start frontend server
         run: |
           cd frontend
-          npm start &
-          sleep 5
+          npm start > /tmp/server.log 2>&1 &
+          sleep 3
+          # Wait for server to be ready
+          for i in {1..60}; do
+            if curl -s http://localhost:3000 > /dev/null 2>&1; then
+              echo "✓ Server is ready on http://localhost:3000"
+              break
+            fi
+            echo "Waiting for server ($i/60)..."
+            sleep 1
+          done
+          # Show server logs
+          tail -20 /tmp/server.log || true
         env:
           NEXT_PUBLIC_API_URL: http://localhost:3000
 
@@ -38,6 +49,7 @@ jobs:
         with:
           name: lighthouse-results
           path: ./lhci-results/
+          retention-days: 30
 
       - name: Comment Lighthouse Score
         if: github.event_name == 'pull_request'

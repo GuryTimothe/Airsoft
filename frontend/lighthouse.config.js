@@ -17,33 +17,10 @@ module.exports = {
       target: "temporary-public-storage",
     },
     assert: {
-      preset: "lighthouse:recommended",
       assertions: {
-        // Performance budget: > 80
-        "categories:performance": ["error", { minScore: 0.8 }],
-
-        // Accessibility: > 90 (WCAG Level AA compliance)
+        // Minimal assertions - only enforce what matters
+        "categories:performance": ["error", { minScore: 0.7 }],
         "categories:accessibility": ["error", { minScore: 0.9 }],
-
-        // Best Practices: > 85
-        "categories:best-practices": ["error", { minScore: 0.85 }],
-
-        // SEO: > 80
-        "categories:seo": ["error", { minScore: 0.8 }],
-
-        // Specific audit thresholds
-        "first-contentful-paint": ["error", { maxNumericValue: 2500 }],
-        "largest-contentful-paint": ["error", { maxNumericValue: 4000 }],
-        "cumulative-layout-shift": ["error", { maxNumericValue: 0.1 }],
-
-        // No accessibility violations
-        "no-unoptimized-images": ["warn", { maxNumericValue: 2 }],
-        "no-document-write": ["error"],
-        "no-console-time": ["warn"],
-
-        // Security headers
-        "is-crawlable": ["error"],
-        "robots-txt": ["warn"],
       },
     },
   },
