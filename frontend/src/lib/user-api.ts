@@ -5,10 +5,7 @@ import {
 } from "@/lib/emergency-contact";
 
 export type UserRole =
-  | "ROLE_USER"
-  | "ROLE_ADMIN"
-  | "ROLE_ORGANIZER"
-  | "ROLE_SUPER_ADMIN";
+  "ROLE_USER" | "ROLE_ADMIN" | "ROLE_ORGANIZER" | "ROLE_SUPER_ADMIN";
 
 export interface User {
   id: number;
