@@ -39,7 +39,7 @@ jobs:
       - name: Run Lighthouse
         uses: treosh/lighthouse-ci-action@v10
         with:
-          uploadArtifacts: true
+          uploadArtifacts: false
           temporaryPublicStorage: true
           configPath: "./frontend/lighthouse.config.js"
 
