@@ -5,7 +5,10 @@ import {
 } from "@/lib/emergency-contact";
 
 export type UserRole =
-  "ROLE_USER" | "ROLE_ADMIN" | "ROLE_ORGANIZER" | "ROLE_SUPER_ADMIN";
+  | "ROLE_USER"
+  | "ROLE_ADMIN"
+  | "ROLE_ORGANIZER"
+  | "ROLE_SUPER_ADMIN";
 
 export interface User {
   id: number;
@@ -237,7 +240,7 @@ export async function getUsers(page?: number): Promise<UsersResult> {
   });
 
   if (!response.ok) {
-    throw new Error("Impossible de charger les utilisateurs");
+    throw new Error(await parseApiErrorMessage(response));
   }
 
   const data = await response.json();
@@ -360,7 +363,7 @@ export async function getUser(id: number): Promise<User> {
   });
 
   if (!response.ok) {
-    throw new Error("Impossible de charger l'utilisateur");
+    throw new Error(await parseApiErrorMessage(response));
   }
 
   return normalizeUser(await response.json());
@@ -374,7 +377,7 @@ export async function getCurrentUser(): Promise<User> {
   });
 
   if (!response.ok) {
-    throw new Error("Impossible de charger l'utilisateur courant");
+    throw new Error(await parseApiErrorMessage(response));
   }
 
   return normalizeUser(await response.json());

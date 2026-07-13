@@ -9,6 +9,7 @@ use Lexik\Bundle\JWTAuthenticationBundle\Event\JWTDecodedEvent;
 use Lexik\Bundle\JWTAuthenticationBundle\Events;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
+use Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException;
 
 final class TokenVersionSubscriber implements EventSubscriberInterface
 {
@@ -36,10 +37,12 @@ final class TokenVersionSubscriber implements EventSubscriberInterface
         }
 
         $payload            = $event->getData();
+        $payload['jti']     = bin2hex(random_bytes(16));
         $payload['pwd_sig'] = $this->computePasswordSignature($user);
-        $nonce              = $this->jwtRevocationStore->getOrCreateUserTokenNonce($user);
-        if (\is_string($nonce) && '' !== $nonce) {
-            $payload['tok_nce'] = $nonce;
+        try {
+            $payload['tok_nce'] = $this->jwtRevocationStore->getOrCreateUserTokenNonce($user);
+        } catch (JwtRevocationUnavailableException $exception) {
+            throw new ServiceUnavailableHttpException(null, 'Redis is required to issue JWT tokens.', $exception);
         }
 
         $event->setData($payload);
@@ -48,6 +51,23 @@ final class TokenVersionSubscriber implements EventSubscriberInterface
     public function onJwtDecoded(JWTDecodedEvent $event): void
     {
         $payload = $event->getPayload();
+
+        $tokenId = $payload['jti'] ?? null;
+        if (!\is_string($tokenId) || '' === $tokenId) {
+            $event->markAsInvalid();
+
+            return;
+        }
+
+        try {
+            if ($this->jwtRevocationStore->isTokenIdRevoked($tokenId)) {
+                $event->markAsInvalid();
+
+                return;
+            }
+        } catch (JwtRevocationUnavailableException $exception) {
+            throw new ServiceUnavailableHttpException(null, 'Redis is required to validate JWT tokens.', $exception);
+        }
 
         $identifier = $payload['username'] ?? null;
         if (!\is_string($identifier) || '' === $identifier) {
@@ -78,7 +98,12 @@ final class TokenVersionSubscriber implements EventSubscriberInterface
             return;
         }
 
-        $currentNonce = $this->jwtRevocationStore->getUserTokenNonce($user);
+        try {
+            $currentNonce = $this->jwtRevocationStore->getUserTokenNonce($user);
+        } catch (JwtRevocationUnavailableException $exception) {
+            throw new ServiceUnavailableHttpException(null, 'Redis is required to validate JWT tokens.', $exception);
+        }
+
         if (null !== $currentNonce) {
             if (!\is_string($tokenNonce) || '' === $tokenNonce) {
                 $event->markAsInvalid();
@@ -88,6 +113,8 @@ final class TokenVersionSubscriber implements EventSubscriberInterface
 
             if (!hash_equals($currentNonce, $tokenNonce)) {
                 $event->markAsInvalid();
+
+                return;
             }
         }
     }

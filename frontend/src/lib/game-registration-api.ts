@@ -3,8 +3,9 @@ import {
   getAuthToken,
   getUserIdentifierCandidatesFromToken,
 } from "@/lib/auth";
+import { getApiBaseUrl } from "@/lib/api-base-url";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const API_BASE_URL = getApiBaseUrl();
 
 function buildUrl(path: string): string {
   return `${API_BASE_URL}${path}`;
