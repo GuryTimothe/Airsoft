@@ -96,7 +96,7 @@ EOF
 
 | Métrique | Seuil | Outil | Cible |
 |----------|-------|-------|-------|
-| **Lighthouse Performance** | > 80 | Chrome DevTools | Prod |
+| **Lighthouse Performance** | > 50 (baseline pragmatique) | Chrome DevTools | Prod |
 | **First Contentful Paint (FCP)** | < 1.5 s | Web Vitals | < 1.5s |
 | **Largest Contentful Paint (LCP)** | < 2.5 s | Web Vitals | < 2.5s |
 | **Cumulative Layout Shift (CLS)** | < 0.1 | Web Vitals | Stable |

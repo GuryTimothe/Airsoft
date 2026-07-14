@@ -8,7 +8,7 @@
 - WCAG AA couvre les critères critiques et prioritaires de RGAA
 - Audit automatisé via Lighthouse + Pa11y (continu, non-bloquant)
 - Implémentation pragmatique vs audit manuel RGAA (3+ jours consultant)
-- Score Lighthouse 90+ garantit conformité AA
+- Seuils Lighthouse alignés sur la configuration CI réelle : Performance > 50, Accessibilité > 80
 
 **Critères RGAA couverts** :
 ✅ Couleurs et contraste  
@@ -34,8 +34,8 @@
    - Automated performance budgets
    - Accessibility scoring (WCAG 2.1 Level AA)
    - Core Web Vitals monitoring
-   - Performance threshold: 80
-   - Accessibility threshold: 90
+   - Performance threshold: 50
+   - Accessibility threshold: 80
 
 2. **Pa11y Accessibility Audit** (`.github/workflows/pa11y.yml`)
    - Automated WCAG AA compliance checking
@@ -125,7 +125,7 @@ cd frontend
 # Lighthouse audit (requires built app)
 npm run build
 npm start &
-npm run lighthouse
+npx lhci autorun --config=./lighthouse.config.js
 
 # Pa11y accessibility audit
 npm run test:pa11y
@@ -141,7 +141,7 @@ npm run build && npm start & && npm run test:pa11y && npm run test:a11y
 
 **Lighthouse** (`.github/workflows/lighthouse.yml`):
 - Runs on each push
-- Accessibility score: 90+ (WCAG AA Level)
+- Accessibility score: 80+ (WCAG AA baseline pragmatique)
 - Report: artifact in GitHub Actions
 
 **Pa11y** (`.github/workflows/pa11y.yml`):
@@ -162,10 +162,10 @@ npm run build && npm start & && npm run test:pa11y && npm run test:a11y
 
 | Metric | Target | Status | Notes |
 |--------|--------|--------|-------|
-| **Performance** | > 80 | ✅ Enforced CI/CD | Threshold configuré dans `lighthouse.config.js` |
-| **Accessibility (WCAG AA)** | > 90 | ✅ Enforced CI/CD | Threshold configuré + Pa11y WCAG2AA |
-| **Best Practices** | > 85 | ✅ Enforced CI/CD | Threshold configuré dans `lighthouse.config.js` |
-| **SEO** | > 80 | ✅ Enforced CI/CD | Threshold configuré dans `lighthouse.config.js` |
+| **Performance** | > 50 | ✅ Enforced CI/CD | Threshold configuré dans `lighthouse.config.js` |
+| **Accessibility (WCAG AA)** | > 80 | ✅ Enforced CI/CD | Threshold configuré + Pa11y WCAG2AA |
+| **Best Practices** | Informative | ℹ️ Non bloquant | Score collecté, non asserté en CI |
+| **SEO** | Informative | ℹ️ Non bloquant | Score collecté, non asserté en CI |
 
 > Scores exacts mesurés en production à chaque déploiement via `.github/workflows/lighthouse.yml`.
 
@@ -190,7 +190,7 @@ Assertions configured:
 
 | Aspect | Status | Details |
 |--------|--------|---------|
-| **WCAG 2.1 Level AA** | ✅ Implemented | Lighthouse 90+, Pa11y CI |
+| **WCAG 2.1 Level AA** | ✅ Implemented | Lighthouse 80+, Pa11y CI |
 | **Referential Chosen** | ✅ WCAG AA | ~75% RGAA 4.1 coverage |
 | **Automated Testing** | ✅ Continuous | Lighthouse + Pa11y on every push |
 | **Manual Validation** | ⏳ Optional | Audit RGAA formelle non nécessaire pour critère |

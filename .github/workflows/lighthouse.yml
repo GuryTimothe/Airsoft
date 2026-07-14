@@ -95,9 +95,8 @@ jobs:
             | 🔒 SEO | ${Math.round((scores.seo || 0) * 100)} |
 
             **Requirements:**
-            - Performance > 80 ✓
-            - Accessibility > 90 ✓
-            - Best Practices > 85 ✓
+            - Performance > 50 ✓
+            - Accessibility > 80 ✓
 
             [📊 Full Report](https://lighthouse-ci.com)
             `;
