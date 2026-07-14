@@ -37,7 +37,6 @@ import {
   hasCompleteEmergencyContact,
   parseEmergencyContact,
   serializeEmergencyContact,
-  type EmergencyContactFields,
 } from "@/lib/emergency-contact";
 
 interface UserFormProps {

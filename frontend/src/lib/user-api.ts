@@ -5,10 +5,7 @@ import {
 } from "@/lib/emergency-contact";
 
 export type UserRole =
-  | "ROLE_USER"
-  | "ROLE_ADMIN"
-  | "ROLE_ORGANIZER"
-  | "ROLE_SUPER_ADMIN";
+  "ROLE_USER" | "ROLE_ADMIN" | "ROLE_ORGANIZER" | "ROLE_SUPER_ADMIN";
 
 export interface User {
   id: number;
@@ -178,13 +175,21 @@ function normalizeUser(data: unknown): User {
   };
 }
 
-async function parseApiErrorMessage(response: Response): Promise<string> {
+async function parseApiErrorMessage(
+  response: Response,
+  fallbackMessage = "Une erreur est survenue.",
+  options?: { preferFallback?: boolean },
+): Promise<string> {
   let data: unknown = null;
 
   try {
     data = await response.json();
   } catch {
     data = null;
+  }
+
+  if (options?.preferFallback) {
+    return fallbackMessage;
   }
 
   if (typeof data === "object" && data !== null) {
@@ -213,7 +218,7 @@ async function parseApiErrorMessage(response: Response): Promise<string> {
     }
   }
 
-  return "Une erreur est survenue.";
+  return fallbackMessage;
 }
 
 function normalizeSelfUserUpdateResult(data: unknown): SelfUserUpdateResult {
@@ -240,7 +245,13 @@ export async function getUsers(page?: number): Promise<UsersResult> {
   });
 
   if (!response.ok) {
-    throw new Error(await parseApiErrorMessage(response));
+    throw new Error(
+      await parseApiErrorMessage(
+        response,
+        "Impossible de charger les utilisateurs",
+        { preferFallback: true },
+      ),
+    );
   }
 
   const data = await response.json();
@@ -363,7 +374,13 @@ export async function getUser(id: number): Promise<User> {
   });
 
   if (!response.ok) {
-    throw new Error(await parseApiErrorMessage(response));
+    throw new Error(
+      await parseApiErrorMessage(
+        response,
+        "Impossible de charger l'utilisateur",
+        { preferFallback: true },
+      ),
+    );
   }
 
   return normalizeUser(await response.json());
@@ -377,7 +394,13 @@ export async function getCurrentUser(): Promise<User> {
   });
 
   if (!response.ok) {
-    throw new Error(await parseApiErrorMessage(response));
+    throw new Error(
+      await parseApiErrorMessage(
+        response,
+        "Impossible de charger l'utilisateur courant",
+        { preferFallback: true },
+      ),
+    );
   }
 
   return normalizeUser(await response.json());
