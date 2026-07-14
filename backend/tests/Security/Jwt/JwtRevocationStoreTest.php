@@ -3,167 +3,181 @@
 namespace App\Tests\Security\Jwt;
 
 use App\Entity\User;
+use App\Security\Jwt\RedisJwtClient;
 use App\Security\Jwt\JwtRevocationStore;
+use App\Security\Jwt\JwtRevocationUnavailableException;
 use PHPUnit\Framework\TestCase;
-use Psr\Cache\CacheItemInterface;
-use Psr\Cache\CacheItemPoolInterface;
 
 final class JwtRevocationStoreTest extends TestCase
 {
-    private function createCacheItem(bool $isHit, mixed $value = null): CacheItemInterface
+    private function createUserWithId(int $id): User
     {
-        $item = $this->createMock(CacheItemInterface::class);
-        $item->method('isHit')->willReturn($isHit);
-        $item->method('get')->willReturn($value);
-        $item->method('set')->willReturnSelf();
+        $user = new User();
 
-        return $item;
+        $reflection = new \ReflectionProperty(User::class, 'id');
+        $reflection->setAccessible(true);
+        $reflection->setValue($user, $id);
+
+        return $user;
     }
 
     public function testGetOrCreateUserTokenNonceReturnsExistingNonce(): void
     {
-        $user = new User();
-        $item = $this->createCacheItem(true, 'existing-nonce');
+        $user = $this->createUserWithId(42);
+        $redis = $this->createMock(RedisJwtClient::class);
+        $redis->expects($this->once())
+            ->method('get')
+            ->with('jwt:nonce:user:42')
+            ->willReturn('existing-nonce');
+        $redis->expects($this->never())->method('set');
 
-        $cache = $this->createMock(CacheItemPoolInterface::class);
-        $cache->method('getItem')->willReturn($item);
-        $cache->expects($this->never())->method('save');
+        $store = new JwtRevocationStore('redis://localhost:6379', $redis);
 
-        $store = new JwtRevocationStore($cache);
-        $result = $store->getOrCreateUserTokenNonce($user);
-
-        $this->assertSame('existing-nonce', $result);
+        $this->assertSame('existing-nonce', $store->getOrCreateUserTokenNonce($user));
     }
 
-    public function testGetOrCreateUserTokenNonceCreatesNewNonceWhenNotHit(): void
+    public function testGetOrCreateUserTokenNonceCreatesNewNonceWhenMissing(): void
     {
-        $user = new User();
-        $item = $this->createCacheItem(false);
-        $item->expects($this->once())->method('set');
+        $user = $this->createUserWithId(42);
+        $redis = $this->createMock(RedisJwtClient::class);
+        $redis->expects($this->once())
+            ->method('get')
+            ->with('jwt:nonce:user:42')
+            ->willReturn(null);
+        $redis->expects($this->once())
+            ->method('set')
+            ->with(
+                'jwt:nonce:user:42',
+                $this->callback(static fn ($value): bool => \is_string($value) && '' !== $value),
+            );
 
-        $cache = $this->createMock(CacheItemPoolInterface::class);
-        $cache->method('getItem')->willReturn($item);
-        $cache->expects($this->once())->method('save');
-
-        $store = new JwtRevocationStore($cache);
+        $store = new JwtRevocationStore('redis://localhost:6379', $redis);
         $result = $store->getOrCreateUserTokenNonce($user);
 
         $this->assertIsString($result);
-        $this->assertNotEmpty($result);
+        $this->assertNotSame('', $result);
     }
 
-    public function testGetOrCreateUserTokenNonceCreatesNewNonceWhenHitButEmpty(): void
+    public function testGetOrCreateThrowsOnRedisException(): void
     {
-        $user = new User();
-        $item = $this->createCacheItem(true, '');
-        $item->expects($this->once())->method('set');
+        $user = $this->createUserWithId(42);
+        $redis = $this->createMock(RedisJwtClient::class);
+        $redis->method('get')->willThrowException(new \RuntimeException('redis down'));
 
-        $cache = $this->createMock(CacheItemPoolInterface::class);
-        $cache->method('getItem')->willReturn($item);
-        $cache->expects($this->once())->method('save');
+        $store = new JwtRevocationStore('redis://localhost:6379', $redis);
 
-        $store = new JwtRevocationStore($cache);
-        $result = $store->getOrCreateUserTokenNonce($user);
-
-        $this->assertIsString($result);
-        $this->assertNotEmpty($result);
-    }
-
-    public function testGetOrCreateReturnsNullOnCacheException(): void
-    {
-        $user = new User();
-
-        $cache = $this->createMock(CacheItemPoolInterface::class);
-        $cache->method('getItem')->willThrowException(new \RuntimeException('cache error'));
-
-        $store = new JwtRevocationStore($cache);
-        $result = $store->getOrCreateUserTokenNonce($user);
-
-        $this->assertNull($result);
+        $this->expectException(JwtRevocationUnavailableException::class);
+        $store->getOrCreateUserTokenNonce($user);
     }
 
     public function testRotateUserTokenNonceReturnsNewNonce(): void
     {
-        $user = new User();
-        $item = $this->createCacheItem(false);
-        $item->expects($this->once())->method('set');
+        $user = $this->createUserWithId(7);
+        $redis = $this->createMock(RedisJwtClient::class);
+        $redis->expects($this->once())
+            ->method('set')
+            ->with(
+                'jwt:nonce:user:7',
+                $this->callback(static fn ($value): bool => \is_string($value) && '' !== $value),
+            );
 
-        $cache = $this->createMock(CacheItemPoolInterface::class);
-        $cache->method('getItem')->willReturn($item);
-        $cache->expects($this->once())->method('save');
-
-        $store = new JwtRevocationStore($cache);
+        $store = new JwtRevocationStore('redis://localhost:6379', $redis);
         $result = $store->rotateUserTokenNonce($user);
 
         $this->assertIsString($result);
-        $this->assertNotEmpty($result);
+        $this->assertNotSame('', $result);
     }
 
-    public function testRotateUserTokenNonceReturnsNullOnException(): void
+    public function testRotateUserTokenNonceThrowsOnException(): void
     {
-        $user = new User();
+        $user = $this->createUserWithId(7);
+        $redis = $this->createMock(RedisJwtClient::class);
+        $redis->method('set')->willThrowException(new \RuntimeException('redis down'));
 
-        $cache = $this->createMock(CacheItemPoolInterface::class);
-        $cache->method('getItem')->willThrowException(new \RuntimeException('error'));
+        $store = new JwtRevocationStore('redis://localhost:6379', $redis);
 
-        $store = new JwtRevocationStore($cache);
-        $result = $store->rotateUserTokenNonce($user);
-
-        $this->assertNull($result);
+        $this->expectException(JwtRevocationUnavailableException::class);
+        $store->rotateUserTokenNonce($user);
     }
 
-    public function testGetUserTokenNonceReturnsNonceWhenHit(): void
+    public function testGetUserTokenNonceReturnsNonceWhenPresent(): void
     {
-        $user = new User();
-        $item = $this->createCacheItem(true, 'stored-nonce');
+        $user = $this->createUserWithId(3);
+        $redis = $this->createMock(RedisJwtClient::class);
+        $redis->expects($this->once())
+            ->method('get')
+            ->with('jwt:nonce:user:3')
+            ->willReturn('stored-nonce');
 
-        $cache = $this->createMock(CacheItemPoolInterface::class);
-        $cache->method('getItem')->willReturn($item);
+        $store = new JwtRevocationStore('redis://localhost:6379', $redis);
 
-        $store = new JwtRevocationStore($cache);
-        $result = $store->getUserTokenNonce($user);
-
-        $this->assertSame('stored-nonce', $result);
+        $this->assertSame('stored-nonce', $store->getUserTokenNonce($user));
     }
 
-    public function testGetUserTokenNonceReturnsNullWhenNotHit(): void
+    public function testGetUserTokenNonceReturnsNullWhenValueIsInvalid(): void
     {
-        $user = new User();
-        $item = $this->createCacheItem(false);
+        $user = $this->createUserWithId(3);
+        $redis = $this->createMock(RedisJwtClient::class);
+        $redis->expects($this->exactly(2))
+            ->method('get')
+            ->with('jwt:nonce:user:3')
+            ->willReturnOnConsecutiveCalls('', null);
 
-        $cache = $this->createMock(CacheItemPoolInterface::class);
-        $cache->method('getItem')->willReturn($item);
+        $store = new JwtRevocationStore('redis://localhost:6379', $redis);
 
-        $store = new JwtRevocationStore($cache);
-        $result = $store->getUserTokenNonce($user);
-
-        $this->assertNull($result);
+        $this->assertNull($store->getUserTokenNonce($user));
+        $this->assertNull($store->getUserTokenNonce($user));
     }
 
-    public function testGetUserTokenNonceReturnsNullWhenValueIsEmpty(): void
+    public function testGetUserTokenNonceThrowsOnException(): void
     {
-        $user = new User();
-        $item = $this->createCacheItem(true, '');
+        $user = $this->createUserWithId(3);
+        $redis = $this->createMock(RedisJwtClient::class);
+        $redis->method('get')->willThrowException(new \RuntimeException('redis down'));
 
-        $cache = $this->createMock(CacheItemPoolInterface::class);
-        $cache->method('getItem')->willReturn($item);
+        $store = new JwtRevocationStore('redis://localhost:6379', $redis);
 
-        $store = new JwtRevocationStore($cache);
-        $result = $store->getUserTokenNonce($user);
-
-        $this->assertNull($result);
+        $this->expectException(JwtRevocationUnavailableException::class);
+        $store->getUserTokenNonce($user);
     }
 
-    public function testGetUserTokenNonceReturnsNullOnException(): void
+    public function testRevokeTokenIdStoresBlacklistWithTtl(): void
     {
-        $user = new User();
+        $redis = $this->createMock(RedisJwtClient::class);
+        $expiresAt = time() + 60;
 
-        $cache = $this->createMock(CacheItemPoolInterface::class);
-        $cache->method('getItem')->willThrowException(new \RuntimeException('error'));
+        $redis->expects($this->once())
+            ->method('setex')
+            ->with(
+                'jwt:blacklist:jti:token-id',
+                $this->callback(static fn (int $ttl): bool => $ttl > 0 && $ttl <= 60),
+                '1',
+            );
 
-        $store = new JwtRevocationStore($cache);
-        $result = $store->getUserTokenNonce($user);
+        $store = new JwtRevocationStore('redis://localhost:6379', $redis);
+        $store->revokeTokenId('token-id', $expiresAt);
+    }
 
-        $this->assertNull($result);
+    public function testRevokeTokenIdSkipsExpiredTokens(): void
+    {
+        $redis = $this->createMock(RedisJwtClient::class);
+        $redis->expects($this->never())->method('setex');
+
+        $store = new JwtRevocationStore('redis://localhost:6379', $redis);
+        $store->revokeTokenId('token-id', time() - 1);
+    }
+
+    public function testIsTokenIdRevokedReturnsBoolean(): void
+    {
+        $redis = $this->createMock(RedisJwtClient::class);
+        $redis->expects($this->exactly(2))
+            ->method('exists')
+            ->with('jwt:blacklist:jti:token-id')
+            ->willReturnOnConsecutiveCalls(1, 0);
+
+        $store = new JwtRevocationStore('redis://localhost:6379', $redis);
+
+        $this->assertTrue($store->isTokenIdRevoked('token-id'));
+        $this->assertFalse($store->isTokenIdRevoked('token-id'));
     }
 }

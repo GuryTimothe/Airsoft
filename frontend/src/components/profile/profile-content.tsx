@@ -177,9 +177,13 @@ export function ProfileContent() {
           });
           setErrorMessage(null);
         }
-      } catch {
+      } catch (error) {
         if (!isDisposed) {
-          setErrorMessage("Impossible de charger votre profil.");
+          setErrorMessage(
+            error instanceof Error
+              ? error.message
+              : "Impossible de charger votre profil.",
+          );
         }
       } finally {
         if (!isDisposed) {

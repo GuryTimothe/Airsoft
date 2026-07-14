@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import {
   LayoutDashboard,
   Users,
@@ -12,7 +13,7 @@ import {
   Menu,
   X,
 } from "lucide-react";
-import { clearAuthToken } from "@/lib/auth";
+import { logout } from "@/lib/auth";
 import type { UserRole } from "@/lib/user-api";
 
 type SidebarProps = {
@@ -24,11 +25,22 @@ type SidebarProps = {
 export function Sidebar({ open, userRole, onToggle }: SidebarProps) {
   const router = useRouter();
   const isOrganizer = userRole === "ROLE_ORGANIZER";
+  const [logoutError, setLogoutError] = useState<string | null>(null);
 
-  function onLogout() {
-    clearAuthToken();
-    router.push("/auth/login");
-    router.refresh();
+  async function onLogout() {
+    setLogoutError(null);
+
+    try {
+      await logout();
+      router.push("/auth/login");
+      router.refresh();
+    } catch (error) {
+      setLogoutError(
+        error instanceof Error
+          ? error.message
+          : "Impossible de vous deconnecter pour le moment.",
+      );
+    }
   }
 
   return (
@@ -100,6 +112,10 @@ export function Sidebar({ open, userRole, onToggle }: SidebarProps) {
           <LogOut className="h-5 w-5" />
           {open && <span>Déconnexion</span>}
         </button>
+
+        {logoutError ? (
+          <p className="px-2 text-xs text-red-400">{logoutError}</p>
+        ) : null}
       </nav>
     </aside>
   );

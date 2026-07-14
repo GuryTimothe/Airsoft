@@ -1,0 +1,7 @@
+.git
+.idea
+.phpunit.cache
+var/cache
+var/log
+vendor
+tests

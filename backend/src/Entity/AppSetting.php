@@ -8,6 +8,7 @@ use ApiPlatform\Metadata\Patch;
 use App\Repository\AppSettingRepository;
 use App\Security\Voter\AppSettingVoter;
 use App\State\AppSettingProvider;
+use App\State\AppSettingUpdateProcessor;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -25,6 +26,7 @@ use Symfony\Component\Validator\Constraints as Assert;
         new Patch(
             uriTemplate: '/app_settings',
             provider: AppSettingProvider::class,
+            processor: AppSettingUpdateProcessor::class,
             security: "is_granted('" . AppSettingVoter::MANAGE_APP_SETTINGS . "')",
         ),
     ]

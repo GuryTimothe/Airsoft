@@ -4,13 +4,34 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 export const AUTH_TOKEN_KEY = "ma_access_token";
 export const AUTH_STATE_CHANGE_EVENT = "auth-state-changed";
 
-/**
- * Build full API URL from relative path
- * @param path - Relative API path (e.g., "/api/users")
- * @returns Full URL
- */
+let authExpiryTimeout: number | null = null;
+
 function buildUrl(path: string): string {
   return `${API_BASE_URL}${path}`;
+}
+
+async function parseApiErrorMessage(response: Response): Promise<string> {
+  let data: unknown = null;
+
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+
+  if (typeof data === "object" && data !== null) {
+    const detail = (data as { detail?: unknown }).detail;
+    if (typeof detail === "string" && detail.trim()) {
+      return detail;
+    }
+
+    const message = (data as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) {
+      return message;
+    }
+  }
+
+  return "Une erreur est survenue.";
 }
 
 type RegisterPayload = {
@@ -24,12 +45,6 @@ type RegisterPayload = {
   phone?: string;
 };
 
-/**
- * Get cookie value by name
- * Safe for server and client rendering
- * @param name - Cookie name
- * @returns Cookie value or null if not found
- */
 function getBrowserCookieValue(name: string): string | null {
   if (typeof document === "undefined") {
     return null;
@@ -46,11 +61,6 @@ function getBrowserCookieValue(name: string): string | null {
   }
 
   try {
-    /**
-     * Get current auth token from localStorage or cookies
-     * Syncs cookie to localStorage if found
-     * @returns Auth token or null if not authenticated
-     */
     return decodeURIComponent(match.slice(prefix.length));
   } catch {
     return match.slice(prefix.length);
@@ -64,12 +74,25 @@ export function getAuthToken(): string | null {
 
   const localStorageToken = window.localStorage.getItem(AUTH_TOKEN_KEY);
   if (localStorageToken) {
+    if (isTokenExpired(localStorageToken)) {
+      clearAuthToken();
+
+      return null;
+    }
+
     return localStorageToken;
   }
 
   const cookieToken = getBrowserCookieValue(AUTH_TOKEN_KEY);
   if (cookieToken) {
+    if (isTokenExpired(cookieToken)) {
+      clearAuthToken();
+
+      return null;
+    }
+
     window.localStorage.setItem(AUTH_TOKEN_KEY, cookieToken);
+    scheduleTokenExpiry(cookieToken);
   }
 
   return cookieToken;
@@ -82,6 +105,7 @@ export function setAuthToken(token: string): void {
 
   window.localStorage.setItem(AUTH_TOKEN_KEY, token);
   document.cookie = `${AUTH_TOKEN_KEY}=${encodeURIComponent(token)}; path=/; max-age=604800; samesite=lax`;
+  scheduleTokenExpiry(token);
   window.dispatchEvent(new Event(AUTH_STATE_CHANGE_EVENT));
 }
 
@@ -90,9 +114,32 @@ export function clearAuthToken(): void {
     return;
   }
 
+  clearAuthExpiryTimeout();
   window.localStorage.removeItem(AUTH_TOKEN_KEY);
   document.cookie = `${AUTH_TOKEN_KEY}=; path=/; max-age=0; samesite=lax`;
   window.dispatchEvent(new Event(AUTH_STATE_CHANGE_EVENT));
+}
+
+export async function logout(): Promise<void> {
+  const token = getAuthToken();
+
+  if (!token) {
+    clearAuthToken();
+    return;
+  }
+
+  const response = await fetch(buildUrl("/api/logout"), {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok && response.status !== 401) {
+    throw new Error(await parseApiErrorMessage(response));
+  }
+
+  clearAuthToken();
 }
 
 export function isAuthenticated(): boolean {
@@ -102,6 +149,7 @@ export function isAuthenticated(): boolean {
 type JwtPayload = {
   roles?: unknown;
   role?: unknown;
+  exp?: unknown;
 };
 
 function parseJwtPayload(token: string | null): JwtPayload | null {
@@ -126,6 +174,59 @@ function parseJwtPayload(token: string | null): JwtPayload | null {
   } catch {
     return null;
   }
+}
+
+function getTokenExpirationTimestamp(token: string | null): number | null {
+  const payload = parseJwtPayload(token);
+  if (
+    !payload ||
+    typeof payload.exp !== "number" ||
+    !Number.isFinite(payload.exp)
+  ) {
+    return null;
+  }
+
+  return payload.exp * 1000;
+}
+
+function isTokenExpired(token: string | null): boolean {
+  const expirationTimestamp = getTokenExpirationTimestamp(token);
+  if (expirationTimestamp === null) {
+    return false;
+  }
+
+  return Date.now() >= expirationTimestamp;
+}
+
+function clearAuthExpiryTimeout(): void {
+  if (authExpiryTimeout !== null) {
+    window.clearTimeout(authExpiryTimeout);
+    authExpiryTimeout = null;
+  }
+}
+
+function scheduleTokenExpiry(token: string): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  clearAuthExpiryTimeout();
+
+  const expirationTimestamp = getTokenExpirationTimestamp(token);
+  if (expirationTimestamp === null) {
+    return;
+  }
+
+  const delay = expirationTimestamp - Date.now();
+  if (delay <= 0) {
+    clearAuthToken();
+
+    return;
+  }
+
+  authExpiryTimeout = window.setTimeout(() => {
+    clearAuthToken();
+  }, delay);
 }
 
 export function getRolesFromToken(token: string | null): string[] {
@@ -195,7 +296,9 @@ async function getServerAuthToken(): Promise<string | null> {
     const { cookies } = await import("next/headers");
     const cookieStore = await cookies();
 
-    return cookieStore.get(AUTH_TOKEN_KEY)?.value ?? null;
+    const token = cookieStore.get(AUTH_TOKEN_KEY)?.value ?? null;
+
+    return isTokenExpired(token) ? null : token;
   } catch {
     return null;
   }

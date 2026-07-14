@@ -1,7 +1,8 @@
 import { getAuthHeaders } from "@/lib/auth";
+import { getApiBaseUrl } from "@/lib/api-base-url";
 import type { UserRole } from "@/lib/user-api";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const API_BASE_URL = getApiBaseUrl();
 
 type AgeGroupFilter = "mineur" | "majeur" | "tous";
 

@@ -1,4 +1,5 @@
 import { getAuthHeaders } from "@/lib/auth";
+import { getApiBaseUrl } from "@/lib/api-base-url";
 
 export interface Game {
   id: number;
@@ -49,7 +50,7 @@ export interface GamesResult {
   totalItems?: number;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const API_BASE_URL = getApiBaseUrl();
 
 function buildUrl(path: string) {
   return `${API_BASE_URL}${path}`;

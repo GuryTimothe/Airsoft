@@ -63,28 +63,6 @@ final class TokenVersionSubscriberTest extends TestCase
         $subscriber->onJwtCreated($event);
     }
 
-    public function testOnJwtCreatedSkipsNonceWhenNullNonce(): void
-    {
-        $user = (new User())
-            ->setEmail('test@example.com')
-            ->setPassword('hashed-password');
-
-        $userRepository = $this->createMock(UserRepository::class);
-
-        $revocationStore = $this->createMock(JwtRevocationStore::class);
-        $revocationStore->method('getOrCreateUserTokenNonce')->willReturn(null);
-
-        $event = $this->createMock(JWTCreatedEvent::class);
-        $event->method('getUser')->willReturn($user);
-        $event->method('getData')->willReturn([]);
-        $event->expects($this->once())->method('setData')->with($this->callback(function (array $payload) {
-            return isset($payload['pwd_sig']) && !isset($payload['tok_nce']);
-        }));
-
-        $subscriber = new TokenVersionSubscriber($userRepository, $revocationStore, self::SECRET);
-        $subscriber->onJwtCreated($event);
-    }
-
     public function testOnJwtDecodedInvalidatesWhenNoUsername(): void
     {
         $userRepository  = $this->createMock(UserRepository::class);
@@ -98,15 +76,32 @@ final class TokenVersionSubscriberTest extends TestCase
         $subscriber->onJwtDecoded($event);
     }
 
+    public function testOnJwtDecodedInvalidatesWhenNoJti(): void
+    {
+        $userRepository  = $this->createMock(UserRepository::class);
+        $revocationStore = $this->createMock(JwtRevocationStore::class);
+
+        $event = $this->createMock(JWTDecodedEvent::class);
+        $event->method('getPayload')->willReturn(['username' => 'test@example.com']);
+        $event->expects($this->once())->method('markAsInvalid');
+
+        $subscriber = new TokenVersionSubscriber($userRepository, $revocationStore, self::SECRET);
+        $subscriber->onJwtDecoded($event);
+    }
+
     public function testOnJwtDecodedInvalidatesWhenUserNotFound(): void
     {
         $userRepository = $this->createMock(UserRepository::class);
         $userRepository->method('findOneBy')->willReturn(null);
 
         $revocationStore = $this->createMock(JwtRevocationStore::class);
+        $revocationStore->method('isTokenIdRevoked')->willReturn(false);
 
         $event = $this->createMock(JWTDecodedEvent::class);
-        $event->method('getPayload')->willReturn(['username' => 'unknown@example.com']);
+        $event->method('getPayload')->willReturn([
+            'jti'      => 'token-id',
+            'username' => 'unknown@example.com',
+        ]);
         $event->expects($this->once())->method('markAsInvalid');
 
         $subscriber = new TokenVersionSubscriber($userRepository, $revocationStore, self::SECRET);
@@ -121,9 +116,13 @@ final class TokenVersionSubscriberTest extends TestCase
         $userRepository->method('findOneBy')->willReturn($user);
 
         $revocationStore = $this->createMock(JwtRevocationStore::class);
+        $revocationStore->method('isTokenIdRevoked')->willReturn(false);
 
         $event = $this->createMock(JWTDecodedEvent::class);
-        $event->method('getPayload')->willReturn(['username' => 'test@example.com']);
+        $event->method('getPayload')->willReturn([
+            'jti'      => 'token-id',
+            'username' => 'test@example.com',
+        ]);
         $event->expects($this->once())->method('markAsInvalid');
 
         $subscriber = new TokenVersionSubscriber($userRepository, $revocationStore, self::SECRET);
@@ -138,10 +137,12 @@ final class TokenVersionSubscriberTest extends TestCase
         $userRepository->method('findOneBy')->willReturn($user);
 
         $revocationStore = $this->createMock(JwtRevocationStore::class);
+        $revocationStore->method('isTokenIdRevoked')->willReturn(false);
         $revocationStore->method('getUserTokenNonce')->willReturn(null);
 
         $event = $this->createMock(JWTDecodedEvent::class);
         $event->method('getPayload')->willReturn([
+            'jti'      => 'token-id',
             'username' => 'test@example.com',
             'pwd_sig'  => 'wrong-signature',
         ]);
@@ -161,10 +162,12 @@ final class TokenVersionSubscriberTest extends TestCase
         $userRepository->method('findOneBy')->willReturn($user);
 
         $revocationStore = $this->createMock(JwtRevocationStore::class);
+        $revocationStore->method('isTokenIdRevoked')->willReturn(false);
         $revocationStore->method('getUserTokenNonce')->willReturn($nonce);
 
         $event = $this->createMock(JWTDecodedEvent::class);
         $event->method('getPayload')->willReturn([
+            'jti'      => 'token-id',
             'username' => 'test@example.com',
             'pwd_sig'  => $correctSignature,
             'tok_nce'  => $nonce,
@@ -184,10 +187,12 @@ final class TokenVersionSubscriberTest extends TestCase
         $userRepository->method('findOneBy')->willReturn($user);
 
         $revocationStore = $this->createMock(JwtRevocationStore::class);
+        $revocationStore->method('isTokenIdRevoked')->willReturn(false);
         $revocationStore->method('getUserTokenNonce')->willReturn('stored-nonce');
 
         $event = $this->createMock(JWTDecodedEvent::class);
         $event->method('getPayload')->willReturn([
+            'jti'      => 'token-id',
             'username' => 'test@example.com',
             'pwd_sig'  => $correctSignature,
         ]);
@@ -206,10 +211,12 @@ final class TokenVersionSubscriberTest extends TestCase
         $userRepository->method('findOneBy')->willReturn($user);
 
         $revocationStore = $this->createMock(JwtRevocationStore::class);
+        $revocationStore->method('isTokenIdRevoked')->willReturn(false);
         $revocationStore->method('getUserTokenNonce')->willReturn('stored-nonce');
 
         $event = $this->createMock(JWTDecodedEvent::class);
         $event->method('getPayload')->willReturn([
+            'jti'      => 'token-id',
             'username' => 'test@example.com',
             'pwd_sig'  => $correctSignature,
             'tok_nce'  => 'wrong-nonce',

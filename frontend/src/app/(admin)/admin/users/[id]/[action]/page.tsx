@@ -1,13 +1,18 @@
 import { UserForm } from "@/components/admin/user-form";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getCurrentUser, getUser } from "@/lib/user-api";
 
 interface PageProps {
-  params: Promise<{ id: string }>;
+  params: Promise<{ id: string; action: string }>;
 }
 
-export default async function EditUserPage({ params }: PageProps) {
-  const { id } = await params;
+export default async function UserActionPage({ params }: PageProps) {
+  const { id, action } = await params;
+
+  if (action !== "edit") {
+    notFound();
+  }
+
   const userId = Number(id);
 
   if (!Number.isFinite(userId) || userId <= 0) {

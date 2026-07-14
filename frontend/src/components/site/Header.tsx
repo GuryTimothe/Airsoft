@@ -8,9 +8,9 @@ import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AUTH_STATE_CHANGE_EVENT,
-  clearAuthToken,
   getAuthToken,
   hasAdminAccessToken,
+  logout,
 } from "@/lib/auth";
 
 type HeaderProps = {
@@ -28,12 +28,23 @@ export function Header({
     initialIsAuthenticated,
   );
   const [hasAdminAccess, setHasAdminAccess] = useState(initialHasAdminAccess);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
 
-  function handleLogout() {
-    clearAuthToken();
-    setMobileMenuOpen(false);
-    router.push("/");
-    router.refresh();
+  async function handleLogout() {
+    setLogoutError(null);
+
+    try {
+      await logout();
+      setMobileMenuOpen(false);
+      router.push("/");
+      router.refresh();
+    } catch (error) {
+      setLogoutError(
+        error instanceof Error
+          ? error.message
+          : "Impossible de vous deconnecter pour le moment.",
+      );
+    }
   }
 
   useEffect(() => {
@@ -112,6 +123,12 @@ export function Header({
           )}
         </button>
       </nav>
+
+      {logoutError ? (
+        <div className="mx-auto max-w-7xl px-6 pb-3 text-sm text-red-200">
+          {logoutError}
+        </div>
+      ) : null}
 
       {mobileMenuOpen ? (
         <div className="border-t border-border bg-background md:hidden">

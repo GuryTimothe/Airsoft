@@ -27,7 +27,7 @@ final class AdminExportController extends AbstractController
     #[Route('/games.csv', methods: ['GET'])]
     public function exportGames(Request $request): StreamedResponse
     {
-        $this->denyAccessUnlessGranted('ROLE_ADMIN');
+        $this->denyAccessUnlessGrantedAdminOrSuperAdmin();
 
         $dateFrom = $this->parseDate($request->query->get('dateFrom'), 'dateFrom');
         $dateTo   = $this->parseDate($request->query->get('dateTo'), 'dateTo');
@@ -96,7 +96,7 @@ final class AdminExportController extends AbstractController
     #[Route('/users.csv', methods: ['GET'])]
     public function exportUsers(Request $request): StreamedResponse
     {
-        $this->denyAccessUnlessGranted('ROLE_ADMIN');
+        $this->denyAccessUnlessGrantedAdminOrSuperAdmin();
 
         $queryParams = $request->query->all();
         $isMinor     = $this->parseMinorFilter($request->query->get('ageGroup'));
@@ -146,6 +146,15 @@ final class AdminExportController extends AbstractController
                 $users,
             ),
         );
+    }
+
+    private function denyAccessUnlessGrantedAdminOrSuperAdmin(): void
+    {
+        if ($this->isGranted('ROLE_ADMIN') || $this->isGranted('ROLE_SUPER_ADMIN')) {
+            return;
+        }
+
+        $this->denyAccessUnlessGranted('ROLE_ADMIN');
     }
 
     private function parseDate(mixed $value, string $parameterName): ?\DateTimeImmutable
