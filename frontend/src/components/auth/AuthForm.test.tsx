@@ -36,8 +36,8 @@ describe("AuthForm", () => {
     await user.type(screen.getByLabelText("Nom"), "Martin");
     await user.type(screen.getByLabelText("Prénom"), "Alex");
     await user.type(screen.getByLabelText("Email"), "alex@example.com");
-    await user.type(screen.getByLabelText("Mot de passe"), "password123");
-    await user.type(screen.getByLabelText("Confirmer"), "password123");
+    await user.type(screen.getByLabelText("Mot de passe"), "Password1234!");
+    await user.type(screen.getByLabelText("Confirmer"), "Password1234!");
     await user.type(screen.getByLabelText("Date de naissance"), "1992-01-01");
     await user.type(screen.getByLabelText("Nom du responsable"), "Durand");
     await user.type(screen.getByLabelText("Prénom du responsable"), "Paul");
@@ -56,7 +56,7 @@ describe("AuthForm", () => {
         firstname: "Alex",
         lastname: "Martin",
         email: "alex@example.com",
-        password: "password123",
+        password: "Password1234!",
         dateOfBirth: "1992-01-01",
         emergencyContact: JSON.stringify({
           lastname: "Durand",

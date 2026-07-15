@@ -20,7 +20,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { deleteUser, getUser, type User } from "@/lib/user-api";
+import { deleteUser, getCurrentUser, getUser, type User } from "@/lib/user-api";
 import {
   Mail,
   Phone,
@@ -33,7 +33,6 @@ import {
   parseEmergencyContact,
   type EmergencyContactFields,
 } from "@/lib/emergency-contact";
-import { getAuthToken, getRolesFromToken } from "@/lib/auth";
 
 interface UserDetailProps {
   userId: number;
@@ -79,23 +78,24 @@ export function UserDetail({ userId }: UserDetailProps) {
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const actorRoles = getRolesFromToken(getAuthToken());
-  const isAdminOnlyActor =
-    actorRoles.includes("ROLE_ADMIN") &&
-    !actorRoles.includes("ROLE_SUPER_ADMIN");
+  const [isAdminOnlyActor, setIsAdminOnlyActor] = useState(false);
 
   useEffect(() => {
     let active = true;
 
     const load = async () => {
       try {
-        const userData = await getUser(userId);
+        const [currentUser, userData] = await Promise.all([
+          getCurrentUser(),
+          getUser(userId),
+        ]);
 
         if (!active) {
           return;
         }
 
         setUser(userData);
+        setIsAdminOnlyActor(currentUser.role === "ROLE_ADMIN");
 
         const fallbackEmergency = parseEmergencyContact(
           userData.emergencyContact,

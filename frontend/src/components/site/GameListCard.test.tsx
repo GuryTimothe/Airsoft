@@ -2,11 +2,7 @@ import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { GameListCard } from "./GameListCard";
 import { getGames } from "@/lib/game-api";
 import { getMyGameRegistrations } from "@/lib/game-registration-api";
-import {
-  getAuthToken,
-  getUserIdentifierCandidatesFromToken,
-  hasAdminAccessToken,
-} from "@/lib/auth";
+import { getCurrentUser } from "@/lib/user-api";
 
 jest.mock("@/lib/game-api", () => ({
   getGames: jest.fn(),
@@ -18,11 +14,8 @@ jest.mock("@/lib/game-registration-api", () => ({
   cancelGameRegistration: jest.fn(),
 }));
 
-jest.mock("@/lib/auth", () => ({
-  AUTH_STATE_CHANGE_EVENT: "auth-state-changed",
-  getAuthToken: jest.fn(),
-  getUserIdentifierCandidatesFromToken: jest.fn(),
-  hasAdminAccessToken: jest.fn(),
+jest.mock("@/lib/user-api", () => ({
+  getCurrentUser: jest.fn(),
 }));
 
 jest.mock("@/assets/images/game-banner.jpg", () => ({
@@ -32,22 +25,13 @@ jest.mock("@/assets/images/game-banner.jpg", () => ({
 const mockedGetGames = getGames as jest.MockedFunction<typeof getGames>;
 const mockedGetMyGameRegistrations =
   getMyGameRegistrations as jest.MockedFunction<typeof getMyGameRegistrations>;
-const mockedGetAuthToken = getAuthToken as jest.MockedFunction<
-  typeof getAuthToken
->;
-const mockedGetUserIdentifierCandidatesFromToken =
-  getUserIdentifierCandidatesFromToken as jest.MockedFunction<
-    typeof getUserIdentifierCandidatesFromToken
-  >;
-const mockedHasAdminAccessToken = hasAdminAccessToken as jest.MockedFunction<
-  typeof hasAdminAccessToken
+const mockedGetCurrentUser = getCurrentUser as jest.MockedFunction<
+  typeof getCurrentUser
 >;
 
 describe("GameListCard", () => {
   beforeEach(() => {
-    mockedGetAuthToken.mockReturnValue(null);
-    mockedGetUserIdentifierCandidatesFromToken.mockReturnValue([]);
-    mockedHasAdminAccessToken.mockReturnValue(false);
+    mockedGetCurrentUser.mockRejectedValue(new Error("unauthenticated"));
     mockedGetMyGameRegistrations.mockResolvedValue([]);
     mockedGetGames.mockResolvedValue([
       {
@@ -98,7 +82,7 @@ describe("GameListCard", () => {
   });
 
   it("keeps games visible when registration lookup fails for a connected user", async () => {
-    mockedGetAuthToken.mockReturnValue("token");
+    mockedGetCurrentUser.mockResolvedValue({ role: "ROLE_USER" } as never);
     mockedGetMyGameRegistrations.mockRejectedValueOnce(
       new Error("Impossible de charger vos inscriptions."),
     );
@@ -115,8 +99,7 @@ describe("GameListCard", () => {
   });
 
   it("keeps the registration button enabled for admins even when the game is full", async () => {
-    mockedGetAuthToken.mockReturnValue("token");
-    mockedHasAdminAccessToken.mockReturnValue(true);
+    mockedGetCurrentUser.mockResolvedValue({ role: "ROLE_ADMIN" } as never);
     mockedGetGames.mockResolvedValueOnce([
       {
         id: 1,
@@ -145,8 +128,7 @@ describe("GameListCard", () => {
   });
 
   it("shows 'Complet' disabled button for regular user when game is full", async () => {
-    mockedGetAuthToken.mockReturnValue("token");
-    mockedHasAdminAccessToken.mockReturnValue(false);
+    mockedGetCurrentUser.mockResolvedValue({ role: "ROLE_USER" } as never);
     mockedGetGames.mockResolvedValueOnce([
       {
         id: 1,
@@ -178,8 +160,7 @@ describe("GameListCard", () => {
   });
 
   it("shows cancel button when user is already registered", async () => {
-    mockedGetAuthToken.mockReturnValue("token");
-    mockedHasAdminAccessToken.mockReturnValue(false);
+    mockedGetCurrentUser.mockResolvedValue({ role: "ROLE_USER" } as never);
     mockedGetMyGameRegistrations.mockResolvedValueOnce([
       {
         id: 42,
@@ -208,8 +189,7 @@ describe("GameListCard", () => {
       typeof registerToGame
     >;
 
-    mockedGetAuthToken.mockReturnValue("token");
-    mockedHasAdminAccessToken.mockReturnValue(false);
+    mockedGetCurrentUser.mockResolvedValue({ role: "ROLE_USER" } as never);
     mockedRegisterToGame.mockResolvedValue({
       id: 99,
       gameId: 1,
@@ -241,13 +221,13 @@ describe("GameListCard", () => {
   });
 
   it("shows 'Se connecter' link button for unauthenticated user", async () => {
-    mockedGetAuthToken.mockReturnValue(null);
+    mockedGetCurrentUser.mockRejectedValue(new Error("unauthenticated"));
 
     render(<GameListCard />);
 
     await screen.findByText("Forêt");
     expect(
-      screen.getByText("Se connecter pour s'inscrire"),
+      screen.getByRole("link", { name: "Se connecter pour s'inscrire" }),
     ).toBeInTheDocument();
   });
 });

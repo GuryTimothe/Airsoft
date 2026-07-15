@@ -13,6 +13,12 @@ import {
 
 describe("user-api", () => {
   let fetchMock: jest.Mock;
+  const mockCsrf = () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ csrfToken: "csrf-token" }),
+    });
+  };
 
   beforeEach(() => {
     fetchMock = jest.fn();
@@ -213,6 +219,7 @@ describe("user-api", () => {
   });
 
   it("creates a user", async () => {
+    mockCsrf();
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -230,7 +237,7 @@ describe("user-api", () => {
       lastname: "Roux",
       firstname: "Nina",
       email: "nina@example.com",
-      password: "secret123",
+      password: "Password1234!",
       dateOfBirth: "1995-04-20",
       role: "ROLE_USER",
       canSeePrivate: false,
@@ -244,6 +251,7 @@ describe("user-api", () => {
   });
 
   it("sends canSeePrivate when creating a user", async () => {
+    mockCsrf();
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -261,13 +269,13 @@ describe("user-api", () => {
       lastname: "Lemoine",
       firstname: "Nora",
       email: "nora@example.com",
-      password: "secret123",
+      password: "Password1234!",
       dateOfBirth: "1996-03-08",
       role: "ROLE_ORGANIZER",
       canSeePrivate: true,
     });
 
-    const [, options] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [, options] = fetchMock.mock.calls[1] as [string, RequestInit];
     const body = JSON.parse(String(options.body));
 
     expect(body.canSeePrivate).toBe(true);
@@ -275,6 +283,7 @@ describe("user-api", () => {
   });
 
   it("updates a user", async () => {
+    mockCsrf();
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -301,6 +310,7 @@ describe("user-api", () => {
   });
 
   it("sends canSeePrivate when updating a user", async () => {
+    mockCsrf();
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -318,7 +328,7 @@ describe("user-api", () => {
       canSeePrivate: true,
     });
 
-    const [, options] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [, options] = fetchMock.mock.calls[1] as [string, RequestInit];
     const body = JSON.parse(String(options.body));
 
     expect(body.canSeePrivate).toBe(true);
@@ -326,6 +336,7 @@ describe("user-api", () => {
   });
 
   it("deletes a user", async () => {
+    mockCsrf();
     fetchMock.mockResolvedValueOnce({ ok: true });
 
     await deleteUser(8);
@@ -337,6 +348,7 @@ describe("user-api", () => {
   });
 
   it("deletes the current user from /api/me", async () => {
+    mockCsrf();
     fetchMock.mockResolvedValueOnce({ ok: true });
 
     await deleteCurrentUser();
@@ -348,6 +360,7 @@ describe("user-api", () => {
   });
 
   it("updates current user general profile without password", async () => {
+    mockCsrf();
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -382,6 +395,7 @@ describe("user-api", () => {
   });
 
   it("updates current user email with current password", async () => {
+    mockCsrf();
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -415,6 +429,7 @@ describe("user-api", () => {
   });
 
   it("updates current user password with current password", async () => {
+    mockCsrf();
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -471,6 +486,7 @@ describe("user-api", () => {
   });
 
   it("throws when createUser fails with text body", async () => {
+    mockCsrf();
     fetchMock.mockResolvedValueOnce({
       ok: false,
       text: async () => "Email already taken",
@@ -480,13 +496,14 @@ describe("user-api", () => {
         lastname: "X",
         firstname: "Y",
         email: "x@y.com",
-        password: "pass",
+        password: "Password1234!",
         dateOfBirth: "1990-01-01",
       }),
     ).rejects.toThrow("Email already taken");
   });
 
   it("throws when updateUser fails", async () => {
+    mockCsrf();
     fetchMock.mockResolvedValueOnce({
       ok: false,
       text: async () => "Forbidden",
@@ -497,6 +514,7 @@ describe("user-api", () => {
   });
 
   it("throws when deleteUser fails", async () => {
+    mockCsrf();
     fetchMock.mockResolvedValueOnce({ ok: false, json: async () => ({}) });
     await expect(deleteUser(1)).rejects.toThrow(
       "Impossible de supprimer l'utilisateur",
@@ -504,6 +522,7 @@ describe("user-api", () => {
   });
 
   it("throws when deleteCurrentUser fails with detail message", async () => {
+    mockCsrf();
     fetchMock.mockResolvedValueOnce({
       ok: false,
       json: async () => ({ detail: "Non autorisé." }),
@@ -512,6 +531,7 @@ describe("user-api", () => {
   });
 
   it("throws when updateMyProfile fails", async () => {
+    mockCsrf();
     fetchMock.mockResolvedValueOnce({
       ok: false,
       json: async () => ({ message: "Validation échouée." }),
@@ -522,6 +542,7 @@ describe("user-api", () => {
   });
 
   it("throws when updateMyEmail fails with violations", async () => {
+    mockCsrf();
     fetchMock.mockResolvedValueOnce({
       ok: false,
       json: async () => ({
@@ -534,6 +555,7 @@ describe("user-api", () => {
   });
 
   it("throws when updateMyPassword fails with generic error", async () => {
+    mockCsrf();
     fetchMock.mockResolvedValueOnce({
       ok: false,
       json: async () => ({}),
@@ -622,6 +644,7 @@ describe("user-api", () => {
   });
 
   it("handles HTTP error when creating user", async () => {
+    mockCsrf();
     fetchMock.mockResolvedValueOnce({
       ok: false,
       text: async () => "Email already exists",
@@ -632,7 +655,7 @@ describe("user-api", () => {
         firstname: "Test",
         lastname: "User",
         email: "test@example.com",
-        password: "Password123",
+        password: "Password1234!",
         dateOfBirth: "1990-01-01",
         role: "ROLE_USER",
       }),
@@ -640,38 +663,37 @@ describe("user-api", () => {
   });
 
   it("handles HTTP error when updating email", async () => {
+    mockCsrf();
     fetchMock.mockResolvedValueOnce({
       ok: false,
       json: async () => ({ message: "Email update failed" }),
     });
 
     await expect(
-      updateMyEmail(
-        { email: "new@example.com", password: "Password123" },
-        "token",
-      ),
+      updateMyEmail({
+        email: "new@example.com",
+        currentPassword: "Password1234!",
+      }),
     ).rejects.toThrow("Email update failed");
   });
 
   it("handles HTTP error when updating password", async () => {
+    mockCsrf();
     fetchMock.mockResolvedValueOnce({
       ok: false,
       json: async () => ({ detail: "Invalid password" }),
     });
 
     await expect(
-      updateMyPassword(
-        {
-          oldPassword: "OldPass123",
-          newPassword: "NewPass123",
-          newPasswordConfirmation: "NewPass123",
-        },
-        "token",
-      ),
+      updateMyPassword({
+        currentPassword: "OldPass1234!",
+        newPassword: "NewPass1234!",
+      }),
     ).rejects.toThrow("Invalid password");
   });
 
   it("handles JSON parse error when deleting user", async () => {
+    mockCsrf();
     fetchMock.mockResolvedValueOnce({
       ok: false,
       json: async () => {
@@ -679,25 +701,24 @@ describe("user-api", () => {
       },
     });
 
-    await expect(deleteUser(1, "token")).rejects.toThrow();
+    await expect(deleteUser(1)).rejects.toThrow();
   });
 
   it("handles fetch error when updating profile", async () => {
+    mockCsrf();
     fetchMock.mockRejectedValueOnce(new Error("Network error"));
 
     await expect(
-      updateMyProfile(
-        {
-          firstname: "Updated",
-          lastname: "Name",
-          dateOfBirth: "1990-01-01",
-        },
-        "token",
-      ),
+      updateMyProfile({
+        firstname: "Updated",
+        lastname: "Name",
+        dateOfBirth: "1990-01-01",
+      }),
     ).rejects.toThrow("Network error");
   });
 
   it("handles violations array in error response", async () => {
+    mockCsrf();
     fetchMock.mockResolvedValueOnce({
       ok: false,
       json: async () => ({
@@ -711,7 +732,7 @@ describe("user-api", () => {
     });
 
     await expect(
-      updateMyEmail({ email: "invalid", password: "Pass123" }, "token"),
+      updateMyEmail({ email: "invalid", currentPassword: "Pass1234!" }),
     ).rejects.toThrow("Validation failed");
   });
 

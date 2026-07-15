@@ -1,4 +1,4 @@
-import { getAuthHeaders } from "@/lib/auth";
+import { getAuthHeaders, withCsrfHeaders } from "@/lib/auth";
 import { getApiBaseUrl } from "@/lib/api-base-url";
 
 export interface AppSetting {
@@ -112,9 +112,10 @@ export async function getAppSettings(): Promise<AppSetting | null> {
 export async function updateAppSettings(
   payload: AppSettingPayload,
 ): Promise<AppSetting> {
-  const headers = await getAuthHeaders({
+  let headers = await getAuthHeaders({
     "Content-Type": "application/merge-patch+json",
   });
+  headers = await withCsrfHeaders(headers);
   const response = await fetch(buildUrl("/api/app_settings"), {
     method: "PATCH",
     headers,

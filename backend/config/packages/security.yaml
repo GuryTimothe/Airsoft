@@ -21,15 +21,29 @@ security:
       stateless: true
       provider: app_user_provider
 
+      login_throttling:
+        max_attempts: 3
+        interval: "5 minutes"
+
       json_login:
         check_path: /api/login
         username_path: email
         password_path: password
-        success_handler: lexik_jwt_authentication.handler.authentication_success
-        failure_handler: lexik_jwt_authentication.handler.authentication_failure
+        success_handler: App\Security\Jwt\LoginSuccessHandler
+        failure_handler: App\Security\Jwt\GenericAuthenticationFailureHandler
 
     public_register:
       pattern: ^/api/register
+      stateless: true
+      security: false
+
+    public_logout:
+      pattern: ^/api/logout
+      stateless: true
+      security: false
+
+    public_csrf_login:
+      pattern: ^/api/csrf
       stateless: true
       security: false
 
@@ -38,8 +52,6 @@ security:
       stateless: true
       provider: app_user_provider
       jwt: ~
-      logout:
-        path: /api/logout
 
       # Activate different ways to authenticate:
       # https://symfony.com/doc/current/security.html#the-firewall
@@ -49,8 +61,10 @@ security:
 
   # Note: Only the *first* matching rule is applied
   access_control:
+    - { path: ^/api/csrf, roles: IS_AUTHENTICATED_ANONYMOUSLY }
     - { path: ^/api/login, roles: IS_AUTHENTICATED_ANONYMOUSLY }
     - { path: ^/api/register, roles: IS_AUTHENTICATED_ANONYMOUSLY }
+    - { path: ^/api/logout, roles: IS_AUTHENTICATED_ANONYMOUSLY }
     - { path: ^/api/games$, roles: PUBLIC_ACCESS, methods: [GET] }
     - { path: ^/api/games/\d+$, roles: PUBLIC_ACCESS, methods: [GET] }
     - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }

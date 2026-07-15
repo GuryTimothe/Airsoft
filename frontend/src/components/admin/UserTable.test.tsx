@@ -1,13 +1,18 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import UserTable from "./UserTable";
 import { type User } from "@/lib/user-api";
 
-jest.mock("@/lib/auth", () => ({
-  getAuthToken: jest.fn(),
-  getRolesFromToken: jest.fn(),
+jest.mock("@/lib/user-api", () => ({
+  getCurrentUser: jest.fn(),
 }));
 
-import { getAuthToken, getRolesFromToken } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/user-api";
 
 const users: User[] = [
   {
@@ -51,8 +56,7 @@ const users: User[] = [
 describe("UserTable", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (getAuthToken as jest.Mock).mockReturnValue(null);
-    (getRolesFromToken as jest.Mock).mockReturnValue([]);
+    (getCurrentUser as jest.Mock).mockResolvedValue({ role: "ROLE_USER" });
   });
 
   it("renders users, highlights minors, and filters by role/private access", () => {
@@ -90,9 +94,8 @@ describe("UserTable", () => {
     expect(screen.queryByText("Nina Roux")).not.toBeInTheDocument();
   });
 
-  it("disables edit for admin actor on admin and super admin rows only", () => {
-    (getAuthToken as jest.Mock).mockReturnValue("token");
-    (getRolesFromToken as jest.Mock).mockReturnValue(["ROLE_ADMIN"]);
+  it("disables edit for admin actor on admin and super admin rows only", async () => {
+    (getCurrentUser as jest.Mock).mockResolvedValue({ role: "ROLE_ADMIN" });
 
     render(
       <UserTable
@@ -111,16 +114,18 @@ describe("UserTable", () => {
     expect(organizerRow).not.toBeNull();
     expect(userRow).not.toBeNull();
 
-    expect(
-      within(adminRow as HTMLElement).getByRole("button", {
-        name: "Modifier",
-      }),
-    ).toBeDisabled();
-    expect(
-      within(superAdminRow as HTMLElement).getByRole("button", {
-        name: "Modifier",
-      }),
-    ).toBeDisabled();
+    await waitFor(() => {
+      expect(
+        within(adminRow as HTMLElement).getByRole("button", {
+          name: "Modifier",
+        }),
+      ).toBeDisabled();
+      expect(
+        within(superAdminRow as HTMLElement).getByRole("button", {
+          name: "Modifier",
+        }),
+      ).toBeDisabled();
+    });
     expect(
       within(organizerRow as HTMLElement).getByRole("link", {
         name: "Modifier",

@@ -134,6 +134,16 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column(length: 255)]
     #[Assert\NotBlank]
+    #[Assert\Length(
+        min: 12,
+        minMessage: 'Le mot de passe doit contenir au moins 12 caractères.',
+        groups: ['user:create']
+    )]
+    #[Assert\Regex(
+        pattern: '/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\w\s]).+$/',
+        message: 'Le mot de passe doit contenir une majuscule, une minuscule, un chiffre et un symbole.',
+        groups: ['user:create']
+    )]
     #[Groups(['user:write'])]
     private string $password;
 

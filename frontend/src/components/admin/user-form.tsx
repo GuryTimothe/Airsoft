@@ -99,6 +99,30 @@ function isPrivateAccessForcedRole(role: UserRole): boolean {
   );
 }
 
+function validatePasswordPolicy(password: string): string | null {
+  if (password.length < 12) {
+    return "Le mot de passe doit contenir au moins 12 caractères.";
+  }
+
+  if (!/[a-z]/.test(password)) {
+    return "Le mot de passe doit contenir une minuscule.";
+  }
+
+  if (!/[A-Z]/.test(password)) {
+    return "Le mot de passe doit contenir une majuscule.";
+  }
+
+  if (!/\d/.test(password)) {
+    return "Le mot de passe doit contenir un chiffre.";
+  }
+
+  if (!/[^\w\s]/.test(password)) {
+    return "Le mot de passe doit contenir un symbole.";
+  }
+
+  return null;
+}
+
 function toFormValues(user?: User): UserFormValues {
   if (!user) {
     return emptyValues;
@@ -279,6 +303,11 @@ export function UserForm({ userId }: UserFormProps) {
         };
 
         if (values.password.trim()) {
+          const passwordPolicyError = validatePasswordPolicy(values.password);
+          if (passwordPolicyError) {
+            throw new Error(passwordPolicyError);
+          }
+
           payload.password = values.password;
         }
 
@@ -288,6 +317,11 @@ export function UserForm({ userId }: UserFormProps) {
         if (isAdminActor && isElevatedRole(values.role)) {
           setError("Un admin ne peut pas creer un admin ou super admin.");
           return;
+        }
+
+        const passwordPolicyError = validatePasswordPolicy(values.password);
+        if (passwordPolicyError) {
+          throw new Error(passwordPolicyError);
         }
 
         const payload: CreateUserPayload = {

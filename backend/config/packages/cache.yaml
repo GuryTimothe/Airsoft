@@ -5,3 +5,5 @@ framework:
     pools:
       lexik_jwt_blocklist.cache:
         adapter: cache.adapter.redis
+      rate_limiter:
+        adapter: cache.adapter.redis

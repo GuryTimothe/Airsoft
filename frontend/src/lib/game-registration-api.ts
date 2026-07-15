@@ -1,8 +1,5 @@
-import {
-  getAuthHeaders,
-  getAuthToken,
-  getUserIdentifierCandidatesFromToken,
-} from "@/lib/auth";
+import { getAuthHeaders, withCsrfHeaders } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/user-api";
 import { getApiBaseUrl } from "@/lib/api-base-url";
 
 const API_BASE_URL = getApiBaseUrl();
@@ -196,6 +193,7 @@ async function fetchAllRegistrations(
   const response = await fetch(buildUrl("/api/game_registrations"), {
     headers,
     cache: "no-store",
+    credentials: "include",
   });
 
   if (!response.ok) {
@@ -206,13 +204,17 @@ async function fetchAllRegistrations(
   return extractItems(payload).map((item) => normalizeGameRegistration(item));
 }
 
-function getCurrentUserCandidates(): Set<string> {
-  const token = getAuthToken();
-  const values = getUserIdentifierCandidatesFromToken(token).map((value) =>
-    value.toLowerCase(),
-  );
+async function getCurrentUserCandidates(): Promise<Set<string>> {
+  try {
+    const currentUser = await getCurrentUser();
+    const values = [String(currentUser.id), currentUser.email]
+      .map((value) => value.trim().toLowerCase())
+      .filter((value) => value !== "");
 
-  return new Set(values);
+    return new Set(values);
+  } catch {
+    return new Set();
+  }
 }
 
 function belongsToCurrentUser(
@@ -232,10 +234,10 @@ function belongsToCurrentUser(
   );
 }
 
-function filterToCurrentUser(
+async function filterToCurrentUser(
   registrations: GameRegistration[],
-): GameRegistration[] {
-  const currentUserCandidates = getCurrentUserCandidates();
+): Promise<GameRegistration[]> {
+  const currentUserCandidates = await getCurrentUserCandidates();
 
   return registrations.filter((registration) =>
     belongsToCurrentUser(registration, currentUserCandidates),
@@ -247,6 +249,7 @@ export async function getMyGameRegistrations(): Promise<GameRegistration[]> {
   const response = await fetch(buildUrl("/api/game_registrations/mine"), {
     headers,
     cache: "no-store",
+    credentials: "include",
   });
 
   if (response.ok) {
@@ -268,6 +271,7 @@ export async function getGameRegistrationsByGameId(
     {
       headers,
       cache: "no-store",
+      credentials: "include",
     },
   );
 
@@ -298,11 +302,13 @@ export async function getGameRegistrationsByGameId(
 export async function registerToGame(
   gameId: number,
 ): Promise<GameRegistration> {
-  const headers = await getAuthHeaders({
+  let headers = await getAuthHeaders({
     "Content-Type": "application/ld+json",
   });
+  headers = await withCsrfHeaders(headers);
   const response = await fetch(buildUrl("/api/game_registrations"), {
     method: "POST",
+    credentials: "include",
     headers,
     body: JSON.stringify({ game: `/api/games/${gameId}` }),
   });
@@ -318,11 +324,13 @@ export async function registerToGame(
 export async function cancelGameRegistration(
   registrationId: number,
 ): Promise<void> {
-  const headers = await getAuthHeaders();
+  let headers = await getAuthHeaders();
+  headers = await withCsrfHeaders(headers);
   const response = await fetch(
     buildUrl(`/api/game_registrations/${registrationId}`),
     {
       method: "DELETE",
+      credentials: "include",
       headers,
     },
   );
@@ -337,13 +345,15 @@ export async function updateGameRegistrationPresence(
   registrationId: number,
   isPresent: boolean,
 ): Promise<GameRegistration> {
-  const headers = await getAuthHeaders({
+  let headers = await getAuthHeaders({
     "Content-Type": "application/merge-patch+json",
   });
+  headers = await withCsrfHeaders(headers);
   const response = await fetch(
     buildUrl(`/api/game_registrations/${registrationId}`),
     {
       method: "PATCH",
+      credentials: "include",
       headers,
       body: JSON.stringify({ present: isPresent, isPresent }),
     },

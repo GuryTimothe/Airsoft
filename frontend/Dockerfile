@@ -1,5 +1,8 @@
 FROM node:20-alpine
 
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+
 RUN apk add --no-cache tini \
 	&& addgroup -S app-group \
 	&& adduser -S app-user -G app-group

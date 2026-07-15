@@ -1,4 +1,5 @@
-import { getAuthHeaders } from "@/lib/auth";
+import { getAuthHeaders, withCsrfHeaders } from "@/lib/auth";
+import { getApiBaseUrl } from "@/lib/api-base-url";
 import {
   parseEmergencyContact,
   type EmergencyContactFields,
@@ -88,7 +89,7 @@ export interface CreateUserPayload {
   adminNotes?: string | null;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const API_BASE_URL = getApiBaseUrl();
 
 function buildUrl(path: string): string {
   return `${API_BASE_URL}${path}`;
@@ -241,6 +242,7 @@ export async function getUsers(page?: number): Promise<UsersResult> {
       : buildUrl("/api/users");
   const response = await fetch(url, {
     cache: "no-store",
+    credentials: "include",
     headers,
   });
 
@@ -292,11 +294,13 @@ export async function updateUser(
   id: number,
   payload: UpdateUserPayload,
 ): Promise<User> {
-  const headers = await getAuthHeaders({
+  let headers = await getAuthHeaders({
     "Content-Type": "application/merge-patch+json",
   });
+  headers = await withCsrfHeaders(headers);
   const response = await fetch(buildUrl(`/api/users/${id}`), {
     method: "PATCH",
+    credentials: "include",
     headers,
     body: JSON.stringify(payload),
   });
@@ -312,11 +316,13 @@ export async function updateUser(
 export async function updateMyProfile(
   payload: UpdateMyProfilePayload,
 ): Promise<User> {
-  const headers = await getAuthHeaders({
+  let headers = await getAuthHeaders({
     "Content-Type": "application/merge-patch+json",
   });
+  headers = await withCsrfHeaders(headers);
   const response = await fetch(buildUrl("/api/me"), {
     method: "PATCH",
+    credentials: "include",
     headers,
     body: JSON.stringify(payload),
   });
@@ -331,11 +337,13 @@ export async function updateMyProfile(
 export async function updateMyEmail(
   payload: UpdateMyEmailPayload,
 ): Promise<SelfUserUpdateResult> {
-  const headers = await getAuthHeaders({
+  let headers = await getAuthHeaders({
     "Content-Type": "application/merge-patch+json",
   });
+  headers = await withCsrfHeaders(headers);
   const response = await fetch(buildUrl("/api/me/email"), {
     method: "PATCH",
+    credentials: "include",
     headers,
     body: JSON.stringify(payload),
   });
@@ -350,11 +358,13 @@ export async function updateMyEmail(
 export async function updateMyPassword(
   payload: UpdateMyPasswordPayload,
 ): Promise<SelfUserUpdateResult> {
-  const headers = await getAuthHeaders({
+  let headers = await getAuthHeaders({
     "Content-Type": "application/merge-patch+json",
   });
+  headers = await withCsrfHeaders(headers);
   const response = await fetch(buildUrl("/api/me/password"), {
     method: "PATCH",
+    credentials: "include",
     headers,
     body: JSON.stringify(payload),
   });
@@ -370,6 +380,7 @@ export async function getUser(id: number): Promise<User> {
   const headers = await getAuthHeaders();
   const response = await fetch(buildUrl(`/api/users/${id}`), {
     cache: "no-store",
+    credentials: "include",
     headers,
   });
 
@@ -390,6 +401,7 @@ export async function getCurrentUser(): Promise<User> {
   const headers = await getAuthHeaders();
   const response = await fetch(buildUrl("/api/me"), {
     cache: "no-store",
+    credentials: "include",
     headers,
   });
 
@@ -407,11 +419,13 @@ export async function getCurrentUser(): Promise<User> {
 }
 
 export async function createUser(payload: CreateUserPayload): Promise<User> {
-  const headers = await getAuthHeaders({
+  let headers = await getAuthHeaders({
     "Content-Type": "application/ld+json",
   });
+  headers = await withCsrfHeaders(headers);
   const response = await fetch(buildUrl("/api/users"), {
     method: "POST",
+    credentials: "include",
     headers,
     body: JSON.stringify(payload),
   });
@@ -425,9 +439,11 @@ export async function createUser(payload: CreateUserPayload): Promise<User> {
 }
 
 export async function deleteCurrentUser(): Promise<void> {
-  const headers = await getAuthHeaders();
+  let headers = await getAuthHeaders();
+  headers = await withCsrfHeaders(headers);
   const response = await fetch(buildUrl("/api/me"), {
     method: "DELETE",
+    credentials: "include",
     headers,
   });
 
@@ -437,9 +453,11 @@ export async function deleteCurrentUser(): Promise<void> {
 }
 
 export async function deleteUser(id: number): Promise<void> {
-  const headers = await getAuthHeaders();
+  let headers = await getAuthHeaders();
+  headers = await withCsrfHeaders(headers);
   const response = await fetch(buildUrl(`/api/users/${id}`), {
     method: "DELETE",
+    credentials: "include",
     headers,
   });
 

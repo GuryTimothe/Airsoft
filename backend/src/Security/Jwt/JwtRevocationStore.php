@@ -7,6 +7,8 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 class JwtRevocationStore
 {
+    private const DEFAULT_INACTIVITY_TIMEOUT_SECONDS = 1800;
+
     private RedisJwtClient $redis;
 
     public function __construct(
@@ -90,6 +92,35 @@ class JwtRevocationStore
         }
     }
 
+    public function touchTokenActivity(string $tokenId, ?int $ttlSeconds = null): void
+    {
+        $ttl = $this->normalizeTtl($ttlSeconds);
+
+        try {
+            $this->redis->setex($this->activityKey($tokenId), $ttl, '1');
+        } catch (\Throwable $exception) {
+            throw new JwtRevocationUnavailableException('Unable to update JWT token activity.', 0, $exception);
+        }
+    }
+
+    public function isTokenActivityActive(string $tokenId): bool
+    {
+        try {
+            return 1 === (int) $this->redis->exists($this->activityKey($tokenId));
+        } catch (\Throwable $exception) {
+            throw new JwtRevocationUnavailableException('Unable to verify JWT token activity.', 0, $exception);
+        }
+    }
+
+    public function revokeTokenActivity(string $tokenId): void
+    {
+        try {
+            $this->redis->del($this->activityKey($tokenId));
+        } catch (\Throwable $exception) {
+            throw new JwtRevocationUnavailableException('Unable to revoke JWT token activity.', 0, $exception);
+        }
+    }
+
     private function nonceKey(User $user): string
     {
         return sprintf('jwt:nonce:user:%d', (int) $user->getId());
@@ -98,5 +129,17 @@ class JwtRevocationStore
     private function blacklistKey(string $tokenId): string
     {
         return sprintf('jwt:blacklist:jti:%s', $tokenId);
+    }
+
+    private function activityKey(string $tokenId): string
+    {
+        return sprintf('jwt:activity:jti:%s', $tokenId);
+    }
+
+    private function normalizeTtl(?int $ttlSeconds): int
+    {
+        $ttl = $ttlSeconds ?? self::DEFAULT_INACTIVITY_TIMEOUT_SECONDS;
+
+        return $ttl > 0 ? $ttl : self::DEFAULT_INACTIVITY_TIMEOUT_SECONDS;
     }
 }

@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { clearAuthToken, getAuthToken, setAuthToken } from "@/lib/auth";
+import { clearAuthToken } from "@/lib/auth";
 import {
   hasCompleteEmergencyContact,
   parseEmergencyContact,
@@ -59,6 +59,30 @@ function isMinorDate(dateOfBirth: string): boolean {
   }
 
   return age < 18;
+}
+
+function validatePasswordPolicy(password: string): string | null {
+  if (password.length < 12) {
+    return "Le nouveau mot de passe doit contenir au moins 12 caractères.";
+  }
+
+  if (!/[a-z]/.test(password)) {
+    return "Le nouveau mot de passe doit contenir une minuscule.";
+  }
+
+  if (!/[A-Z]/.test(password)) {
+    return "Le nouveau mot de passe doit contenir une majuscule.";
+  }
+
+  if (!/\d/.test(password)) {
+    return "Le nouveau mot de passe doit contenir un chiffre.";
+  }
+
+  if (!/[^\w\s]/.test(password)) {
+    return "Le nouveau mot de passe doit contenir un symbole.";
+  }
+
+  return null;
 }
 
 type DismissibleMessageProps = {
@@ -148,11 +172,6 @@ export function ProfileContent() {
     let isDisposed = false;
 
     async function loadProfile() {
-      if (!getAuthToken()) {
-        router.replace("/auth/login");
-        return;
-      }
-
       try {
         const currentUser = await getCurrentUser();
         if (!isDisposed) {
@@ -407,8 +426,6 @@ export function ProfileContent() {
         email: emailForm.email,
         currentPassword: emailForm.currentPassword,
       });
-
-      setAuthToken(result.token);
       setUser(result.user);
       setEmailForm({
         email: result.user.email,
@@ -442,6 +459,14 @@ export function ProfileContent() {
       return;
     }
 
+    const passwordPolicyError = validatePasswordPolicy(
+      passwordForm.newPassword,
+    );
+    if (passwordPolicyError) {
+      setPasswordError(passwordPolicyError);
+      return;
+    }
+
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       setPasswordError(
         "La confirmation ne correspond pas au nouveau mot de passe.",
@@ -456,8 +481,6 @@ export function ProfileContent() {
         currentPassword: passwordForm.currentPassword,
         newPassword: passwordForm.newPassword,
       });
-
-      setAuthToken(result.token);
       setUser(result.user);
       setPasswordForm({
         currentPassword: "",

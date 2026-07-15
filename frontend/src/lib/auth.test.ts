@@ -22,42 +22,50 @@ import {
 } from "@/lib/auth";
 
 describe("auth.ts - Authentication utilities", () => {
+  let originalFetch: typeof global.fetch;
+
   beforeEach(() => {
+    originalFetch = global.fetch;
     localStorage.clear();
     document.cookie = `${AUTH_TOKEN_KEY}=; max-age=0`;
   });
 
   afterEach(() => {
     localStorage.clear();
+    global.fetch = originalFetch;
   });
 
   describe("Token Management", () => {
-    it("should store and retrieve token from localStorage", () => {
-      const token = "test-jwt-token";
-      setAuthToken(token);
-
-      expect(getAuthToken()).toBe(token);
+    it("never exposes token to browser JavaScript", () => {
+      setAuthToken("test-jwt-token");
+      expect(getAuthToken()).toBeNull();
     });
 
-    it("should clear auth token", () => {
+    it("dispatches auth state change on setAuthToken", () => {
+      const listener = jest.fn();
+      window.addEventListener("auth-state-changed", listener);
+
       setAuthToken("test-token");
+
+      expect(listener).toHaveBeenCalledTimes(1);
+      window.removeEventListener("auth-state-changed", listener);
+    });
+
+    it("dispatches auth state change on clearAuthToken", () => {
+      const listener = jest.fn();
+      window.addEventListener("auth-state-changed", listener);
+
       clearAuthToken();
 
-      expect(getAuthToken()).toBeNull();
-      expect(isAuthenticated()).toBe(false);
+      expect(listener).toHaveBeenCalledTimes(1);
+      window.removeEventListener("auth-state-changed", listener);
     });
 
     it("should return null when no token exists", () => {
       expect(getAuthToken()).toBeNull();
     });
 
-    it("should check if user is authenticated", () => {
-      expect(isAuthenticated()).toBe(false);
-
-      setAuthToken("test-token");
-      expect(isAuthenticated()).toBe(true);
-
-      clearAuthToken();
+    it("always reports unauthenticated in client code", () => {
       expect(isAuthenticated()).toBe(false);
     });
   });
@@ -100,43 +108,7 @@ describe("auth.ts - Authentication utilities", () => {
   });
 
   describe("Admin Access Check", () => {
-    it("should identify admin users correctly", () => {
-      // JWT with ROLE_ADMIN
-      const adminToken =
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlcyI6WyJST0xFX0FETUlOIl19.signature";
-
-      setAuthToken(adminToken);
-      expect(hasAdminAccessToken()).toBe(true);
-    });
-
-    it("should identify super-admin users", () => {
-      // JWT with ROLE_SUPER_ADMIN
-      const superAdminToken =
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlcyI6WyJST0xFX1NVUEVSX0FETUlOIl19.signature";
-
-      setAuthToken(superAdminToken);
-      expect(hasAdminAccessToken()).toBe(true);
-    });
-
-    it("should identify organizer users", () => {
-      // JWT with ROLE_ORGANIZER
-      const organizerToken =
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlcyI6WyJST0xFX09SR0FOSVpFUiJdfQ.signature";
-
-      setAuthToken(organizerToken);
-      expect(hasAdminAccessToken()).toBe(true);
-    });
-
-    it("should deny access for regular users", () => {
-      // JWT with only ROLE_USER
-      const userToken =
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlcyI6WyJST0xFX1VTRVIiXX0.signature";
-
-      setAuthToken(userToken);
-      expect(hasAdminAccessToken()).toBe(false);
-    });
-
-    it("should return false when no token exists", () => {
+    it("returns false in browser context because token is not readable", () => {
       expect(hasAdminAccessToken()).toBe(false);
     });
   });
@@ -186,31 +158,21 @@ describe("auth.ts - Authentication utilities", () => {
   });
 
   describe("getAuthHeaders", () => {
-    it("returns Authorization header when token exists", async () => {
-      setAuthToken("my-jwt-token");
+    it("returns headers unchanged in browser context", async () => {
       const headers = await getAuthHeaders();
-      expect((headers as Record<string, string>)["Authorization"]).toBe(
-        "Bearer my-jwt-token",
-      );
-    });
-
-    it("returns empty headers when no token", async () => {
-      clearAuthToken();
-      const headers = await getAuthHeaders();
-      expect(headers).not.toHaveProperty("Authorization");
+      expect(headers).toEqual({});
     });
 
     it("merges with existing headers", async () => {
-      setAuthToken("my-token");
       const headers = await getAuthHeaders({
         "Content-Type": "application/json",
       });
       expect((headers as Record<string, string>)["Content-Type"]).toBe(
         "application/json",
       );
-      expect((headers as Record<string, string>)["Authorization"]).toBe(
-        "Bearer my-token",
-      );
+      expect(
+        (headers as Record<string, string>)["Authorization"],
+      ).toBeUndefined();
     });
   });
 
@@ -219,52 +181,76 @@ describe("auth.ts - Authentication utilities", () => {
       clearAuthToken();
     });
 
-    it("stores token on successful login", async () => {
-      global.fetch = jest.fn().mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ token: "jwt-token-from-server" }),
-      }) as jest.Mock;
+    it("performs csrf prefetch before login and returns empty string", async () => {
+      global.fetch = jest
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ csrfToken: "csrf-token" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ token: "jwt-token-from-server" }),
+        }) as jest.Mock;
 
       const token = await login({
         email: "user@example.com",
         password: "secret",
       });
 
-      expect(token).toBe("jwt-token-from-server");
-      expect(getAuthToken()).toBe("jwt-token-from-server");
+      expect(token).toBe("");
+      expect((global.fetch as jest.Mock).mock.calls).toHaveLength(2);
+      expect((global.fetch as jest.Mock).mock.calls[0][0]).toContain(
+        "/api/csrf/token",
+      );
+      expect((global.fetch as jest.Mock).mock.calls[1][0]).toContain(
+        "/api/login",
+      );
     });
 
     it("throws on invalid credentials", async () => {
-      global.fetch = jest.fn().mockResolvedValueOnce({
-        ok: false,
-        json: async () => ({ message: "Email ou mot de passe invalide." }),
-      }) as jest.Mock;
+      global.fetch = jest
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ csrfToken: "csrf-token" }),
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          json: async () => ({ message: "Email ou mot de passe invalide." }),
+        }) as jest.Mock;
 
       await expect(
         login({ email: "bad@example.com", password: "wrong" }),
-      ).rejects.toThrow("Email ou mot de passe invalide.");
+      ).rejects.toThrow("Identifiants invalides.");
     });
 
-    it("throws when token missing from response", async () => {
+    it("throws when csrf prefetch fails", async () => {
       global.fetch = jest.fn().mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ user: "no-token-here" }),
+        ok: false,
+        json: async () => ({ csrfToken: "" }),
       }) as jest.Mock;
 
       await expect(
         login({ email: "user@example.com", password: "secret" }),
-      ).rejects.toThrow("token manquant");
+      ).rejects.toThrow("Impossible d'initialiser la session.");
     });
 
     it("throws with generic error when no message in response", async () => {
-      global.fetch = jest.fn().mockResolvedValueOnce({
-        ok: false,
-        json: async () => ({}),
-      }) as jest.Mock;
+      global.fetch = jest
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ csrfToken: "csrf-token" }),
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          json: async () => ({}),
+        }) as jest.Mock;
 
       await expect(
         login({ email: "user@example.com", password: "wrong" }),
-      ).rejects.toThrow("invalide");
+      ).rejects.toThrow("Identifiants invalides.");
     });
   });
 
@@ -280,7 +266,7 @@ describe("auth.ts - Authentication utilities", () => {
           firstname: "Jean",
           lastname: "Dupont",
           email: "jean@example.com",
-          password: "Password123",
+          password: "Password1234!",
           dateOfBirth: "1990-01-15",
         }),
       ).resolves.toBeUndefined();
@@ -289,7 +275,7 @@ describe("auth.ts - Authentication utilities", () => {
     it("throws on failed registration", async () => {
       global.fetch = jest.fn().mockResolvedValueOnce({
         ok: false,
-        json: async () => ({ detail: "Email déjà utilisé." }),
+        json: async () => ({ detail: "Identifiants invalides." }),
       }) as jest.Mock;
 
       await expect(
@@ -297,10 +283,10 @@ describe("auth.ts - Authentication utilities", () => {
           firstname: "Jean",
           lastname: "Dupont",
           email: "existing@example.com",
-          password: "Password123",
+          password: "Password1234!",
           dateOfBirth: "1990-01-15",
         }),
-      ).rejects.toThrow("Email déjà utilisé.");
+      ).rejects.toThrow("Identifiants invalides.");
     });
 
     it("throws generic error when no detail in response", async () => {
@@ -314,7 +300,7 @@ describe("auth.ts - Authentication utilities", () => {
           firstname: "Jean",
           lastname: "Dupont",
           email: "jean@example.com",
-          password: "Password123",
+          password: "Password1234!",
           dateOfBirth: "1990-01-15",
         }),
       ).rejects.toThrow("Impossible de créer le compte.");
@@ -333,7 +319,7 @@ describe("auth.ts - Authentication utilities", () => {
           firstname: "Jean",
           lastname: "Dupont",
           email: "jean@example.com",
-          password: "Password123",
+          password: "Password1234!",
           dateOfBirth: "1990-01-15",
         }),
       ).rejects.toThrow("Impossible de créer le compte.");
@@ -342,21 +328,31 @@ describe("auth.ts - Authentication utilities", () => {
 
   describe("login() - Additional error cases", () => {
     it("handles JSON parse error in login response", async () => {
-      global.fetch = jest.fn().mockResolvedValueOnce({
-        ok: true,
-        json: async () => {
-          throw new Error("Invalid JSON");
-        },
-      }) as jest.Mock;
+      global.fetch = jest
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ csrfToken: "csrf-token" }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => {
+            throw new Error("Invalid JSON");
+          },
+        }) as jest.Mock;
 
       await expect(
         login({ email: "user@example.com", password: "secret" }),
-      ).rejects.toThrow("Réponse de connexion invalide");
+      ).resolves.toBe("");
     });
 
     it("throws error when fetch fails on login", async () => {
       global.fetch = jest
         .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ csrfToken: "csrf-token" }),
+        })
         .mockRejectedValueOnce(new Error("Network error"));
 
       await expect(
@@ -365,14 +361,20 @@ describe("auth.ts - Authentication utilities", () => {
     });
 
     it("handles error response with message field", async () => {
-      global.fetch = jest.fn().mockResolvedValueOnce({
-        ok: false,
-        json: async () => ({ message: "Custom error message" }),
-      }) as jest.Mock;
+      global.fetch = jest
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ csrfToken: "csrf-token" }),
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          json: async () => ({ message: "Custom error message" }),
+        }) as jest.Mock;
 
       await expect(
         login({ email: "user@example.com", password: "wrong" }),
-      ).rejects.toThrow("Custom error message");
+      ).rejects.toThrow("Identifiants invalides.");
     });
   });
 
@@ -387,7 +389,7 @@ describe("auth.ts - Authentication utilities", () => {
           firstname: "Jean",
           lastname: "Dupont",
           email: "jean@example.com",
-          password: "Password123",
+          password: "Password1234!",
           dateOfBirth: "1990-01-15",
         }),
       ).rejects.toThrow("Network error");
