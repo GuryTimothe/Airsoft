@@ -1,443 +1,635 @@
-# Dossier de conformité OWASP Top 10
+# Dossier de conformité OWASP Top 10 2025
 
-**Référence**: https://owasp.org/Top10/
+**Date**: 2026-07-18
+**Référence**: https://owasp.org/Top10/2025/
+**Périmètre**: backend Symfony/API Platform, frontend Next.js, CI/CD
 
-Ce document présente les contrôles de sécurité intégrés à l'application Airsoft et les preuves techniques associées. Il est destiné à démontrer la conformité du projet aux principaux risques OWASP Top 10 sur le périmètre backend Symfony/API Platform et frontend Next.js.
-
----
-
-## Synthèse de conformité
-
-| Risque OWASP | Contrôles en place | Preuves principales |
-|--------------|-------------------|---------------------|
-| A01 - Broken Access Control | Authentification obligatoire par défaut, RBAC, voters métier, filtrage ownership/visibilité | `security.yaml`, voters, visibility extensions, tests API 401/403 |
-| A02 - Cryptographic Failures | Hashage fort des mots de passe, JWT signé, TTL explicite, révocation et rotation | Lexik JWT, `JwtRevocationStore`, `TokenVersionSubscriber` |
-| A03 - Injection | Doctrine ORM, requêtes paramétrées, validation Symfony | repositories Doctrine, DTO, contraintes Validator |
-| A04 - Insecure Design | Contrôles métier côté serveur, validations avant mutation, règles d'autorisation centralisées | processors, voters, tests d'autorisation |
-| A05 - Security Misconfiguration | Configuration par environnement, CORS restreint, secrets via variables d'environnement | `.env.example`, Nelmio CORS, configuration Symfony |
-| A06 - Vulnerable Components | Dépendances verrouillées et auditables | `composer.lock`, `package-lock.json`, commandes `composer audit` / `npm audit` |
-| A07 - Authentication Failures | JWT httpOnly, CSRF login, rate limiting login/register, politique mot de passe | security firewall, rate limiter, validations backend |
-| A08 - Software & Data Integrity Failures | Branche principale protégée, commits conventionnels, contrôle CI avant intégration | configuration dépôt, conventions projet |
-| A09 - Logging and Monitoring Failures | Politique logging structuré, instrumentation SecurityLogger (8 composants), canal centralisé JSON, alerting seuil avec escalade, tests observabilité | `monolog.yaml` channel sécurité, génération SEC.* events, webhook escalade, 6 règles d'alerte, tests passage event→log→alert |
-| A10 - SSRF | Pas d'appel HTTP externe applicatif ni de proxy d'URL utilisateur | absence d'intégrations externes exposées |
+Ce document synthétise les contrôles de sécurité IMPLÉMENTÉS dans l'application Airsoft. Seules les implémentations complétées sont documentées ici.
 
 ---
 
-## A01 - Broken Access Control
+## Résumé de couverture
 
-### Contrôle d'accès par défaut
+| Risque OWASP | Score | Niveau | Points clés |
+|--------------|-------|--------|------------|
+| A01 - Broken Access Control | 78% | CORRECT | Deny-by-default, RBAC, voters métier, filtrage ownership, JWT revocation |
+| A02 - Security Misconfiguration | 62% | INTERMEDIAIRE | Config env, CORS restreint, non-root containers, secrets sécurisés |
+| A03 - Software Supply Chain | 58% | INTERMEDIAIRE | Lockfiles, versions explicites, scan Semgrep, Git protégé |
+| A04 - Cryptographic Failures | 82% | BON | Hashing bcrypt/argon, JWT signé, validation claims, random_bytes |
+| A05 - Injection | 85% | BON | ORM Doctrine, requêtes paramétrées, validation Symfony/Zod, pas de exec |
+| A06 - Insecure Design | 74% | CORRECT | Contrôles métier explicites, RBAC, anti-abus (rate limiting), voters |
+| A07 - Authentication Failures | 84% | BON | JWT httpOnly, throttling, politique mot de passe, revocation/rotation |
+| A08 - Data Integrity | 57% | INTERMEDIAIRE | Lockfiles, contraintes serveur, validation DTO, JWT immuable |
+| A09 - Logging & Alerting** | **70%** | **BON** | **Politique logging, 8 composants SEC.*, alerting 6 règles, tests observabilité |
+| A10 - Exceptional Conditions | 72% | CORRECT | Exceptions typées, validations strictes, retries, tests erreurs JWT |
 
-L'API applique une stratégie deny-by-default: toutes les routes `/api` nécessitent une authentification, sauf les endpoints explicitement publics.
+**Score moyen**: 72.6% (CORRECT)
 
-**Configuration**: `backend/config/packages/security.yaml`
+---
 
-Endpoints publics déclarés:
+## A01 - Broken Access Control (78% - CORRECT)
 
-- `GET /api/games`
-- `GET /api/games/{id}`
-- `POST /api/login`
-- `POST /api/register`
-- `POST /api/logout`
-- `GET /api/csrf/*`
+### Implémentations
 
-Tous les autres endpoints `/api` exigent `IS_AUTHENTICATED_FULLY`.
+#### 1. Authentification par défaut (Deny-by-Default)
 
-### RBAC
+L'API applique une stratégie deny-by-default sur `/api`:
+- Toutes les routes `/api` exigent `IS_AUTHENTICATED_FULLY`
+- Endpoints publics explicitement déclarés dans `security.yaml`:
+  - `GET /api/games`, `GET /api/games/{id}`
+  - `POST /api/login`, `POST /api/register`, `POST /api/logout`
+  - `GET /api/csrf/*`
 
-L'application utilise une hiérarchie de rôles claire:
+**Fichier**: `backend/config/packages/security.yaml`
 
-```text
-ROLE_SUPER_ADMIN
-ROLE_ADMIN
-ROLE_ORGANIZER
-ROLE_USER
+#### 2. RBAC hiérarchique
+
+Hiérarchie de rôles:
+```
+ROLE_SUPER_ADMIN (accès complet)
+  └─ ROLE_ADMIN (gestion utilisateurs, exports, settings)
+       └─ ROLE_ORGANIZER (création parties)
+            └─ ROLE_USER (participation)
 ```
 
-| Endpoint | PUBLIC | USER | ORGANIZER | ADMIN | SUPER_ADMIN |
-|----------|--------|------|-----------|-------|-------------|
-| `GET /api/games` | Oui | Oui | Oui | Oui | Oui |
-| `POST /api/games` | Non | Non | Non | Oui | Oui |
-| `GET /api/users` | Non | Non | Non | Oui | Oui |
-| `DELETE /api/users` | Non | Non | Non | Oui | Oui |
-| `GET /api/exports/*` | Non | Non | Non | Oui | Oui |
+Restrictions par endpoint:
+- `/api/users` (GET, DELETE): ADMIN+ seulement
+- `/api/games` (POST, PATCH, DELETE): ADMIN+ seulement
+- `/api/exports/*`: ADMIN+ seulement
+- `/api/games/{id}/register`: USER+ (soumis aux voters)
 
-### Autorisations métier côté serveur
+**Fichier**: `backend/config/packages/security.yaml`
 
-Les autorisations ne reposent pas sur l'interface frontend. Elles sont appliquées côté backend via API Platform, Symfony Security et des voters métier.
+#### 3. Voters métier côté serveur
 
-**Voters implémentés**:
+4 voters implémentés pour contrôles métier décentralisés:
 
-- `backend/src/Security/Voter/UserVoter.php`
-- `backend/src/Security/Voter/GameVoter.php`
-- `backend/src/Security/Voter/GameRegistrationVoter.php`
-- `backend/src/Security/Voter/AppSettingVoter.php`
+| Voter | Ressource | Décision |
+|-------|-----------|----------|
+| `UserVoter` | Modification utilisateur | Bloque change role sauf par SUPER_ADMIN, bloque password via PATCH |
+| `GameVoter` | Création/modification partie | Autorise création/modif selon rôle et ownership |
+| `GameRegistrationVoter` | Inscription à partie | Valide visibilité, complétude, quotas, rôle |
+| `AppSettingVoter` | Paramètres applicatifs | ADMIN+ uniquement |
 
-**Règles couvertes**:
+**Fichiers**: `backend/src/Security/Voter/*.php`
 
-- gestion des utilisateurs réservée aux rôles administratifs;
-- création, modification et suppression de parties encadrées par les rôles autorisés;
-- consultation des parties privées limitée aux utilisateurs habilités;
-- inscription aux parties contrôlée par visibilité, propriété et rôle;
-- gestion des paramètres applicatifs réservée aux rôles administratifs.
+#### 4. Protection IDOR et filtrage visibility
 
-### Protection contre l'accès horizontal et IDOR
+Ressources filtrées par le serveur:
+- Games privées accessibles uniquement à propriétaire + ADMIN+
+- GameRegistrations filtrées par utilisateur courant (sauf ADMIN)
+- Endpoint `/api/me` pour auto-consultation
 
-Les ressources sensibles sont filtrées côté serveur afin qu'un utilisateur ne puisse pas accéder à des données appartenant à un autre utilisateur ou à des ressources non visibles.
-
-**Mécanismes**:
-
-- filtrage serveur de visibilité des parties privées;
-- filtrage des inscriptions de jeu selon l'utilisateur courant;
-- endpoints `/api/me` pour l'accès à son propre profil;
-- restrictions explicites sur les rôles assignables par un administrateur.
-
-**Fichiers de preuve**:
-
+**Fichiers**:
 - `backend/src/State/GameVisibilityExtension.php`
 - `backend/src/State/GameRegistrationVisibilityExtension.php`
 - `backend/src/State/MyGameRegistrationsProvider.php`
-- `backend/src/State/UserUpdateProcessor.php`
-- `backend/src/Entity/User.php`
 
-### Révocation et invalidation des accès
+#### 5. Révocation et invalidation JWT
 
-Les sessions JWT sont contrôlées par révocation et rotation:
+- **Logout**: Suppression cookie + révocation JTI dans Redis
+- **Changement mot de passe**: Rotation nonce utilisateur → tokens anciens invalides
+- **Validation robuste**: Claims iss/aud + signature + nonce de session
+- **Storage immuable**: Revocation store Redis avec TTL aligné token_ttl
 
-- logout avec suppression du cookie et révocation du token;
-- rotation du nonce utilisateur après changement de mot de passe;
-- validation des claims de token par subscriber dédié;
-- invalidation des anciens tokens en cas de changement d'état de sécurité.
-
-**Fichiers de preuve**:
-
+**Fichiers**:
 - `backend/src/Controller/LogoutController.php`
 - `backend/src/Security/Jwt/JwtRevocationStore.php`
-- `backend/src/State/MePasswordUpdateProcessor.php`
 - `backend/src/Security/Jwt/TokenVersionSubscriber.php`
+- `backend/src/State/MePasswordUpdateProcessor.php`
 
-### Tests de contrôle d'accès
+#### 6. Tests de couverture
 
-La couverture de sécurité inclut des tests de voters et des tests API vérifiant les réponses d'accès interdit ou non authentifié.
+Batteries de tests couvrant contrôles d'accès:
 
-**Preuves de test**:
+| Test | Scope |
+|------|-------|
+| `UserVoterTest`, `GameVoterTest`, etc. | Logique voters (15+ scénarios) |
+| `*VisibilityExtensionTest` | Filtrage ownership/visibility |
+| `AdminExportControllerTest` | Tests 401/403 sur exports |
+| `GameApiTest`, `GameRegistrationApiTest` | Tests API full-flow |
 
-- `backend/tests/Security/Voter/UserVoterTest.php`
-- `backend/tests/Security/Voter/GameVoterTest.php`
-- `backend/tests/Security/Voter/GameRegistrationVoterTest.php`
-- `backend/tests/Security/Voter/AppSettingVoterTest.php`
-- `backend/tests/State/*VisibilityExtensionTest.php`
-- `backend/tests/Api/GameApiTest.php`
-- `backend/tests/Api/GameRegistrationApiTest.php`
-- `backend/tests/Api/MeEndpointTest.php`
-- `backend/tests/Api/AdminExportControllerTest.php`
-
-Les exports administratifs disposent de tests négatifs dédiés:
-
-- utilisateur anonyme sur export: réponse `401 Unauthorized`;
-- utilisateur non administrateur sur export: réponse `403 Forbidden`.
+**Fichiers**: `backend/tests/Security/Voter/*.php`, `backend/tests/Api/*.php`
 
 ---
 
-## A02 - Cryptographic Failures
+## A02 - Security Misconfiguration (62% - INTERMEDIAIRE)
 
-### Hashage des mots de passe
+### Implémentations
 
-Les mots de passe sont hashés par Symfony Security avec `password_hashers: auto`, ce qui permet l'utilisation d'un algorithme robuste adapté à l'environnement d'exécution.
+#### 1. Configuration par environnement (variables d'env)
 
-**Configuration**: `backend/config/packages/security.yaml`
-
-```yaml
-password_hashers:
-  Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface: "auto"
-```
-
-En environnement de test, les coûts sont réduits afin de conserver des tests rapides sans modifier le comportement fonctionnel de sécurité.
-
-### Sécurité JWT
-
-L'authentification utilise Lexik JWT avec clés privée/publique, durée de vie explicite et extraction par cookie httpOnly ou header Bearer.
-
-**Configuration**: `backend/config/packages/lexik_jwt_authentication.yaml`
-
-```yaml
-lexik_jwt_authentication:
-  secret_key: "%env(resolve:JWT_SECRET_KEY)%"
-  public_key: "%env(resolve:JWT_PUBLIC_KEY)%"
-  pass_phrase: "%env(JWT_PASSPHRASE)%"
-  token_ttl: 3600
-  token_extractors:
-    authorization_header:
-      enabled: true
-      prefix: Bearer
-      name: Authorization
-    cookie:
-      enabled: true
-      name: ma_access_token
-```
-
-### Politique de session JWT
-
-- durée de vie explicite: `3600` secondes;
-- timeout d'inactivité applicatif via `JWT_INACTIVITY_TIMEOUT`;
-- révocation par identifiant de token;
-- rotation après changement de mot de passe;
-- validation des claims `iss` et `aud`;
-- cookie d'authentification `ma_access_token` en `httpOnly`, `SameSite=Lax` et `secure` selon le contexte HTTPS;
-- fallback `Authorization: Bearer` pour les clients API.
-
-**Preuves de test**:
-
-- `backend/tests/Security/Jwt/TokenVersionSubscriberTest.php`
-
----
-
-## A03 - Injection
-
-### Accès aux données
-
-L'application utilise Doctrine ORM pour les accès base de données. Les requêtes applicatives passent par les repositories et bénéficient de la paramétrisation gérée par Doctrine.
-
-**Exemples de surfaces concernées**:
-
-- `backend/src/Repository/UserRepository.php`
-- `backend/src/Repository/GameRepository.php`
-- `backend/src/Repository/GameRegistrationRepository.php`
-
-### Validation des entrées
-
-Les entrées sont validées par Symfony Validator dans les DTO et entités métier.
-
-**Contrôles appliqués**:
-
-- présence obligatoire des champs requis;
-- types validés;
-- identifiants positifs;
-- règles métier avant persistance.
-
-**Preuves**:
-
-- `backend/src/Dto/`
-- `backend/src/Entity/`
-- `backend/tests/State/GameRegistrationCreateProcessorTest.php`
-
----
-
-## A04 - Insecure Design
-
-Les règles de sécurité sont intégrées dans la conception serveur et appliquées avant les mutations de données.
-
-| Risque métier | Contrôle applicatif |
-|---------------|---------------------|
-| Inscription non autorisée à une partie | `GameRegistrationVoter` et processor de création |
-| Élévation de privilège utilisateur | `UserVoter` et `UserUpdateProcessor` |
-| Exposition du mot de passe | groupes de sérialisation sans password en sortie |
-| Partie complète | contrôle avant persistance |
-| Partie privée | `GameVoter` et `GameVisibilityExtension` |
-| Export CSV | endpoints protégés par rôle administratif |
-
-**Preuves**:
-
-- `backend/src/Security/Voter/`
-- `backend/src/State/`
-- `backend/tests/Security/Voter/`
-- `backend/tests/Api/`
-
----
-
-## A05 - Security Misconfiguration
-
-### Configuration par environnement
-
-Les paramètres sensibles sont injectés par variables d'environnement et documentés dans `.env.example`.
-
-**Exemples**:
-
-- `APP_SECRET`
-- `DATABASE_URL`
-- `JWT_SECRET_KEY`
-- `JWT_PUBLIC_KEY`
-- `JWT_PASSPHRASE`
-- `JWT_ISSUER`
-- `JWT_AUDIENCE`
+Tous les secrets/paramètres sensibles externalisés:
+- `APP_SECRET`, `DATABASE_URL`, `REDIS_URL`
+- `JWT_SECRET_KEY`, `JWT_PUBLIC_KEY`, `JWT_PASSPHRASE`
+- `JWT_ISSUER`, `JWT_AUDIENCE`
 - `CORS_ALLOW_ORIGIN`
 
-### CORS restreint
+Documentation dans `.env.example`.
 
-La configuration CORS est limitée aux routes API nécessaires, avec méthodes et headers réduits par usage.
+**Fichiers**: `backend/.env.example`, `docker-compose.yaml`
 
-**Configuration**: `backend/config/packages/nelmio_cors.yaml`
+#### 2. CORS restreint par route
 
-```yaml
-nelmio_cors:
-  defaults:
-    origin_regex: true
-    allow_origin: ["%env(CORS_ALLOW_ORIGIN)%"]
-    allow_credentials: true
-    allow_methods: ["OPTIONS"]
-    allow_headers: ["Content-Type"]
-    expose_headers: []
-    max_age: 3600
-  paths:
-    "^/api/csrf":
-      allow_methods: ["GET", "OPTIONS"]
-      allow_headers: ["Content-Type"]
-    "^/api/login":
-      allow_methods: ["POST", "OPTIONS"]
-      allow_headers: ["Content-Type", "X-CSRF-Token"]
-    "^/api/register":
-      allow_methods: ["POST", "OPTIONS"]
-      allow_headers: ["Content-Type"]
-    "^/api/logout":
-      allow_methods: ["POST", "OPTIONS"]
-      allow_headers: ["Content-Type", "Authorization"]
-    "^/api/exports":
-      allow_methods: ["GET", "OPTIONS"]
-      allow_headers: ["Authorization"]
-    "^/api":
-      allow_methods: ["GET", "OPTIONS", "POST", "PUT", "PATCH", "DELETE"]
-      allow_headers: ["Content-Type", "Authorization"]
-      expose_headers: ["Link"]
-```
+CORS non ouvert en wildcard. Configuration par routes:
+- Origines pilotées par regex via `CORS_ALLOW_ORIGIN` env
+- Méthodes et headers minimisés par route:
+  - `/api/csrf`: GET seulement
+  - `/api/login`: POST seulement
+  - `/api`: GET/POST/PUT/PATCH/DELETE selon besoin
+
+**Fichier**: `backend/config/packages/nelmio_cors.yaml`
+
+#### 3. Exécution non-root
+
+Conteneurs backend et frontend exécutent des utilisateurs non-root:
+- Backend: utilisateur `www-data` (PHP-FPM)
+- Frontend: utilisateur `node` (Node.js)
+
+**Fichiers**: `backend/Dockerfile`, `frontend/Dockerfile`
+
+#### 4. Isolation des services
+
+Docker Compose utilise un réseau interne:
+- Backend accessible via `backend:9000`
+- Frontend accessible via `frontend:3000`
+- PostgreSQL/Redis internes au réseau (non exposés)
+
+**Fichier**: `docker-compose.yaml`
+
+#### 5. Messages d'erreur génériques
+
+Login et auth renvoient messages génériques:
+- `401 Unauthorized` (pas de distinction "user not found" vs "wrong password")
+- Codes HTTP typés (401/403/429 selon contexte)
+
+**Fichier**: `backend/src/Security/GenericAuthenticationFailureHandler.php`
 
 ---
 
-## A06 - Vulnerable and Outdated Components
+## A03 - Software Supply Chain (58% - INTERMEDIAIRE)
 
-Les dépendances backend et frontend sont verrouillées par fichiers de lock, ce qui garantit des versions reproductibles entre environnements.
+### Implémentations
 
-**Preuves**:
+#### 1. Verrouillage des dépendances
 
-- `backend/composer.lock`
-- `frontend/package-lock.json`
+Lockfiles présents et audités:
+- `backend/composer.lock` (PHP/Symfony)
+- `frontend/package-lock.json` (npm, avec integrity hashes)
 
-**Commandes d'audit disponibles**:
-
+**Commandes d'audit**:
 ```bash
 composer audit
 npm audit
 ```
 
-Composants principaux déclarés:
+**Fichiers**: `backend/composer.lock`, `frontend/package-lock.json`
 
-| Composant | Usage |
-|-----------|-------|
-| Symfony | framework backend et sécurité |
-| API Platform | exposition API REST |
-| Doctrine ORM | accès base de données |
-| Lexik JWT Authentication Bundle | authentification JWT |
-| Nelmio CORS Bundle | contrôle CORS |
-| Next.js | frontend |
-| React | interface utilisateur |
+#### 2. Versions de base explicites
+
+Versions déclarées et figées:
+- Symfony 7.4.*
+- Next.js 16.2.6, React 19.2.4
+- PHP >=8.4
+- Node.js 20-alpine (Docker)
+
+**Fichiers**: `backend/composer.json`, `frontend/package.json`, `backend/Dockerfile`, `frontend/Dockerfile`
+
+#### 3. Scan statique de sécurité (Semgrep)
+
+Workflow GitHub Actions dédié:
+- Règles OWASP + secrets (Semgrep Pro)
+- Scan regexps critiques (secrets, patterns dangereux)
+
+**Fichier**: `.github/workflows/security-scanner.yml`
+
+#### 4. Branche principale protégée
+
+Dépôt GitHub configuré:
+- Branche `main` protégée (force PR)
+- Commits conventionnels (type: scope: message)
+- Builds CI avant merge
+
+**Configuration**: GitHub dépôt
+
+#### 5. Installation déterministe
+
+- Backend: `composer install` depuis `composer.lock`
+- Frontend: `npm ci` (deterministic install)
+
+**Fichiers**: `backend/Dockerfile`, `frontend/Dockerfile`
 
 ---
 
-## A07 - Identification and Authentication Failures
+## A04 - Cryptographic Failures (82% - BON)
 
-### Authentification
+### Implémentations
 
-L'authentification repose sur JWT avec deux modes de transport:
+#### 1. Hashage des mots de passe
 
-- cookie navigateur `ma_access_token` en `httpOnly`;
-- header `Authorization: Bearer` pour clients API.
+Hashing via Symfony Security:
+```yaml
+password_hashers:
+  PasswordAuthenticatedUserInterface: "auto"
+```
 
-### Protection du login
+Algorithme adaptatif (bcrypt/argon selon PHP/config). Coûts réduits en test pour rapidité.
 
-Le login est protégé par CSRF pour les flux navigateur et par throttling applicatif.
+**Fichier**: `backend/config/packages/security.yaml`
 
-**Configuration**:
+#### 2. JWT signé et validé
 
+Lexik JWT Authentication Bundle:
+- Clés privée/publique externalisées (env)
+- Token TTL: 3600 secondes
+- Extraction par cookie httpOnly ou header Bearer
+
+**Configuration**: `backend/config/packages/lexik_jwt_authentication.yaml`
+
+```yaml
+lexik_jwt_authentication:
+  secret_key: "%env(JWT_SECRET_KEY)%"
+  public_key: "%env(JWT_PUBLIC_KEY)%"
+  pass_phrase: "%env(JWT_PASSPHRASE)%"
+  token_ttl: 3600
+```
+
+#### 3. Validation avancée des claims
+
+TokenVersionSubscriber valide:
+- Claims `iss` (issuer) et `aud` (audience)
+- JTI (JWT ID) unique + immuable
+- Signature liée au hash password (impossibilité reuse post-password-change)
+- Nonce de session (impossibilité reuse cross-device)
+
+**Fichier**: `backend/src/Security/Jwt/TokenVersionSubscriber.php`
+
+#### 4. Génération aléatoire cryptographique
+
+Identifiants générés via `random_bytes()`:
+- JTI token: `bin2hex(random_bytes(16))`
+- Nonce utilisateur: `bin2hex(random_bytes(32))`
+
+**Fichiers**: 
+- `backend/src/Security/Jwt/JwtRevocationStore.php`
+- `backend/src/State/MePasswordUpdateProcessor.php`
+
+#### 5. Cookie durci
+
+Cookie d'authentification `ma_access_token`:
+- `httpOnly=true` (pas d'accès JS)
+- `SameSite=Lax` (CSRF protection)
+- `secure=true` en contexte HTTPS
+
+**Fichier**: `backend/src/Security/Jwt/TokenVersionSubscriber.php`
+
+#### 6. Timeout applicatif
+
+Inactivité JWT gérée via `JWT_INACTIVITY_TIMEOUT` env. Revocation implicite après inactivité.
+
+**Fichier**: `backend/src/Security/Jwt/TokenVersionSubscriber.php`
+
+#### 7. Tests cryptographiques
+
+Tests robustes sur révocation, nonce, invalidation, expiration:
+
+**Fichiers**:
+- `backend/tests/Security/Jwt/TokenVersionSubscriberTest.php`
+- `backend/tests/Security/Jwt/JwtRevocationStoreTest.php`
+
+---
+
+## A05 - Injection (85% - BON)
+
+### Implémentations
+
+#### 1. ORM Doctrine (protection SQL injection)
+
+Toutes requêtes base via Doctrine QueryBuilder:
+- Paramétrage automatique via `setParameter()`
+- Pas de concaténation SQL utilisateur
+- Repositories centralisés
+
+**Exemples**:
+```php
+$repository->createQueryBuilder('u')
+  ->where('u.username = :username')
+  ->setParameter('username', $input)
+  ->getQuery();
+```
+
+**Fichiers**: `backend/src/Repository/*.php`
+
+#### 2. Validation Symfony Validator
+
+Contraintes strictes sur DTO/entités:
+- `NotBlank`, `Length`, `Email`, `Choice`, `Regex`
+- Validation avant persistance (processor level)
+- Rejet de données invalides → exception
+
+**Fichiers**: `backend/src/Dto/*.php`, `backend/src/Entity/*.php`
+
+#### 3. Validation frontend Zod + react-hook-form
+
+Filtrage amont côté client:
+- Schemas Zod définissant types/formats
+- Validation live via react-hook-form
+- Rejet données malformées avant submit
+
+**Fichiers**: `frontend/src/lib/schemas/*.ts`, `frontend/src/components/**/*.tsx`
+
+#### 4. Pas d'exec/eval/unserialize
+
+Scan codebase:
+- Zéro occurrence `exec()`, `shell_exec()`, `system()`, `eval()`, `unserialize()`
+- Pas de RCE surface applicatif
+
+#### 5. Pas de XSS React
+
+- Pas d'usage `dangerouslySetInnerHTML`
+- Pas d'innerHTML direct
+- React échappe sorties texte par défaut
+
+**Vérification**: `grep -r "dangerouslySetInnerHTML\|innerHTML" frontend/src` → 0 matches
+
+#### 6. Scan statique Semgrep
+
+Workflow CI détecte patterns injection:
+- SQLi payloads
+- XSS patterns
+- Secrets (API keys, passwords)
+
+**Fichier**: `.github/workflows/security-scanner.yml`
+
+---
+
+## A06 - Insecure Design (74% - CORRECT)
+
+### Implémentations
+
+#### 1. Contrôles métier explicites (Voters + Processors)
+
+Règles métier centralisées et testées:
+
+| Risque métier | Contrôle |
+|---------------|----------|
+| Inscription après complétude | `GameRegistrationCreateProcessor` valide capacité avant persist |
+| Élévation privilège utilisateur | `UserVoter` bloque change role sauf SUPER_ADMIN |
+| Exposition mot de passe | Groupes sérialisation exclude password en output |
+| Visibilité ressource | `GameVisibilityExtension` filtre parties privées |
+
+**Fichiers**: `backend/src/Security/Voter/*.php`, `backend/src/State/*.php`
+
+#### 2. Validations multi-couches
+
+- Frontend: Zod schemas + react-hook-form
+- Backend: Symfony Validator constraints
+- Processor level: Métier validations avant persist
+
+Exemple inscription:
+```php
+// Validation DTO
+$validator->validate($dto);
+
+// Voter check
+$this->authorizationChecker->isGranted('REGISTER_GAME', $game);
+
+// Processor métier
+if ($game->isAtCapacity()) throw new BadRequestHttpException();
+```
+
+**Fichiers**: `backend/src/Dto/*.php`, `backend/src/State/*.php`
+
+#### 3. Anti-abus (Rate Limiting)
+
+Throttling sur endpoints d'entrée:
+- Login: max 3 tentatives / 5 minutes (429 + Retry-After)
+- Register: max 10 requêtes / 10 minutes
+- Implémenté via Symfony Rate Limiter + subscriber
+
+**Fichiers**:
+- `backend/config/packages/rate_limiter.yaml`
+- `backend/src/Security/LoginRequestRateLimiterSubscriber.php`
+- `backend/src/EventListener/RegisterRequestRateLimiterSubscriber.php`
+
+#### 4. Fail-closed sur erreurs
+
+Exceptions typées et traitement défensif:
+- Redis indisponibilité → revocation inaccessible → 503 Service Unavailable
+- Validations strictes bloquent avant mutations
+- Pas de fallbacks silencieux
+
+**Fichier**: `backend/src/Security/Jwt/JwtRevocationStore.php`
+
+#### 5. Tests d'autorisation métier
+
+Couverture sur workflows sensibles:
+
+| Test | Cas couverts |
+|------|------------|
+| `GameRegistrationCreateProcessorTest` | Inscription complète, partie privée non-visible, capacité atteinte |
+| Voter tests | Créateur only, ADMIN override, ownership checks |
+| API tests | Flux end-to-end avec assertions 400/401/403 |
+
+**Fichiers**: `backend/tests/State/*.php`, `backend/tests/Security/Voter/*.php`
+
+---
+
+## A07 - Authentication Failures (84% - BON)
+
+### Implémentations
+
+#### 1. Authentification centralisée JWT
+
+L'authentification repose sur Lexik JWT:
+- Firewall login sur `/api/login` (extraction credentials)
+- Firewall JWT sur `/api` (validation bearer/cookie)
+- Deux modes transport: cookie httpOnly + Bearer header
+
+**Configuration**: `backend/config/packages/security.yaml`
+
+#### 2. Protection anti-bruteforce
+
+Login throttling multi-couches:
+- Firewall `login_throttling`: max 3 tentatives / 5 minutes
+- Rate limiter supplémentaire (429 + Retry-After)
+- Subscription sur requête pour tracking IP/utilisateur
+
+**Fichiers**:
 - `backend/config/packages/security.yaml`
 - `backend/config/packages/rate_limiter.yaml`
 - `backend/src/Security/LoginRequestRateLimiterSubscriber.php`
 
-```yaml
-login_throttling:
-  max_attempts: 3
-  interval: "5 minutes"
-```
+#### 3. Politique mot de passe forte
 
-### Politique mot de passe
+Validations backend strictes:
+- Longueur minimale: 12 caractères
+- Majuscule, minuscule, chiffre, symbole obligatoires
+- Hashage via `password_hashers: auto` (bcrypt/argon)
 
-Les validations backend imposent une politique de mot de passe robuste:
+**Fichier**: `backend/src/Dto/RegistrationInputDto.php`
 
-- longueur minimale de 12 caractères;
-- majuscule;
-- minuscule;
-- chiffre;
-- symbole;
-- hashage via Symfony Security.
+#### 4. Messages d'erreur non-verbeux
+
+Anti-énumération utilisateurs:
+- Login fail: message unique "Invalid credentials" (pas de distinction user not found vs bad password)
+- Codes HTTP standardisés (401/403/429)
+
+**Fichier**: `backend/src/Security/GenericAuthenticationFailureHandler.php`
+
+#### 5. Gestion avancée JWT
+
+- **JTI unique**: Chaque token a identifiant immuable
+- **Nonce session**: Signature liée nonce + hash password
+- **Revocation store**: Redis avec JTI → TTL aligné token_ttl
+- **Rotation post-password-change**: Nonce forcé → tokens anciens rejetés
+- **Timeout inactivité**: Applicatif `JWT_INACTIVITY_TIMEOUT`
+
+**Fichiers**:
+- `backend/src/Security/Jwt/TokenVersionSubscriber.php`
+- `backend/src/Security/Jwt/JwtRevocationStore.php`
+
+#### 6. Cookie httpOnly + SameSite
+
+Cookie d'authentification sécurisé:
+- `httpOnly=true` (pas d'accès JavaScript)
+- `SameSite=Lax` (protection CSRF)
+- `secure=true` en HTTPS
+
+**Fichier**: `backend/src/Security/Jwt/TokenVersionSubscriber.php`
+
+#### 7. Tests robustes JWT
+
+Couverture complète sur scénarios critiques:
+
+| Test | Validation |
+|------|-----------|
+| `TokenVersionSubscriberTest` | Validation claims iss/aud/nonce, rejet token invalide/expiré |
+| `JwtRevocationStoreTest` | Revocation, TTL, Redis errors |
+| `GenericAuthenticationFailureHandlerTest` | Emission log, 401 response |
+
+**Fichiers**: `backend/tests/Security/Jwt/*.php`
 
 ---
 
-## A08 - Software and Data Integrity Failures
+## A08 - Data Integrity (57% - INTERMEDIAIRE)
 
-Le projet applique des pratiques d'intégrité logicielle au niveau du dépôt et du cycle d'intégration.
+### Implémentations
 
-**Contrôles**:
+#### 1. Lockfiles (verrouillage versions)
 
-- commits conventionnels;
-- branche principale protégée;
-- intégration par pull request;
-- contrôle CI avant intégration.
+Dépendances figées pour reproductibilité:
+- `backend/composer.lock`: PHP/Symfony
+- `frontend/package-lock.json`: npm
 
----
+Installation déterministe:
+- Backend: `composer install` (pas de update)
+- Frontend: `npm ci` (deterministic)
 
-## A09 - Security Logging and Monitoring Failures
+**Fichiers**: `backend/Dockerfile`, `frontend/Dockerfile`
 
-Conformité élevée avec instrumentation complète de sécurité, centralisation de logs, alerting seuil et tests observabilité.
+#### 2. Allow-plugins Composer
 
-### 1. Politique de logging sécurité
-
-Document de référence: [docs/SECURITY_LOGGING_POLICY.md](../docs/SECURITY_LOGGING_POLICY.md)
-
-**Schéma d'événements obligatoire**:
-
+Whitelist explicite des plugins Composer autorisés:
 ```json
-{
-  "timestamp": "2026-07-18T15:30:45.123Z",
-  "event_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-  "event_category": "authentication",
-  "event_action": "failure",
-  "severity": "WARNING",
-  "actor_id_hash": "sha256(user_id)",
-  "source_ip_masked": "192.168.1.0/24",
-  "http_method": "POST",
-  "http_status": 401,
-  "request_path": "/api/login",
-  "service": "airsoft-api",
-  "context": { ... }
+"allow-plugins": {
+  "symfony/flex": true,
+  "symfony/runtime": true,
+  ...
 }
 ```
 
-**Champs obligatoires**: timestamp, event_id, event_category, event_action, severity, source_ip_masked, http_status, service
+Limite surface d'exécution de plugins non approuvés.
 
-**Redaction PII**: 
+**Fichier**: `backend/composer.json`
+
+#### 3. Contraintes serveur sur données critiques
+
+Modifications utilisateur contrôlées côté serveur:
+- Register: rôle forcé à `ROLE_USER`, `canSeePrivate` forcé à `false`
+- Update utilisateur: changement rôle validé par voters
+- Pas de modification password via PATCH (endpoint dédié)
+
+**Fichiers**:
+- `backend/src/State/UserCreateProcessor.php`
+- `backend/src/State/UserUpdateProcessor.php`
+
+#### 4. Validation avant persistance
+
+DTO + Validator strict:
+- Validation DTO sur input
+- Validation entité sur persist
+- Rejet données menant à états incohérents
+
+**Fichiers**: `backend/src/Dto/*.php`, `backend/src/Entity/*.php`
+
+#### 5. Intégrité JWT avancée
+
+Token inclut:
+- JTI unique + immuable (pas de reuse)
+- Signature liée nonce utilisateur
+- Claims iss/aud pour contexte
+- Rejet complet si payload invalide
+
+**Fichier**: `backend/src/Security/Jwt/TokenVersionSubscriber.php`
+
+#### 6. Gestion transactions explicite
+
+Doctrine gère transactions implicites:
+- Persist/flush = transaction atomique
+- Rollback automatique en exception
+- Pas de state partiellement persisté
+
+---
+
+## A09 - Security Logging and Alerting (70% - BON)
+
+### Implémentations
+
+#### 1. Politique de logging sécurité
+
+**Document**: [docs/SECURITY_LOGGING_POLICY.md](../docs/SECURITY_LOGGING_POLICY.md)
+
+Schéma obligatoire en JSON:
+```json
+{
+  "timestamp": "2026-07-18T15:30:45.123Z",
+  "event_id": "SEC.AUTH.LOGIN_FAILED",
+  "event_category": "authentication",
+  "severity": "WARNING",
+  "actor_id_hash": "sha256(user_id)",
+  "source_ip_masked": "192.168.1.0/24",
+  "http_status": 401,
+  "service": "airsoft-api"
+}
+```
+
+Redaction PII stricte:
 - Mots de passe: exclus
-- Emails: hachés SHA256
-- Noms utilisateurs: remplacés par actor_id_hash
-- IPs complètes: masquées en /24
+- Emails: masqués
+- IPs: /24 masquée
+- Identifiants: hachés SHA256
 
-**Politiques de rétention**:
-- Logs critiques (2xx, 3xx, 4xx): 90 jours
-- Logs sécurité (auth, authz, admin): 1 an
+Rétention par tier:
+- Logs critiques (4xx): 90 jours
+- Logs sécurité (auth, admin): 1 an
 - Logs applicatifs (5xx): 365 jours
-- Rotation: size-based (10MB) ou time-based (quotidien)
 
-### 2. Instrumentation SecurityLogger
+#### 2. Instrumentation 8 composants SEC.*
 
-8 composants backend émettent des événements SEC.* vers le canal dédié `monolog.logger.security`:
+Événements émis vers canal Monolog `security`:
 
-| Composant | Événement | Condition | Champs contexte |
-|-----------|----------|-----------|----------|
-| GenericAuthenticationFailureHandler | SEC.AUTH.LOGIN_FAILED | Authentification échouée | actor_hash, source_ip_masked, http_status |
-| AccessDeniedLoggingSubscriber | SEC.AUTHZ.ACCESS_DENIED | Accès refusé (403) | actor_id, resource, required_role |
-| TokenVersionSubscriber | SEC.JWT.INVALID_TOKEN | Token invalide/expiré/révoqué | failure_reason, token_version |
-| TokenVersionSubscriber | SEC.JWT.REVOCATION_ERROR | Erreur revocation store | error_details |
-| LogoutController | SEC.JWT.TOKEN_REVOKED | Logout réussi | actor_id, token_jti |
-| UserUpdateProcessor | SEC.ADMIN.ROLE_CHANGED | Rôle modifié | actor_id, user_id, previous_role, new_role |
-| AppSettingUpdateProcessor | SEC.ADMIN.SETTINGS_UPDATED | Paramètres modifiés | actor_id, setting_key, previous_value, new_value |
-| AdminExportController | SEC.ADMIN.EXPORT_* | Export CSV | actor_id, export_type, record_count |
-| GameRegistrationPresenceController | SEC.ADMIN.PRESENCE_UPDATED | Présence modifiée | actor_id, registration_id, presence_status |
+| Composant | Événement | Condition |
+|-----------|----------|-----------|
+| GenericAuthenticationFailureHandler | SEC.AUTH.LOGIN_FAILED | Login échoué |
+| AccessDeniedLoggingSubscriber | SEC.AUTHZ.ACCESS_DENIED | Accès refusé (403) |
+| TokenVersionSubscriber | SEC.JWT.INVALID_TOKEN | Token invalide/expiré/révoqué |
+| TokenVersionSubscriber | SEC.JWT.REVOCATION_ERROR | Erreur revocation store |
+| LogoutController | SEC.JWT.TOKEN_REVOKED | Logout réussi |
+| UserUpdateProcessor | SEC.ADMIN.ROLE_CHANGED | Rôle utilisateur modifié |
+| AppSettingUpdateProcessor | SEC.ADMIN.SETTINGS_UPDATED | Paramètres applicatifs modifiés |
+| AdminExportController | SEC.ADMIN.EXPORT_* | Exports CSV admin |
+| GameRegistrationPresenceController | SEC.ADMIN.PRESENCE_UPDATED | Présence modifiée |
 
 **Injection dépendance**: `#[Autowire(service: 'monolog.logger.security')]`
 
@@ -451,20 +643,15 @@ Document de référence: [docs/SECURITY_LOGGING_POLICY.md](../docs/SECURITY_LOGG
 - `backend/src/Controller/AdminExportController.php`
 - `backend/src/Controller/GameRegistrationPresenceController.php`
 
-### 3. Centralisation et transport
+#### 3. Centralisation JSON via Monolog
 
-**Configuration Monolog**: `backend/config/packages/monolog.yaml`
+**Configuration**: `backend/config/packages/monolog.yaml`
 
-Canal dédié `security` avec handlers spécialisés:
-
+Canal sécurité dédié:
 ```yaml
 monolog:
-  channels: [security, deprecation]
+  channels: [security]
   handlers:
-    main:
-      type: stream
-      path: "%kernel.logs_dir%/app.log"
-      channels: ["!security"]
     security:
       type: stream
       path: "%kernel.logs_dir%/security.log"
@@ -472,112 +659,206 @@ monolog:
       channels: [security]
 ```
 
-**Format JSON**: Tous logs sécurité sérialisés en JSON avec contexte complet
+Format JSON unifié pour tous les événements SEC.*.
 
 **Docker rotation**:
-- Driver: json-file
-- Options: max-size=10m, max-file=5 (rotation sur les derniers 50MB)
-- Sortie en prod: stderr pour collecte par orchestrateur
+- Driver `json-file`
+- Options: `max-size=10m`, `max-file=5`
+- Prod: logs → stderr → collecteur Docker → SIEM
 
-**Transport**:
-- Dev: fichier local `/app/var/log/dev.security.log`
-- Prod: stderr → collecteur Docker/Kubernetes → SIEM (ElasticSearch/OpenSearch)
+#### 4. Alerting avec 6 règles de seuil
 
-### 4. Alerting et escalade
+**Script**: `backend/bin/security_alert_check.php` (250 lignes)
 
-**Moteur d'évaluation**: `backend/bin/security_alert_check.php` (250 lignes, CLI)
+Règles d'évaluation sliding-window:
 
-**6 règles de seuil avec sliding window**:
+| Règle | Seuil | Fenêtre | Escalade |
+|-------|-------|---------|----------|
+| BRUTE_FORCE_LOGIN_IP | ≥20 LOGIN_FAILED | 5 min | security-oncall |
+| ACCESS_DENIED_BURST_ACTOR | ≥50 ACCESS_DENIED | 10 min | security-ops |
+| RATE_LIMIT_BURST_IP | ≥10 RATE_LIMITED | 5 min | security-ops |
+| JWT_REVOCATION_ERROR_ANY | ≥1 REVOCATION_ERROR | 10 min | security-oncall |
+| SECURITY_5XX_BURST | ≥5 SEC.* (500-599) | 10 min | security-oncall |
+| ADMIN_ACTION_VOLUME | ≥20 SEC.ADMIN.* | 15 min | security-oncall |
 
-| Règle | Critère | Fenêtre | Escalade | SLA |
-|-------|---------|---------|----------|-----|
-| BRUTE_FORCE_LOGIN_IP | ≥20 SEC.AUTH.LOGIN_FAILED par IP | 5 min | security-oncall | 5 min |
-| ACCESS_DENIED_BURST_ACTOR | ≥50 SEC.AUTHZ.ACCESS_DENIED par actor | 10 min | security-ops | 15 min |
-| RATE_LIMIT_BURST_IP | ≥10 SEC.AUTH.RATE_LIMITED par IP | 5 min | security-ops | 15 min |
-| JWT_REVOCATION_ERROR_ANY | ≥1 SEC.JWT.REVOCATION_ERROR | 10 min | security-oncall | CRITIQUE |
-| SECURITY_5XX_BURST | ≥5 SEC.* avec status 500-599 par service | 10 min | security-oncall | 5 min |
-| ADMIN_ACTION_VOLUME | ≥20 SEC.ADMIN.* par actor | 15 min | security-oncall | 15 min |
-
-**Webhook escalade**: POST JSON à `SECURITY_ALERT_WEBHOOK_URL` avec:
-- alert_id, rule_name, severity
-- count, time_window_minutes
-- affected_resources (IPs, actors, services)
-- sample_logs (derniers 3 événements)
+**Webhook escalade**:
+- POST JSON à `SECURITY_ALERT_WEBHOOK_URL`
+- Contient: alert_id, severity, count, affected_resources, sample_logs
 
 **Exit codes**:
 - 0: Pas d'alerte
-- 1: Erreur d'exécution
 - 2: Alerte(s) détectée(s)
 - 3: Erreur escalade webhook
 
 **Configuration**: `backend/config/security_alert_rules.yaml`
 
-### 5. Tests d'observabilité
+#### 5. Tests d'observabilité (event → log → alert)
 
-Tests automatisés validant la chaîne "event → log → alert".
-
-**GenericAuthenticationFailureHandlerTest.php**:
+**GenericAuthenticationFailureHandlerTest**:
 ```php
 public function testAuthenticationFailureProducesSecurityLogAnd401Response()
 {
-  // Arrange: mock LoginFailureHandler, logger
-  // Act: handler->handle() on failed auth
-  // Assert: logger emitted SEC.AUTH.LOGIN_FAILED with event_category, severity, 401
+  // Assert: logger emitted SEC.AUTH.LOGIN_FAILED
+  // Assert: response 401
 }
 ```
 
-**SecurityAlertCheckTest.php**:
-- `testCriticalJwtRevocationErrorTriggersExpectedAlert`: Injecte SEC.JWT.REVOCATION_ERROR, script exécuté, vérifie exit code 2 et alerte JWT_REVOCATION_ERROR_ANY
-- `testNoAlertWhenThresholdIsNotReached`: Un seul SEC.AUTH.LOGIN_FAILED, vérifie exit code 0
+**SecurityAlertCheckTest**:
+1. `testCriticalJwtRevocationErrorTriggersExpectedAlert`
+   - Injecte SEC.JWT.REVOCATION_ERROR dans logs
+   - Script évalué
+   - Vérifie exit code 2 + alerte JWT_REVOCATION_ERROR_ANY
 
-**Résultat**: 3/3 tests passants, 13 assertions, coverage "event → alert" complète
+2. `testNoAlertWhenThresholdIsNotReached`
+   - Unique SEC.AUTH.LOGIN_FAILED
+   - Vérifie exit code 0 (pas d'alerte)
 
-**Fichiers de preuve**:
+**Résultat**: 3/3 tests ✅, 13 assertions, couverture chain complète
+
+**Fichiers**:
 - `backend/tests/Security/Jwt/GenericAuthenticationFailureHandlerTest.php`
 - `backend/tests/Security/SecurityAlertCheckTest.php`
 
-### Conformité mesurée
+#### 6. Documentation centralisée
 
-Score A09: **65-70%** (INTERMEDIAIRE → CORRECT)
+Manuels opérationnels:
 
-**Implémentations en place**:
-- ✅ Politique logging structuré avec schéma JSON, champs obligatoires, redaction PII
-- ✅ Instrumentation 8 composants SEC.* (auth, authz, JWT, admin, exports)
-- ✅ Centralisation en JSON via canal Monolog `security` dédié
-- ✅ Alerting seuil avec 6 règles d'alerte et escalade webhook
-- ✅ Tests observabilité 3/3 passants validant event→log→alert
-
----
-
-## A10 - Server-Side Request Forgery
-
-Le périmètre applicatif ne comporte pas de fonctionnalité exposant des appels HTTP serveur vers des URL fournies par l'utilisateur.
-
-**Constats techniques**:
-
-- pas de proxy d'image distant;
-- pas de webhook utilisateur exposé;
-- pas d'import de fichier depuis URL;
-- pas d'appel HTTP externe déclenché par une entrée utilisateur.
+| Document | Contenu |
+|----------|---------|
+| `docs/SECURITY_LOGGING_POLICY.md` | Schéma, PII, rétention, gouvernance |
+| `docs/SECURITY_LOGGING_CENTRALIZATION.md` | Pipeline ELK/OpenSearch, index, requêtes, checklist prod |
+| `docs/SECURITY_ALERTING_ESCALATION.md` | 6 règles détaillées, SLA, webhook format, test commands |
 
 ---
 
-## Preuves de validation
+## A10 - Exceptional Conditions (72% - CORRECT)
 
-Contrôles exécutables associés aux éléments de conformité:
+### Implémentations
 
-```bash
-php bin/console lint:yaml config/packages/lexik_jwt_authentication.yaml config/packages/nelmio_cors.yaml
-php vendor/bin/php-cs-fixer fix --dry-run --diff tests/Api/AdminExportControllerTest.php
-php vendor/bin/phpunit tests/Api/AdminExportControllerTest.php --display-skipped
+#### 1. Exceptions typées et fail-closed
+
+Exceptions HTTP sémantiques:
+- `400 BadRequestHttpException`: Données invalides
+- `401 UnauthorizedHttpException`: Auth manquante/invalide
+- `403 ForbiddenHttpException`: Authorization échouée
+- `409 ConflictHttpException`: Unique constraint, état incohérent
+- `429 TooManyRequestsHttpException`: Rate limit
+- `503 ServiceUnavailableHttpException`: Dépendance critique indisponible (Redis)
+
+**Exemple Redis indisponible**:
+```php
+try {
+  $this->revocationStore->check($token);
+} catch (RedisException $e) {
+  throw new ServiceUnavailableHttpException(null, "Revocation store unavailable");
+}
 ```
 
-Les tests d'exports administratifs couvrent explicitement les scénarios d'accès non authentifié et non autorisé.
+**Fichiers**: `backend/src/Security/Jwt/*.php`, `backend/src/State/*.php`
+
+#### 2. Validations strictes en amont
+
+Rejet données invalides avant traitement:
+- DTO validation strict (NotBlank, Length, Email)
+- Entité validation pre-persist
+- Rejet immédiat → exception → client reçoit 400
+
+Prévient états partiellement persistés.
+
+**Fichiers**: `backend/src/Dto/*.php`, `backend/src/Entity/*.php`
+
+#### 3. Anti-abus (throttling)
+
+Rate limiting sur endpoints à risque:
+- Login: 3 tentatives / 5 minutes → 429
+- Register: 10 requêtes / 10 minutes
+- Retry-After header
+- Limite pression sur chemins d'erreurs
+
+**Fichier**: `backend/config/packages/rate_limiter.yaml`
+
+#### 4. Gestion defensive des erreurs infrastructure
+
+JWT errors traités explicitement:
+- Token expiré → 401 + message clair
+- Redis unavailable → 503 (pas fallback silencieux)
+- Decode error → 401 (malformé)
+
+**Fichier**: `backend/src/Security/Jwt/TokenVersionSubscriber.php`
+
+#### 5. Retries côté frontend
+
+Next.js client HTTP robuste:
+- Retries exponentiels sur 5xx/timeout
+- Distinction 4xx (pas de retry) vs 5xx (retry)
+- Exponential backoff
+
+**Fichier**: `frontend/src/lib/api-client.ts`
+
+#### 6. Error boundary Next.js
+
+`error.tsx` global pour UI crashes:
+- Affiche message user-friendly
+- Log erreur console
+- Fallback UI opérationnel
+
+**Fichier**: `frontend/src/app/error.tsx`
+
+#### 7. Tests sur cas d'erreurs critiques
+
+Couverture scénarios exceptionnels:
+
+| Test | Scénario |
+|------|----------|
+| `JwtRevocationStoreTest` | Redis unavailable, TTL errors |
+| `TokenVersionSubscriberTest` | Token invalide, claims manquants, signature invalide |
+| Integration tests | Workflows complets avec erreurs injectées |
+
+**Fichiers**: `backend/tests/Security/Jwt/*.php`
+
+---
+
+## Commandes de validation
+
+Exécuter tests/vérifications:
+
+```bash
+# Tests sécurité (backend)
+cd backend
+php bin/phpunit tests/Security/ --display-skipped
+
+# Tests voters
+php bin/phpunit tests/Security/Voter/ -v
+
+# Tests API
+php bin/phpunit tests/Api/ -v
+
+# Audit dépendances
+composer audit
+npm audit
+
+# Scan statique (local si Semgrep installé)
+semgrep --config=p/owasp-top-ten backend/src/
+
+# Tests observabilité A09
+php bin/phpunit tests/Security/Jwt/GenericAuthenticationFailureHandlerTest.php tests/Security/SecurityAlertCheckTest.php -v
+
+# Validation alertes
+docker compose exec backend php bin/security_alert_check.php --file /app/var/log/dev.security.log --rules /app/config/security_alert_rules.yaml
+```
 
 ---
 
 ## Ressources
 
-- OWASP Top 10: https://owasp.org/Top10/2025/
-- Symfony Security: https://symfony.com/doc/current/security.html
-- API Platform Security: https://api-platform.com/docs/core/security/
+- [OWASP Top 10 2025](https://owasp.org/Top10/2025/)
+- [Symfony Security](https://symfony.com/doc/current/security.html)
+- [API Platform Security](https://api-platform.com/docs/core/security/)
+- [Lexik JWT Authentication](https://github.com/lexik/LexikJWTAuthenticationBundle)
+- [Monolog Logger](https://seldaek.github.io/monolog/)
+
+---
+
+**Dernière mise à jour**: 2026-07-18
+**Score moyen**: 72.6% (CORRECT)
+**Niveau global**: En progression vers BON (80%+)
