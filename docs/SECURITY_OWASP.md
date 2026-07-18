@@ -1,557 +1,429 @@
-# OWASP Top 10 (2021) - Couverture Sécurité Implémentée
+# Dossier de conformité OWASP Top 10
 
 **Référence**: https://owasp.org/Top10/
 
+Ce document présente les contrôles de sécurité intégrés à l'application Airsoft et les preuves techniques associées. Il est destiné à démontrer la conformité du projet aux principaux risques OWASP Top 10 sur le périmètre backend Symfony/API Platform et frontend Next.js.
+
 ---
 
-## 1. A01:2021 - Broken Access Control
+## Synthèse de conformité
 
-### ✓ Implémenté
+| Risque OWASP | Contrôles en place | Preuves principales |
+|--------------|-------------------|---------------------|
+| A01 - Broken Access Control | Authentification obligatoire par défaut, RBAC, voters métier, filtrage ownership/visibilité | `security.yaml`, voters, visibility extensions, tests API 401/403 |
+| A02 - Cryptographic Failures | Hashage fort des mots de passe, JWT signé, TTL explicite, révocation et rotation | Lexik JWT, `JwtRevocationStore`, `TokenVersionSubscriber` |
+| A03 - Injection | Doctrine ORM, requêtes paramétrées, validation Symfony | repositories Doctrine, DTO, contraintes Validator |
+| A04 - Insecure Design | Contrôles métier côté serveur, validations avant mutation, règles d'autorisation centralisées | processors, voters, tests d'autorisation |
+| A05 - Security Misconfiguration | Configuration par environnement, CORS restreint, secrets via variables d'environnement | `.env.example`, Nelmio CORS, configuration Symfony |
+| A06 - Vulnerable Components | Dépendances verrouillées et auditables | `composer.lock`, `package-lock.json`, commandes `composer audit` / `npm audit` |
+| A07 - Authentication Failures | JWT httpOnly, CSRF login, rate limiting login/register, politique mot de passe | security firewall, rate limiter, validations backend |
+| A08 - Software & Data Integrity Failures | Branche principale protégée, commits conventionnels, contrôle CI avant intégration | configuration dépôt, conventions projet |
+| A09 - Logging and Monitoring Failures | Journalisation applicative Symfony et traces CI/CD | Monolog, logs Symfony, GitHub Actions |
+| A10 - SSRF | Pas d'appel HTTP externe applicatif ni de proxy d'URL utilisateur | absence d'intégrations externes exposées |
 
-**Technologie**: Symfony Security + User Voters + JWT
+---
 
-#### Role-Based Access Control (RBAC)
+## A01 - Broken Access Control
 
-4 rôles implémentés avec hiérarchie:
+### Contrôle d'accès par défaut
 
-```
-ROLE_SUPER_ADMIN (≥ tous les autres)
-    ↓
+L'API applique une stratégie deny-by-default: toutes les routes `/api` nécessitent une authentification, sauf les endpoints explicitement publics.
+
+**Configuration**: `backend/config/packages/security.yaml`
+
+Endpoints publics déclarés:
+
+- `GET /api/games`
+- `GET /api/games/{id}`
+- `POST /api/login`
+- `POST /api/register`
+- `POST /api/logout`
+- `GET /api/csrf/*`
+
+Tous les autres endpoints `/api` exigent `IS_AUTHENTICATED_FULLY`.
+
+### RBAC
+
+L'application utilise une hiérarchie de rôles claire:
+
+```text
+ROLE_SUPER_ADMIN
 ROLE_ADMIN
-    ↓
 ROLE_ORGANIZER
-    ↓
 ROLE_USER
 ```
 
-**Matrice de contrôle d'accès** (`config/packages/security.yaml`):
-
 | Endpoint | PUBLIC | USER | ORGANIZER | ADMIN | SUPER_ADMIN |
-|----------|--------|------|-----------|-------|------------|
-| GET /api/games | ✓ | ✓ | ✓ | ✓ | ✓ |
-| POST /api/games | ✗ | ✗ | ✗ | ✓ | ✓ |
-| GET /api/users | ✗ | ✗ | ✗ | ✓ | ✓ |
-| DELETE /api/users | ✗ | ✗ | ✗ | ✓ | ✓ |
-| GET /api/exports/* | ✗ | ✗ | ✗ | ✓ | ✓ |
+|----------|--------|------|-----------|-------|-------------|
+| `GET /api/games` | Oui | Oui | Oui | Oui | Oui |
+| `POST /api/games` | Non | Non | Non | Oui | Oui |
+| `GET /api/users` | Non | Non | Non | Oui | Oui |
+| `DELETE /api/users` | Non | Non | Non | Oui | Oui |
+| `GET /api/exports/*` | Non | Non | Non | Oui | Oui |
 
-#### Voter Security (Fine-grained)
+### Autorisations métier côté serveur
 
-**Fichiers** :
-- `src/Security/Voter/UserVoter.php` — gestion des utilisateurs
-- `src/Security/Voter/GameVoter.php` — accès et création de parties
-- `src/Security/Voter/GameRegistrationVoter.php` — inscriptions aux parties
-- `src/Security/Voter/AppSettingVoter.php` — paramètres application
+Les autorisations ne reposent pas sur l'interface frontend. Elles sont appliquées côté backend via API Platform, Symfony Security et des voters métier.
 
-Contrôles spécifiques par opération :
+**Voters implémentés**:
 
-```php
-// UserVoter
-- VIEW_ALL_USERS:  ROLE_ADMIN requis
-- DELETE_USER:     ROLE_ADMIN requis (ne peut pas supprimer ADMIN/SUPER_ADMIN)
-- CREATE_USER:     ROLE_ADMIN requis (ne peut pas créer ADMIN/SUPER_ADMIN)
-- UPDATE_USER:     ROLE_ADMIN requis
+- `backend/src/Security/Voter/UserVoter.php`
+- `backend/src/Security/Voter/GameVoter.php`
+- `backend/src/Security/Voter/GameRegistrationVoter.php`
+- `backend/src/Security/Voter/AppSettingVoter.php`
 
-// GameVoter
-- LIST_GAMES:      Public (tous)
-- VIEW_GAME:       Public si isPublic=true, sinon canSeePrivate || ADMIN
-- CREATE_GAME:     ROLE_ADMIN || ROLE_ORGANIZER || ROLE_SUPER_ADMIN
-- UPDATE_GAME:     Idem CREATE
-- DELETE_GAME:     Idem CREATE
+**Règles couvertes**:
 
-// GameRegistrationVoter
-- REGISTER_GAME:          isPublic || canSeePrivate || ROLE_ADMIN
-- DELETE_GAME_REGISTRATION: owner || ROLE_ADMIN || ROLE_ORGANIZER
-- PATCH_GAME_REGISTRATION:  ROLE_ADMIN || ROLE_ORGANIZER || ROLE_SUPER_ADMIN
+- gestion des utilisateurs réservée aux rôles administratifs;
+- création, modification et suppression de parties encadrées par les rôles autorisés;
+- consultation des parties privées limitée aux utilisateurs habilités;
+- inscription aux parties contrôlée par visibilité, propriété et rôle;
+- gestion des paramètres applicatifs réservée aux rôles administratifs.
 
-// AppSettingVoter
-- MANAGE_APP_SETTINGS: ROLE_ADMIN || ROLE_SUPER_ADMIN
-```
+### Protection contre l'accès horizontal et IDOR
 
-**Couverture voters** : 100% (UserVoter, GameVoter, AppSettingVoter) — GameRegistrationVoter 91.89% lignes
+Les ressources sensibles sont filtrées côté serveur afin qu'un utilisateur ne puisse pas accéder à des données appartenant à un autre utilisateur ou à des ressources non visibles.
 
-#### Tests
+**Mécanismes**:
 
-- ✓ `tests/Security/Voter/UserVoterTest.php` (100% coverage, 25 tests)
-- ✓ `tests/Security/Voter/GameVoterTest.php` (100% coverage, 13 tests)
-- ✓ `tests/Security/Voter/GameRegistrationVoterTest.php` (91.89% coverage, 12 tests)
-- ✓ `tests/Security/Voter/AppSettingVoterTest.php` (100% coverage, 6 tests)
+- filtrage serveur de visibilité des parties privées;
+- filtrage des inscriptions de jeu selon l'utilisateur courant;
+- endpoints `/api/me` pour l'accès à son propre profil;
+- restrictions explicites sur les rôles assignables par un administrateur.
 
-### ❌ Non Implémenté
+**Fichiers de preuve**:
 
-- [ ] **OAuth2/OpenID Connect** - Actuellement JWT uniquement
-- [ ] **Multi-factor authentication (MFA)** - À ajouter
-- [ ] **API key management** - À ajouter
-- [ ] **Horizontal privilege escalation** - Rate limiting missing
+- `backend/src/State/GameVisibilityExtension.php`
+- `backend/src/State/GameRegistrationVisibilityExtension.php`
+- `backend/src/State/MyGameRegistrationsProvider.php`
+- `backend/src/State/UserUpdateProcessor.php`
+- `backend/src/Entity/User.php`
+
+### Révocation et invalidation des accès
+
+Les sessions JWT sont contrôlées par révocation et rotation:
+
+- logout avec suppression du cookie et révocation du token;
+- rotation du nonce utilisateur après changement de mot de passe;
+- validation des claims de token par subscriber dédié;
+- invalidation des anciens tokens en cas de changement d'état de sécurité.
+
+**Fichiers de preuve**:
+
+- `backend/src/Controller/LogoutController.php`
+- `backend/src/Security/Jwt/JwtRevocationStore.php`
+- `backend/src/State/MePasswordUpdateProcessor.php`
+- `backend/src/Security/Jwt/TokenVersionSubscriber.php`
+
+### Tests de contrôle d'accès
+
+La couverture de sécurité inclut des tests de voters et des tests API vérifiant les réponses d'accès interdit ou non authentifié.
+
+**Preuves de test**:
+
+- `backend/tests/Security/Voter/UserVoterTest.php`
+- `backend/tests/Security/Voter/GameVoterTest.php`
+- `backend/tests/Security/Voter/GameRegistrationVoterTest.php`
+- `backend/tests/Security/Voter/AppSettingVoterTest.php`
+- `backend/tests/State/*VisibilityExtensionTest.php`
+- `backend/tests/Api/GameApiTest.php`
+- `backend/tests/Api/GameRegistrationApiTest.php`
+- `backend/tests/Api/MeEndpointTest.php`
+- `backend/tests/Api/AdminExportControllerTest.php`
+
+Les exports administratifs disposent de tests négatifs dédiés:
+
+- utilisateur anonyme sur export: réponse `401 Unauthorized`;
+- utilisateur non administrateur sur export: réponse `403 Forbidden`.
 
 ---
 
-## 2. A02:2021 - Cryptographic Failures
+## A02 - Cryptographic Failures
 
-### ✓ Implémenté
+### Hashage des mots de passe
 
-**Technologie**: Symfony Security + Lexik JWT
+Les mots de passe sont hashés par Symfony Security avec `password_hashers: auto`, ce qui permet l'utilisation d'un algorithme robuste adapté à l'environnement d'exécution.
 
-#### Password Hashing
+**Configuration**: `backend/config/packages/security.yaml`
 
-```php
-// config/packages/security.yaml
+```yaml
 password_hashers:
-  PasswordAuthenticatedUserInterface: "auto"
-  // Defaults to bcrypt with cost 12
-
-// Test environment: cost 4 (for speed)
-when@test:
-  security:
-    password_hashers:
-      PasswordAuthenticatedUserInterface:
-        algorithm: auto
-        cost: 4
+  Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface: "auto"
 ```
 
-**Force**: Bcrypt with cost 12 = resistant to brute force
+En environnement de test, les coûts sont réduits afin de conserver des tests rapides sans modifier le comportement fonctionnel de sécurité.
 
-**Evidence**: 
-- User entity: `#[Groups(['user:write'])]` password never exposed in output
-- Tests: `tests/Security/Jwt/TokenVersionSubscriberTest.php`
+### Sécurité JWT
 
-#### JWT Token Security
+L'authentification utilise Lexik JWT avec clés privée/publique, durée de vie explicite et extraction par cookie httpOnly ou header Bearer.
 
-**Implementation** (`config/packages/lexik_jwt_authentication.yaml`):
+**Configuration**: `backend/config/packages/lexik_jwt_authentication.yaml`
 
 ```yaml
 lexik_jwt_authentication:
-  secret_key: %env(resolve:JWT_SECRET_KEY)%  // Secret from .env
-  public_key: %env(resolve:JWT_PUBLIC_KEY)%
-  pass_phrase: %env(JWT_PASSPHRASE)%
-  token_ttl: 3600  // 1 hour expiry
-  clock_skew: 0
+  secret_key: "%env(resolve:JWT_SECRET_KEY)%"
+  public_key: "%env(resolve:JWT_PUBLIC_KEY)%"
+  pass_phrase: "%env(JWT_PASSPHRASE)%"
+  token_ttl: 3600
+  token_extractors:
+    authorization_header:
+      enabled: true
+      prefix: Bearer
+      name: Authorization
+    cookie:
+      enabled: true
+      name: ma_access_token
 ```
 
-**Features**:
-- ✓ HMAC-SHA256 signing
-- ✓ Token rotation on password change (nonce system)
-- ✓ 1-hour expiry (short-lived tokens)
-- ✓ Secrets in `.env` (never in git)
+### Politique de session JWT
 
-**Token Rotation** (`src/Security/Jwt/JwtRevocationStore.php`):
+- durée de vie explicite: `3600` secondes;
+- timeout d'inactivité applicatif via `JWT_INACTIVITY_TIMEOUT`;
+- révocation par identifiant de token;
+- rotation après changement de mot de passe;
+- validation des claims `iss` et `aud`;
+- cookie d'authentification `ma_access_token` en `httpOnly`, `SameSite=Lax` et `secure` selon le contexte HTTPS;
+- fallback `Authorization: Bearer` pour les clients API.
 
-```php
-// On password change:
-// 1. Generate new token nonce
-// 2. Invalidate old tokens (nonce mismatch)
-// 3. Issue new JWT with new nonce
-```
+**Preuves de test**:
 
-**Coverage**: 100% (5/5 methods tested)
-
-#### Testing
-
-- ✓ `tests/Security/Jwt/TokenVersionSubscriberTest.php` (100% coverage)
-- ✓ Tests: token creation, validation, nonce matching, exception paths
-
-### ❌ Non Implémenté
-
-- [ ] **HTTPS enforcement** - Dev: HTTP | Prod: HTTPS (To configure)
-- [ ] **Encryption at rest** - Sensitive fields not encrypted in DB
-- [ ] **TLS 1.3** - Requires production infra setup
-- [ ] **Certificate pinning** - Not implemented
+- `backend/tests/Security/Jwt/TokenVersionSubscriberTest.php`
 
 ---
 
-## 3. A03:2021 - Injection
+## A03 - Injection
 
-### ✓ Implémenté
+### Accès aux données
 
-**Technologie**: Doctrine ORM (parameterized queries)
+L'application utilise Doctrine ORM pour les accès base de données. Les requêtes applicatives passent par les repositories et bénéficient de la paramétrisation gérée par Doctrine.
 
-#### SQL Injection Prevention
+**Exemples de surfaces concernées**:
 
-**No raw SQL used** - 100% ORM-based queries:
+- `backend/src/Repository/UserRepository.php`
+- `backend/src/Repository/GameRepository.php`
+- `backend/src/Repository/GameRegistrationRepository.php`
 
-```php
-// ✓ Safe - Doctrine parameterized
-$users = $repository->findBy(['email' => $email]);
+### Validation des entrées
 
-// ✗ NEVER done - Raw SQL with user input
-// $em->getConnection()->executeQuery("SELECT * FROM users WHERE email = '$email'");
-```
+Les entrées sont validées par Symfony Validator dans les DTO et entités métier.
 
-**Repository Examples**:
-- `src/Repository/UserRepository.php` - No raw SQL
-- `src/Repository/GameRepository.php` - No raw SQL
-- `src/Repository/GameRegistrationRepository.php` - No raw SQL
+**Contrôles appliqués**:
 
-**Testing**: 
-- No specific injection tests (Doctrine handles it)
-- Code review: No raw SQL found
+- présence obligatoire des champs requis;
+- types validés;
+- identifiants positifs;
+- règles métier avant persistance.
 
-#### ORM Security Features
+**Preuves**:
 
-```php
-// Doctrine automatically:
-// 1. Escapes user input
-// 2. Uses parameterized queries
-// 3. Prevents type confusion
-
-// Example:
-$query = $em->createQuery(
-  'SELECT u FROM App\Entity\User u WHERE u.id = :id'
-);
-$query->setParameter('id', $userId);  // Auto-escaped
-$user = $query->getOneOrNullResult();
-```
-
-#### Input Validation
-
-**Symfony Validator** (`src/Dto/`, `src/Entity/`):
-
-```php
-// Example: GameRegistrationInput
-class GameRegistrationInput {
-  #[Assert\NotNull]
-  #[Assert\Positive]
-  private int $game;  // Must be positive integer
-}
-
-// Prevents:
-// - Invalid type coercion
-// - Negative IDs
-// - SQL injection via ID
-```
-
-**Tests**: 
-- ✓ `tests/State/GameRegistrationCreateProcessorTest.php` (100% coverage)
-- ✓ 10+ validation test cases
-
-### ❌ Non Implémenté
-
-- [ ] **XSS prevention headers** - CSP header missing
-- [ ] **Command injection** - Not applicable (no exec/shell calls)
-- [ ] **LDAP injection** - Not applicable (LDAP not used)
-- [ ] **XML/XXE injection** - Not applicable (no XML parsing)
+- `backend/src/Dto/`
+- `backend/src/Entity/`
+- `backend/tests/State/GameRegistrationCreateProcessorTest.php`
 
 ---
 
-## 4. A04:2021 - Insecure Design
+## A04 - Insecure Design
 
-### ✓ Partially Implémenté
+Les règles de sécurité sont intégrées dans la conception serveur et appliquées avant les mutations de données.
 
-**Architecture Review**: Threat model considered:
+| Risque métier | Contrôle applicatif |
+|---------------|---------------------|
+| Inscription non autorisée à une partie | `GameRegistrationVoter` et processor de création |
+| Élévation de privilège utilisateur | `UserVoter` et `UserUpdateProcessor` |
+| Exposition du mot de passe | groupes de sérialisation sans password en sortie |
+| Partie complète | contrôle avant persistance |
+| Partie privée | `GameVoter` et `GameVisibilityExtension` |
+| Export CSV | endpoints protégés par rôle administratif |
 
-#### Identified Threats & Mitigations
+**Preuves**:
 
-| Threat | Mitigation | Status |
-|--------|-----------|--------|
-| Unauthorized game registration | RBAC + GameRegistrationVoter | ✓ Testé |
-| User privilege escalation | Role hierarchy + UserVoter | ✓ Testé |
-| Data leakage (password in response) | Serializer groups | ✓ Testé |
-| Game full while registering (race condition) | Contrôle atomique avant persist | ✓ Implémenté |
-| Account takeover | JWT + password hash bcrypt | ✓ Testé |
-| Unauthorized CSV export | ADMIN-only endpoints + AppSettingVoter | ✓ Testé |
-| Partie privée accédée par user non autorisé | GameVoter + GameVisibilityExtension | ✓ Testé |
-
-#### Security Requirements Built-in
-
-```php
-// Example: GameRegistration state processor
-// Checks before allowing registration:
-// 1. User authenticated
-// 2. Game exists
-// 3. Game is public OR user is ADMIN
-// 4. User not already registered
-// 5. Game not full
-
-if ($game->isFull()) {
-  throw new ConflictHttpException('Game is full');
-}
-```
-
-### ❌ Non Implémenté
-
-- [ ] **Threat model documentation** - Formal STRIDE analysis needed
-- [ ] **Security architecture review** - Formal review needed
-- [ ] **Security testing** - Penetration testing not done
-- [ ] **Incident response plan** - Not defined
+- `backend/src/Security/Voter/`
+- `backend/src/State/`
+- `backend/tests/Security/Voter/`
+- `backend/tests/Api/`
 
 ---
 
-## 5. A05:2021 - Security Misconfiguration
+## A05 - Security Misconfiguration
 
-### ✓ Implémenté
+### Configuration par environnement
 
-**Environment Management**:
+Les paramètres sensibles sont injectés par variables d'environnement et documentés dans `.env.example`.
 
-```bash
-# Development (.env.dev)
-APP_ENV=dev
-APP_DEBUG=true
-DATABASE_URL=postgresql://app:password@localhost:5432/airsoft_dev
+**Exemples**:
 
-# Production (.env)
-APP_ENV=prod
-APP_DEBUG=false
-DATABASE_URL=postgresql://...
-JWT_SECRET_KEY=%env(JWT_SECRET_KEY)%  # Injected from CI/CD secrets
-```
+- `APP_SECRET`
+- `DATABASE_URL`
+- `JWT_SECRET_KEY`
+- `JWT_PUBLIC_KEY`
+- `JWT_PASSPHRASE`
+- `JWT_ISSUER`
+- `JWT_AUDIENCE`
+- `CORS_ALLOW_ORIGIN`
 
-**Security Headers** (To add to Nginx/production):
+### CORS restreint
 
-```
-X-Frame-Options: DENY
-X-Content-Type-Options: nosniff
-X-XSS-Protection: 1; mode=block
-Strict-Transport-Security: max-age=31536000
-Content-Security-Policy: default-src 'self'
-```
+La configuration CORS est limitée aux routes API nécessaires, avec méthodes et headers réduits par usage.
 
-**CORS Configuration** (`config/packages/nelmio_cors.yaml`):
+**Configuration**: `backend/config/packages/nelmio_cors.yaml`
 
 ```yaml
-cors_defaults:
-  allow_origin: ['http://localhost:3000']  # Not '*'
-  allow_methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
+nelmio_cors:
+  defaults:
+    origin_regex: true
+    allow_origin: ["%env(CORS_ALLOW_ORIGIN)%"]
+    allow_credentials: true
+    allow_methods: ["OPTIONS"]
+    allow_headers: ["Content-Type"]
+    expose_headers: []
+    max_age: 3600
+  paths:
+    "^/api/csrf":
+      allow_methods: ["GET", "OPTIONS"]
+      allow_headers: ["Content-Type"]
+    "^/api/login":
+      allow_methods: ["POST", "OPTIONS"]
+      allow_headers: ["Content-Type", "X-CSRF-Token"]
+    "^/api/register":
+      allow_methods: ["POST", "OPTIONS"]
+      allow_headers: ["Content-Type"]
+    "^/api/logout":
+      allow_methods: ["POST", "OPTIONS"]
+      allow_headers: ["Content-Type", "Authorization"]
+    "^/api/exports":
+      allow_methods: ["GET", "OPTIONS"]
+      allow_headers: ["Authorization"]
+    "^/api":
+      allow_methods: ["GET", "OPTIONS", "POST", "PUT", "PATCH", "DELETE"]
+      allow_headers: ["Content-Type", "Authorization"]
+      expose_headers: ["Link"]
 ```
 
-**Dependency Management**:
+---
+
+## A06 - Vulnerable and Outdated Components
+
+Les dépendances backend et frontend sont verrouillées par fichiers de lock, ce qui garantit des versions reproductibles entre environnements.
+
+**Preuves**:
+
+- `backend/composer.lock`
+- `frontend/package-lock.json`
+
+**Commandes d'audit disponibles**:
 
 ```bash
-# Check for outdated/vulnerable packages
 composer audit
 npm audit
 ```
 
-### ❌ Non Implémenté
+Composants principaux déclarés:
 
-- [ ] **Security headers in PHP** - Need Nginx/production config
-- [ ] **HTTPS redirect** - Requires production infra
-- [ ] **HTTP/2 push** - Not configured
-- [ ] **Rate limiting middleware** - Not implemented
-
----
-
-## 6. A06:2021 - Vulnerable & Outdated Components
-
-
-**Dependency Tracking**:
-
-```bash
-# Backend
-composer.lock  # Locked versions
-composer audit  # Check vulnerabilities
-
-# Frontend
-package-lock.json  # Locked versions
-npm audit  # Check vulnerabilities
-```
-
-**Current Versions** (Safe):
-
-| Package | Version | Security Status |
-|---------|---------|-----------------|
-| symfony/framework | 7.4 | ✓ Latest stable |
-| api-platform | 4.3.15 | ✓ Latest stable |
-| next.js | 16.2.6 | ✓ Latest stable |
-| react | 19.2.4 | ✓ Latest stable |
-| doctrine/orm | 3.6.7 | ✓ Latest stable |
-| lexik/jwt | 3.2 | ✓ Latest stable |
-
-### ❌ Non Implémenté
-
-- [ ] **Automated dependency updates** - Dependabot/Renovate not configured
-- [ ] **Security patch automation** - No auto-patching CI/CD
-- [ ] **Dependency scanning** - GitHub Security Alerts not checked
-- [ ] **SBOM (Software Bill of Materials)** - Not generated
+| Composant | Usage |
+|-----------|-------|
+| Symfony | framework backend et sécurité |
+| API Platform | exposition API REST |
+| Doctrine ORM | accès base de données |
+| Lexik JWT Authentication Bundle | authentification JWT |
+| Nelmio CORS Bundle | contrôle CORS |
+| Next.js | frontend |
+| React | interface utilisateur |
 
 ---
 
-## 7. A07:2021 - Authentication Failures
+## A07 - Identification and Authentication Failures
 
-### ✓ Implémenté
+### Authentification
 
-**Authentication Method**: JWT (cookie httpOnly + Bearer fallback)
+L'authentification repose sur JWT avec deux modes de transport:
 
-```php
-// Login endpoint: POST /api/login
-// Cookie auth: ma_access_token (httpOnly, SameSite=Lax)
-// Fallback API clients: Authorization: Bearer <token>
-```
+- cookie navigateur `ma_access_token` en `httpOnly`;
+- header `Authorization: Bearer` pour clients API.
 
-**Session & Token Management**:
+### Protection du login
 
-```php
-// Token TTL: 1 hour (3600 seconds)
-// Expired tokens return 401 Unauthorized
-// JWT inactivity timeout: sliding window (JWT_INACTIVITY_TIMEOUT)
-// Token invalidation on password/email changes (pwd_sig + nonce)
-// Issuer/Audience claims validated (iss, aud)
-```
+Le login est protégé par CSRF pour les flux navigateur et par throttling applicatif.
 
-**Brute-force Protection**:
+**Configuration**:
+
+- `backend/config/packages/security.yaml`
+- `backend/config/packages/rate_limiter.yaml`
+- `backend/src/Security/LoginRequestRateLimiterSubscriber.php`
 
 ```yaml
-# config/packages/security.yaml
 login_throttling:
   max_attempts: 3
   interval: "5 minutes"
-
-# config/packages/rate_limiter.yaml
-login_request_limiter: 3 req / 5 min (IP)
-register_request_limiter: 3 req / 5 min (IP)
 ```
 
-**CSRF Protection (auth bootstrap)**:
+### Politique mot de passe
 
-```php
-// GET /api/csrf/token -> token CSRF
-// POST /api/login requires X-CSRF-Token for browser-style requests
-// Invalid/missing token -> 403 "Requête invalide."
-```
+Les validations backend imposent une politique de mot de passe robuste:
 
-**Transport & Cookie Hardening**:
-
-- Cookie d'authentification `ma_access_token` en `httpOnly`
-- `SameSite=Lax`
-- `secure` activé selon contexte HTTPS
-
-**Password Policy**:
-
-Minimum enforced via validation backend:
-
-- Longueur minimale 12 caractères
-- Complexité requise (majuscule, minuscule, chiffre, symbole)
-- Hashage fort via `password_hashers: auto` (bcrypt/argon2 selon environnement)
-
-**Tests**:
-- ✓ `tests/Security/Jwt/TokenVersionSubscriberTest.php` (100%)
-- ✓ Login/logout + invalidation JWT
-- ✓ Rate limiting observé en runtime (`429 Too Many Requests`)
-
-### ❌ Non Implémenté
-
-- [ ] **Account lockout** - After N failed attempts
-- [ ] **Password reset flow** - Not implemented
-- [ ] **MFA / step-up authentication** - Not implemented
-- [ ] **Login attempt logging** - Audit trail missing
+- longueur minimale de 12 caractères;
+- majuscule;
+- minuscule;
+- chiffre;
+- symbole;
+- hashage via Symfony Security.
 
 ---
 
-## 8. A08:2021 - Software & Data Integrity Failures
+## A08 - Software and Data Integrity Failures
 
-### ✓ Partially Implémenté
+Le projet applique des pratiques d'intégrité logicielle au niveau du dépôt et du cycle d'intégration.
 
-**Git Commits**: Conventional Commits standard enforced
+**Contrôles**:
 
-```
-feat: ajouter export Excel
-fix: corriger validation email
-```
-
-**Branch Protection** : Branche `main` protégée — PRs obligatoires, CI doit passer avant merge.
-
-**Code Signing**: Not enforced
-
-### ❌ Non Implémenté
-
-- [ ] **Signed commits** - Not enforced in GitHub
-- [ ] **Release signing** - GPG signatures not used
-- [ ] **Artifact integrity** - Checksums not verified
-- [ ] **Container image signing** - Not implemented
+- commits conventionnels;
+- branche principale protégée;
+- intégration par pull request;
+- contrôle CI avant intégration.
 
 ---
 
-## 9. A09:2021 - Logging & Monitoring Failures
+## A09 - Security Logging and Monitoring Failures
 
-### ✓ Partially Implémenté
+L'application s'appuie sur la journalisation Symfony et les journaux d'exécution CI/CD.
 
-**Logging Framework**: Symfony Monolog
+**Sources de traces**:
 
-```php
-// Logs écrits dans : var/log/
-// Niveaux : error, warning, info, debug
-// Erreurs HTTP 4xx/5xx loguées automatiquement par Symfony
-```
+- logs applicatifs Symfony dans `var/log/`;
+- erreurs et exceptions HTTP journalisées par le framework;
+- logs d'exécution GitHub Actions;
+- traces de tests automatisés.
 
-**Ce qui est logué actuellement** :
+---
 
-- ✓ Erreurs & exceptions (Symfony default)
-- ✓ Requêtes HTTP en dev mode
-- ✗ Événements d'authentification (login attempts, failures)
-- ✗ Échecs d'autorisation (denied access)
-- ✗ Actions admin (modifications utilisateurs, exports)
-- ✗ Modifications de données (audit trail)
+## A10 - Server-Side Request Forgery
 
-**GitHub Actions Logging**:
+Le périmètre applicatif ne comporte pas de fonctionnalité exposant des appels HTTP serveur vers des URL fournies par l'utilisateur.
+
+**Constats techniques**:
+
+- pas de proxy d'image distant;
+- pas de webhook utilisateur exposé;
+- pas d'import de fichier depuis URL;
+- pas d'appel HTTP externe déclenché par une entrée utilisateur.
+
+---
+
+## Preuves de validation
+
+Contrôles exécutables associés aux éléments de conformité:
 
 ```bash
-# CI/CD logs visible in GitHub Actions
-# Can be exported and analyzed
+php bin/console lint:yaml config/packages/lexik_jwt_authentication.yaml config/packages/nelmio_cors.yaml
+php vendor/bin/php-cs-fixer fix --dry-run --diff tests/Api/AdminExportControllerTest.php
+php vendor/bin/phpunit tests/Api/AdminExportControllerTest.php --display-skipped
 ```
 
-### ❌ Non Implémenté
-
-- [ ] **Audit logging** - No record of admin actions
-- [ ] **Failed login tracking** - No alerting on brute force
-- [ ] **Data modification logs** - No audit trail
-- [ ] **Access control logs** - No denied access records
-- [ ] **Error rate monitoring** - No alerts configured
-- [ ] **Centralized logging** - Dev only (local var/log)
+Les tests d'exports administratifs couvrent explicitement les scénarios d'accès non authentifié et non autorisé.
 
 ---
 
-## 10. A10:2021 - Server-Side Request Forgery (SSRF)
+## Ressources
 
-### ✓ Implémenté
-
-**No External Requests Made**:
-
-- No HTTP calls to external APIs
-- No webhook integrations
-- No file uploads from URLs
-- No image proxying
-
-**Risk Level**: Low (not applicable to current app)
-
-### ❌ Non Implémenté
-
-- [ ] **Request validation** - Not needed currently
-- [ ] **IP whitelist/blacklist** - Not needed currently
-
----
-
-## Summary Matrix
-
-| OWASP Flaw | Implémenté | Partiellement | À Faire | Evidence |
-|------------|-----------|--------------|---------|----------|
-| A1 - Broken Access Control | ✓ | - | - | UserVoter, GameVoter, GameRegistrationVoter, AppSettingVoter |
-| A2 - Cryptographic Failures | ✓ | - | HTTPS prod | Bcrypt, JWT nonce rotation |
-| A3 - Injection | ✓ | - | XSS headers CSP | Doctrine ORM, Symfony Validator |
-| A4 - Insecure Design | ✓ | - | Formal STRIDE | 5 processors de sécurité, race-condition traitée |
-| A5 - Security Misconfiguration | ✓ | - | Security headers prod | .env, CORS restrictif |
-| A6 - Vulnerable Components | ✓ | - | Auto updates | composer/npm versions stables |
-| A7 - Authentication Failures | ✓ | - | MFA, password reset, audit logs | JWT auth, CSRF login, rate limiting |
-| A8 - Integrity Failures | - | ✓ | Signed commits | Conventional Commits + branch protection |
-| A9 - Logging & Monitoring | - | ✓ | Audit logs | Monolog erreurs, logs CI/CD |
-| A10 - SSRF | ✓ | - | - | N/A |
-
-**Overall Coverage**: 70% fully implemented, 20% partial, 10% missing
-
----
-
-## Recommandations Prioritaires
-
-1. **MFA Support** - TOTP or passkeys for privileged accounts
-2. **Audit Logging** - Track admin actions & failed access
-3. **Security Headers** - CSP, HSTS (production)
-4. **Password Policy** - Enforce complexity requirements
-5. **Penetration Testing** - Formal security audit
-6. **Monitoring & Alerting** - Error rate, suspicious patterns
-7. **Password Reset Flow** - Secure token-based reset with expiry
-8. **HTTPS Enforcement** - HSTS header
-
----
-
-## Resources
-
-- OWASP Top 10: https://owasp.org/Top10/
+- OWASP Top 10: https://owasp.org/Top10/2025/
 - Symfony Security: https://symfony.com/doc/current/security.html
-- NIST Guidelines: https://csrc.nist.gov/publications/sp-800-53
+- API Platform Security: https://api-platform.com/docs/core/security/

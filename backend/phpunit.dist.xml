@@ -13,7 +13,18 @@
         <ini name="display_errors" value="1" />
         <ini name="error_reporting" value="-1" />
         <server name="APP_ENV" value="test" force="true" />
+        <server name="APP_SECRET" value="test-app-secret" force="true" />
+        <server name="CORS_ALLOW_ORIGIN" value="^https?://localhost(:[0-9]+)?$" force="true" />
+        <server name="DEFAULT_URI" value="https://api.example.test" force="true" />
+        <server name="JWT_AUDIENCE" value="https://api.example.test" force="true" />
+        <server name="JWT_INACTIVITY_TIMEOUT" value="1800" force="true" />
+        <server name="JWT_ISSUER" value="https://api.example.test" force="true" />
+        <server name="JWT_PASSPHRASE" value="change-me-jwt-passphrase" force="true" />
+        <server name="JWT_PUBLIC_KEY" value="%kernel.project_dir%/config/jwt/public.pem" force="true" />
+        <server name="JWT_SECRET_KEY" value="%kernel.project_dir%/config/jwt/private.pem" force="true" />
         <server name="KERNEL_CLASS" value="App\Kernel" force="true" />
+        <server name="LOGIN_CSRF_TOKEN_TTL" value="600" force="true" />
+        <server name="REDIS_URL" value="redis://127.0.0.1:6379" force="true" />
         <server name="SHELL_VERBOSITY" value="-1" />
     </php>
 
