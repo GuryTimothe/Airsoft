@@ -7,6 +7,7 @@ use ApiPlatform\State\ProcessorInterface;
 use App\Entity\User;
 use App\State\UserUpdateProcessor;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
@@ -32,7 +33,7 @@ final class UserUpdateProcessorTest extends TestCase
         $security = $this->createMock(Security::class);
         $security->method('getUser')->willReturn($actor);
 
-        $processor = new UserUpdateProcessor($persistProcessor, $security);
+        $processor = new UserUpdateProcessor($persistProcessor, $security, new NullLogger(), 'test', 'test-secret');
 
         $this->assertSame($data, $processor->process($data, new Patch(), context: ['previous_data' => $previous]));
     }
@@ -53,7 +54,7 @@ final class UserUpdateProcessorTest extends TestCase
         $security = $this->createMock(Security::class);
         $security->method('getUser')->willReturn($actor);
 
-        $processor = new UserUpdateProcessor($persistProcessor, $security);
+        $processor = new UserUpdateProcessor($persistProcessor, $security, new NullLogger(), 'test', 'test-secret');
 
         $this->expectException(AccessDeniedException::class);
         $this->expectExceptionMessage('Password changes are not allowed on this route.');
@@ -79,7 +80,7 @@ final class UserUpdateProcessorTest extends TestCase
         $security = $this->createMock(Security::class);
         $security->method('getUser')->willReturn($actor);
 
-        $processor = new UserUpdateProcessor($persistProcessor, $security);
+        $processor = new UserUpdateProcessor($persistProcessor, $security, new NullLogger(), 'test', 'test-secret');
 
         $result = $processor->process($data, new Patch(), context: ['previous_data' => $previous]);
 
@@ -103,7 +104,7 @@ final class UserUpdateProcessorTest extends TestCase
         $security = $this->createMock(Security::class);
         $security->method('getUser')->willReturn($actor);
 
-        $processor = new UserUpdateProcessor($persistProcessor, $security);
+        $processor = new UserUpdateProcessor($persistProcessor, $security, new NullLogger(), 'test', 'test-secret');
 
         $this->expectException(AccessDeniedException::class);
         $this->expectExceptionMessage('Admins can only assign ROLE_USER or ROLE_ORGANIZER.');
@@ -131,7 +132,7 @@ final class UserUpdateProcessorTest extends TestCase
         $security = $this->createMock(Security::class);
         $security->method('getUser')->willReturn($actor);
 
-        $processor = new UserUpdateProcessor($persistProcessor, $security);
+        $processor = new UserUpdateProcessor($persistProcessor, $security, new NullLogger(), 'test', 'test-secret');
 
         $this->assertSame($data, $processor->process($data, new Patch(), context: ['previous_data' => $previous]));
     }
@@ -147,7 +148,7 @@ final class UserUpdateProcessorTest extends TestCase
         $security = $this->createMock(Security::class);
         $security->method('getUser')->willReturn($actor);
 
-        $processor = new UserUpdateProcessor($persistProcessor, $security);
+        $processor = new UserUpdateProcessor($persistProcessor, $security, new NullLogger(), 'test', 'test-secret');
 
         $this->expectException(\InvalidArgumentException::class);
         $processor->process($data, new Patch(), context: []);
@@ -164,7 +165,7 @@ final class UserUpdateProcessorTest extends TestCase
         $security = $this->createMock(Security::class);
         $security->method('getUser')->willReturn(null);
 
-        $processor = new UserUpdateProcessor($persistProcessor, $security);
+        $processor = new UserUpdateProcessor($persistProcessor, $security, new NullLogger(), 'test', 'test-secret');
 
         $this->expectException(\Symfony\Component\Security\Core\Exception\AccessDeniedException::class);
         $processor->process($data, new Patch(), context: ['previous_data' => $previous]);

@@ -7,6 +7,7 @@ use App\Repository\UserRepository;
 use Lexik\Bundle\JWTAuthenticationBundle\Event\JWTCreatedEvent;
 use Lexik\Bundle\JWTAuthenticationBundle\Event\JWTDecodedEvent;
 use Lexik\Bundle\JWTAuthenticationBundle\Events;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException;
@@ -16,8 +17,12 @@ final class TokenVersionSubscriber implements EventSubscriberInterface
     public function __construct(
         private UserRepository $userRepository,
         private JwtRevocationStore $jwtRevocationStore,
+        #[Autowire(service: 'monolog.logger.security')]
+        private LoggerInterface $logger,
         #[Autowire('%kernel.secret%')]
         private string $appSecret,
+        #[Autowire('%kernel.environment%')]
+        private string $environment,
         #[Autowire('%env(JWT_ISSUER)%')]
         private string $jwtIssuer,
         #[Autowire('%env(JWT_AUDIENCE)%')]
@@ -51,6 +56,20 @@ final class TokenVersionSubscriber implements EventSubscriberInterface
             $payload['tok_nce'] = $this->jwtRevocationStore->getOrCreateUserTokenNonce($user);
             $this->jwtRevocationStore->touchTokenActivity($payload['jti'], $this->jwtInactivityTimeout);
         } catch (JwtRevocationUnavailableException $exception) {
+            $this->logger->error('Security JWT revocation store unavailable during token issuance.', [
+                'event_id'       => 'SEC.JWT.REVOCATION_ERROR',
+                'event_category' => 'token_security',
+                'severity'       => 'ERROR',
+                'outcome'        => 'failure',
+                'action'         => 'token_issue',
+                'service'        => 'backend-api',
+                'environment'    => $this->environment,
+                'actor_type'     => 'user',
+                'actor_id_hash'  => $this->hashUserId($user),
+                'reason_code'    => 'REVOCATION_STORE_UNAVAILABLE',
+                'message'        => 'JWT issuance requires revocation store availability.',
+            ]);
+
             throw new ServiceUnavailableHttpException(null, 'Redis is required to issue JWT tokens.', $exception);
         }
 
@@ -63,46 +82,72 @@ final class TokenVersionSubscriber implements EventSubscriberInterface
 
         $tokenId = $payload['jti'] ?? null;
         if (!\is_string($tokenId) || '' === $tokenId) {
-            $event->markAsInvalid();
+            $this->markInvalid($event, 'MISSING_JTI', $payload);
 
             return;
         }
 
         try {
             if ($this->jwtRevocationStore->isTokenIdRevoked($tokenId)) {
-                $event->markAsInvalid();
+                $this->markInvalid($event, 'REVOKED_JTI', $payload);
 
                 return;
             }
         } catch (JwtRevocationUnavailableException $exception) {
+            $this->logger->error('Security JWT revocation store unavailable during token validation.', [
+                'event_id'       => 'SEC.JWT.REVOCATION_ERROR',
+                'event_category' => 'token_security',
+                'severity'       => 'ERROR',
+                'outcome'        => 'failure',
+                'action'         => 'token_validate',
+                'service'        => 'backend-api',
+                'environment'    => $this->environment,
+                'actor_type'     => 'anonymous',
+                'reason_code'    => 'REVOCATION_CHECK_FAILED',
+                'message'        => 'JWT revocation check failed because the store is unavailable.',
+            ]);
+
             throw new ServiceUnavailableHttpException(null, 'Redis is required to validate JWT tokens.', $exception);
         }
 
         try {
             if (!$this->jwtRevocationStore->isTokenActivityActive($tokenId)) {
-                $event->markAsInvalid();
+                $this->markInvalid($event, 'INACTIVITY_TIMEOUT', $payload);
 
                 return;
             }
         } catch (JwtRevocationUnavailableException $exception) {
+            $this->logger->error('Security JWT activity store unavailable during token validation.', [
+                'event_id'       => 'SEC.JWT.REVOCATION_ERROR',
+                'event_category' => 'token_security',
+                'severity'       => 'ERROR',
+                'outcome'        => 'failure',
+                'action'         => 'token_validate',
+                'service'        => 'backend-api',
+                'environment'    => $this->environment,
+                'actor_type'     => 'anonymous',
+                'reason_code'    => 'ACTIVITY_CHECK_FAILED',
+                'message'        => 'JWT activity check failed because the store is unavailable.',
+            ]);
+
             throw new ServiceUnavailableHttpException(null, 'Redis is required to validate JWT tokens.', $exception);
         }
 
         if (!$this->isValidIssuer($payload['iss'] ?? null)) {
-            $event->markAsInvalid();
+            $this->markInvalid($event, 'INVALID_ISSUER', $payload);
 
             return;
         }
 
         if (!$this->isValidAudience($payload['aud'] ?? null)) {
-            $event->markAsInvalid();
+            $this->markInvalid($event, 'INVALID_AUDIENCE', $payload);
 
             return;
         }
 
         $identifier = $payload['username'] ?? null;
         if (!\is_string($identifier) || '' === $identifier) {
-            $event->markAsInvalid();
+            $this->markInvalid($event, 'MISSING_IDENTIFIER', $payload);
 
             return;
         }
@@ -111,20 +156,20 @@ final class TokenVersionSubscriber implements EventSubscriberInterface
 
         $user = $this->userRepository->findOneBy(['email' => $identifier]);
         if (!$user instanceof User) {
-            $event->markAsInvalid();
+            $this->markInvalid($event, 'UNKNOWN_USER', $payload);
 
             return;
         }
 
         $passwordSignature = $payload['pwd_sig'] ?? null;
         if (!\is_string($passwordSignature) || '' === $passwordSignature) {
-            $event->markAsInvalid();
+            $this->markInvalid($event, 'MISSING_PASSWORD_SIGNATURE', $payload);
 
             return;
         }
 
         if (!hash_equals($this->computePasswordSignature($user), $passwordSignature)) {
-            $event->markAsInvalid();
+            $this->markInvalid($event, 'PASSWORD_SIGNATURE_MISMATCH', $payload);
 
             return;
         }
@@ -132,18 +177,32 @@ final class TokenVersionSubscriber implements EventSubscriberInterface
         try {
             $currentNonce = $this->jwtRevocationStore->getUserTokenNonce($user);
         } catch (JwtRevocationUnavailableException $exception) {
+            $this->logger->error('Security JWT nonce lookup failed.', [
+                'event_id'       => 'SEC.JWT.REVOCATION_ERROR',
+                'event_category' => 'token_security',
+                'severity'       => 'ERROR',
+                'outcome'        => 'failure',
+                'action'         => 'token_validate',
+                'service'        => 'backend-api',
+                'environment'    => $this->environment,
+                'actor_type'     => 'user',
+                'actor_id_hash'  => $this->hashUserId($user),
+                'reason_code'    => 'NONCE_LOOKUP_FAILED',
+                'message'        => 'JWT nonce lookup failed because the store is unavailable.',
+            ]);
+
             throw new ServiceUnavailableHttpException(null, 'Redis is required to validate JWT tokens.', $exception);
         }
 
         if (null !== $currentNonce) {
             if (!\is_string($tokenNonce) || '' === $tokenNonce) {
-                $event->markAsInvalid();
+                $this->markInvalid($event, 'MISSING_TOKEN_NONCE', $payload);
 
                 return;
             }
 
             if (!hash_equals($currentNonce, $tokenNonce)) {
-                $event->markAsInvalid();
+                $this->markInvalid($event, 'TOKEN_NONCE_MISMATCH', $payload);
 
                 return;
             }
@@ -152,8 +211,60 @@ final class TokenVersionSubscriber implements EventSubscriberInterface
         try {
             $this->jwtRevocationStore->touchTokenActivity($tokenId, $this->jwtInactivityTimeout);
         } catch (JwtRevocationUnavailableException $exception) {
+            $this->logger->error('Security JWT activity touch failed.', [
+                'event_id'       => 'SEC.JWT.REVOCATION_ERROR',
+                'event_category' => 'token_security',
+                'severity'       => 'ERROR',
+                'outcome'        => 'failure',
+                'action'         => 'token_validate',
+                'service'        => 'backend-api',
+                'environment'    => $this->environment,
+                'actor_type'     => 'user',
+                'actor_id_hash'  => $this->hashUserId($user),
+                'reason_code'    => 'ACTIVITY_TOUCH_FAILED',
+                'message'        => 'JWT activity update failed because the store is unavailable.',
+            ]);
+
             throw new ServiceUnavailableHttpException(null, 'Redis is required to validate JWT tokens.', $exception);
         }
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function markInvalid(JWTDecodedEvent $event, string $reasonCode, array $payload): void
+    {
+        $event->markAsInvalid();
+
+        $tokenId   = $payload['jti'] ?? null;
+        $tokenHash = null;
+        if (\is_string($tokenId) && '' !== $tokenId) {
+            $tokenHash = hash_hmac('sha256', sprintf('jti:%s', $tokenId), $this->appSecret);
+        }
+
+        $this->logger->warning('Security JWT token invalidated.', [
+            'event_id'       => 'SEC.JWT.INVALID_TOKEN',
+            'event_category' => 'token_security',
+            'severity'       => 'WARNING',
+            'outcome'        => 'blocked',
+            'action'         => 'token_validate',
+            'service'        => 'backend-api',
+            'environment'    => $this->environment,
+            'actor_type'     => 'anonymous',
+            'token_id_hash'  => $tokenHash,
+            'reason_code'    => $reasonCode,
+            'message'        => 'JWT token rejected during validation.',
+        ]);
+    }
+
+    private function hashUserId(User $user): ?string
+    {
+        $id = $user->getId();
+        if (null === $id) {
+            return null;
+        }
+
+        return hash_hmac('sha256', sprintf('user:%d', $id), $this->appSecret);
     }
 
     private function computePasswordSignature(User $user): string

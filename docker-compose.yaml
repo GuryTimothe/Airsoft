@@ -56,6 +56,12 @@ services:
       SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+        tag: "airsoft-backend"
     volumes:
       - ./backend:/app
       - backend_vendor:/app/vendor
