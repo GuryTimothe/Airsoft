@@ -5,6 +5,7 @@ namespace App\State;
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
 use App\Entity\User;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
@@ -25,6 +26,12 @@ class UserUpdateProcessor implements ProcessorInterface
         #[Autowire(service: 'api_platform.doctrine.orm.state.persist_processor')]
         private ProcessorInterface $persistProcessor,
         private Security $security,
+        #[Autowire(service: 'monolog.logger.security')]
+        private LoggerInterface $logger,
+        #[Autowire('%kernel.environment%')]
+        private string $environment,
+        #[Autowire('%kernel.secret%')]
+        private string $appSecret,
     ) {
     }
 
@@ -54,7 +61,27 @@ class UserUpdateProcessor implements ProcessorInterface
             $data->setCanSeePrivate(true);
         }
 
-        return $this->persistProcessor->process($data, $operation, $uriVariables, $context);
+        $result = $this->persistProcessor->process($data, $operation, $uriVariables, $context);
+
+        if ($previousData->getRole() !== $data->getRole()) {
+            $this->logger->warning('Security role changed.', [
+                'event_id' => 'SEC.ADMIN.ROLE_CHANGED',
+                'event_category' => 'admin_action',
+                'severity' => 'WARNING',
+                'outcome' => 'success',
+                'action' => 'role_change',
+                'service' => 'backend-api',
+                'environment' => $this->environment,
+                'actor_type' => 'user',
+                'actor_id_hash' => $this->hashUserId($actor),
+                'target_type' => 'user',
+                'target_id_hash' => $this->hashUserId($data),
+                'reason_code' => 'ROLE_UPDATED',
+                'message' => 'User role changed by privileged actor.',
+            ]);
+        }
+
+        return $result;
     }
 
     private function isPasswordInitialized(User $user): bool
@@ -62,5 +89,15 @@ class UserUpdateProcessor implements ProcessorInterface
         self::$passwordProperty ??= new \ReflectionProperty(User::class, 'password');
 
         return self::$passwordProperty->isInitialized($user);
+    }
+
+    private function hashUserId(User $user): ?string
+    {
+        $id = $user->getId();
+        if (null === $id) {
+            return null;
+        }
+
+        return hash_hmac('sha256', sprintf('user:%d', $id), $this->appSecret);
     }
 }

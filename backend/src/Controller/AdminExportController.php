@@ -7,7 +7,9 @@ use App\Entity\User;
 use App\Repository\GameRegistrationRepository;
 use App\Repository\GameRepository;
 use App\Repository\UserRepository;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
@@ -21,6 +23,12 @@ final class AdminExportController extends AbstractController
         private readonly GameRepository $gameRepository,
         private readonly UserRepository $userRepository,
         private readonly GameRegistrationRepository $gameRegistrationRepository,
+        #[Autowire(service: 'monolog.logger.security')]
+        private readonly LoggerInterface $logger,
+        #[Autowire('%kernel.environment%')]
+        private readonly string $environment,
+        #[Autowire('%kernel.secret%')]
+        private readonly string $appSecret,
     ) {
     }
 
@@ -34,11 +42,21 @@ final class AdminExportController extends AbstractController
 
         $games = $this->gameRepository->findForExport($dateFrom, $dateTo);
 
+        $this->logAdminAction('SEC.ADMIN.EXPORT_GAMES', $request, [
+            'reason_code' => 'EXPORT_REQUESTED',
+            'games_count' => \count($games),
+            'filters_applied' => [
+                'dateFrom' => null !== $dateFrom,
+                'dateTo' => null !== $dateTo,
+            ],
+            'message' => 'Admin exported games CSV.',
+        ]);
+
         return $this->createGamePlayersCsvResponse($games);
     }
 
     #[Route('/games/{id}/registrations.csv', methods: ['GET'], requirements: ['id' => '\\d+'])]
-    public function exportGameRegistrations(int $id): StreamedResponse
+    public function exportGameRegistrations(int $id, Request $request): StreamedResponse
     {
         if (
             !$this->isGranted('ROLE_ADMIN')
@@ -54,6 +72,14 @@ final class AdminExportController extends AbstractController
         }
 
         $registrations = $this->gameRegistrationRepository->findForGameExport($game);
+
+        $this->logAdminAction('SEC.ADMIN.EXPORT_GAME_REGISTRATIONS', $request, [
+            'reason_code' => 'EXPORT_REQUESTED',
+            'target_type' => 'game',
+            'target_id_hash' => hash_hmac('sha256', sprintf('game:%d', $id), $this->appSecret),
+            'registrations_count' => \count($registrations),
+            'message' => 'Admin exported game registrations CSV.',
+        ]);
 
         return $this->createCsvResponse(
             sprintf('game_%d_registrations_export', $id),
@@ -103,6 +129,16 @@ final class AdminExportController extends AbstractController
         $roles       = $this->parseRolesFilter($queryParams['roles'] ?? null);
 
         $users = $this->userRepository->findForExport($isMinor, $roles);
+
+        $this->logAdminAction('SEC.ADMIN.EXPORT_USERS', $request, [
+            'reason_code' => 'EXPORT_REQUESTED',
+            'users_count' => \count($users),
+            'filters_applied' => [
+                'ageGroup' => null !== $isMinor,
+                'roles' => [] !== $roles,
+            ],
+            'message' => 'Admin exported users CSV.',
+        ]);
 
         return $this->createCsvResponse(
             'users_export',
@@ -155,6 +191,63 @@ final class AdminExportController extends AbstractController
         }
 
         $this->denyAccessUnlessGranted('ROLE_ADMIN');
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     */
+    private function logAdminAction(string $eventId, ?Request $request, array $context): void
+    {
+        $actor = $this->getUser();
+        $actorIdHash = null;
+        if ($actor instanceof User && null !== $actor->getId()) {
+            $actorIdHash = hash_hmac('sha256', sprintf('user:%d', $actor->getId()), $this->appSecret);
+        }
+
+        $baseContext = [
+            'event_id' => $eventId,
+            'event_category' => 'admin_action',
+            'severity' => 'WARNING',
+            'outcome' => 'success',
+            'action' => 'export',
+            'service' => 'backend-api',
+            'environment' => $this->environment,
+            'actor_type' => $actor instanceof User ? 'user' : 'anonymous',
+            'actor_id_hash' => $actorIdHash,
+        ];
+
+        if ($request instanceof Request) {
+            $baseContext['request_id'] = (string) ($request->headers->get('X-Request-Id') ?? '');
+            $baseContext['correlation_id'] = (string) ($request->headers->get('X-Correlation-Id') ?? '');
+            $baseContext['http_method'] = $request->getMethod();
+            $baseContext['http_path'] = $request->getPathInfo();
+            $baseContext['source_ip_masked'] = $this->maskIp($request->getClientIp());
+            $baseContext['http_status'] = 200;
+        }
+
+        $this->logger->warning('Security admin action executed.', array_merge($baseContext, $context));
+    }
+
+    private function maskIp(?string $ip): string
+    {
+        if (null === $ip || '' === $ip) {
+            return 'unknown';
+        }
+
+        if (false !== filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            $parts = explode('.', $ip);
+            if (4 === \count($parts)) {
+                return sprintf('%s.%s.%s.0/24', $parts[0], $parts[1], $parts[2]);
+            }
+        }
+
+        if (false !== filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
+            $parts = explode(':', $ip);
+
+            return sprintf('%s:%s:%s::/48', $parts[0] ?? '0', $parts[1] ?? '0', $parts[2] ?? '0');
+        }
+
+        return 'unknown';
     }
 
     private function parseDate(mixed $value, string $parameterName): ?\DateTimeImmutable

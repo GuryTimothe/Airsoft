@@ -10,6 +10,7 @@ use Lexik\Bundle\JWTAuthenticationBundle\Event\JWTCreatedEvent;
 use Lexik\Bundle\JWTAuthenticationBundle\Event\JWTDecodedEvent;
 use Lexik\Bundle\JWTAuthenticationBundle\Events;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 use Symfony\Component\Security\Core\User\UserInterface;
 
 final class TokenVersionSubscriberTest extends TestCase
@@ -24,7 +25,9 @@ final class TokenVersionSubscriberTest extends TestCase
         return new TokenVersionSubscriber(
             $userRepository,
             $revocationStore,
+            new NullLogger(),
             self::SECRET,
+            'test',
             self::ISSUER,
             self::AUDIENCE,
             self::INACTIVITY_TIMEOUT,

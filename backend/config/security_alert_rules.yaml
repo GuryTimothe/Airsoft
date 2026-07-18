@@ -1,0 +1,56 @@
+rules:
+  - id: BRUTE_FORCE_LOGIN_IP
+    description: Burst de login failed par IP
+    event_ids: [SEC.AUTH.LOGIN_FAILED]
+    group_by: source_ip_masked
+    window_minutes: 5
+    threshold: 20
+    severity: high
+    escalation: security-oncall
+
+  - id: ACCESS_DENIED_BURST_ACTOR
+    description: Burst d'acces refuses par acteur
+    event_ids: [SEC.AUTHZ.ACCESS_DENIED]
+    group_by: actor_id_hash
+    window_minutes: 10
+    threshold: 50
+    severity: medium
+    escalation: security-ops
+
+  - id: RATE_LIMIT_BURST_IP
+    description: Burst de rate limiting par IP
+    event_ids: [SEC.AUTH.RATE_LIMITED]
+    group_by: source_ip_masked
+    window_minutes: 5
+    threshold: 10
+    severity: medium
+    escalation: security-ops
+
+  - id: JWT_REVOCATION_ERROR_ANY
+    description: Toute erreur de revocation JWT doit alerter
+    event_ids: [SEC.JWT.REVOCATION_ERROR]
+    group_by: global
+    window_minutes: 10
+    threshold: 1
+    severity: critical
+    escalation: security-oncall
+
+  - id: SECURITY_5XX_BURST
+    description: Burst d'evenements securite avec status 5xx
+    event_id_prefix: SEC.
+    group_by: service
+    window_minutes: 10
+    threshold: 5
+    min_http_status: 500
+    max_http_status: 599
+    severity: high
+    escalation: security-oncall
+
+  - id: ADMIN_ACTION_VOLUME
+    description: Volume anormal d'actions admin
+    event_id_prefix: SEC.ADMIN.
+    group_by: actor_id_hash
+    window_minutes: 15
+    threshold: 20
+    severity: high
+    escalation: security-oncall

@@ -1,0 +1,113 @@
+﻿Audit OWASP A09:2025 - Security Logging and Alerting Failures
+Date: 2026-07-18
+Perimetre: backend Symfony/API Platform + frontend Next.js + CI/CD
+
+Reference:
+https://owasp.org/Top10/2025/A09_2025-Security_Logging_and_Alerting_Failures/
+
+==================================================
+1) CE QUE TU AS (OK)
+==================================================
+
+[OK] Gestion d'erreurs et statuts securite en place
+- Les flux auth/anti-abus renvoient des codes explicites (401/429) et messages generiques cote client.
+- Exemples:
+  - GenericAuthenticationFailureHandler (401, message neutre)
+  - LoginRequestRateLimiterSubscriber (429, Retry-After)
+- Fichiers:
+  - backend/src/Security/Jwt/GenericAuthenticationFailureHandler.php
+  - backend/src/Security/LoginRequestRateLimiterSubscriber.php
+
+[OK] Controles de securite applicatifs presents
+- RBAC, voters, JWT revocation, throttling login/register, validation forte.
+- Ces mecanismes sont des points a journaliser prioritairement pour A09.
+- Fichiers:
+  - backend/config/packages/security.yaml
+  - backend/config/packages/rate_limiter.yaml
+  - backend/src/Security/Jwt/TokenVersionSubscriber.php
+
+[OK] Traces techniques CI disponibles
+- Les runs GitHub Actions produisent des logs d'execution exploitables pour diagnostic pipeline.
+- Fichiers:
+  - .github/workflows/*.yml
+
+[OK] Sensibilisation documentaire deja presente
+- Les docs projet identifient explicitement le besoin d'audit logs/admin logs/monitoring.
+- Fichiers:
+  - docs/SECURITY_OWASP.md
+  - docs/QUALITY_CRITERIA.md
+
+==================================================
+2) CE QUE TU N'AS PAS OU A RENFORCER
+==================================================
+
+[MANQUANT] Configuration de logging securite explicite dans le backend
+- Pas de configuration Monolog dediee trouvee dans backend/config/packages.
+- Pas de strategie visible de format, retention, rotation, correlation IDs, redaction PII.
+
+[MANQUANT] Journalisation applicative des evenements securite
+- Pas d'usage explicite de LoggerInterface dans backend/src.
+- Donc pas de traces metier securite codees pour:
+  - echecs d'authentification (avec contexte utile)
+  - acces refuses (authorization denied)
+  - actions admin sensibles (exports, changements roles/settings)
+  - anomalies metier (patterns suspects)
+
+[MANQUANT] Alerting operationnel
+- Pas de pipeline d'alerting (SIEM, webhook, email, Slack, PagerDuty) visible.
+- Pas de seuils d'alerte documentes (bruteforce, 401/403/429 burst, erreurs 5xx, actions admin anormales).
+
+[MANQUANT] Centralisation et protection d'integrite des logs
+- Pas de preuve de centralisation (ELK/OpenSearch/SaaS observability).
+- Pas de mecanisme visible d'immutabilite/tamper-evidence des logs applicatifs.
+
+[PARTIEL] Cas de test orientes detection/alerte
+- Les tests securite existent sur les controles, mais pas de tests verifies "event logged + alert raised".
+- OWASP A09 recommande de verifier que les attaques detectees declenchent une alerte exploitable.
+
+[PARTIEL] Gouvernance de reponse a incident
+- Checklists deployment/qualite presentes, mais playbooks d'escalade A09 peu formalises (qui alerte qui, sous quel delai, que faire).
+
+==================================================
+3) VERDICT RAPIDE
+==================================================
+
+Niveau actuel sur A09: FAIBLE a INTERMEDIAIRE.
+
+Forces:
+- controles securite applicatifs deja solides
+- codes d'erreur securite coherents
+- base documentaire qui identifie les besoins
+
+Gaps majeurs:
+- peu/pas de logs securite applicatifs explicites
+- pas d'alerting operationnel connecte
+- pas de centralisation/integrite formelle des journaux
+
+==================================================
+4) PRIORITES CONSEILLEES (ordre)
+==================================================
+
+1. Ajouter une politique de security logging (schema d'evenements, champs obligatoires, redaction PII, retention).
+2. Implementer LoggerInterface sur les points critiques: login fail, access denied, actions admin, changements de role, erreurs JWT/revocation.
+3. Configurer une stack de centralisation/monitoring (ex: ELK/OpenSearch/SaaS) avec correlation et recherche.
+4. Definir des alertes actionnables (seuils 401/403/429/5xx, bruteforce, anomalies admin) + canal d'escalade.
+5. Ecrire des tests d'observabilite securite (verification qu'un evenement critique produit un log et declenche l'alerte attendue).
+6. Documenter un playbook incident A09 (triage, owner, SLA, post-mortem).
+
+==================================================
+5) NOTE (POUR REPERAGE RAPIDE)
+==================================================
+
+Score estime: 42%
+Niveau: FAIBLE
+
+Grille:
+- 0-24% Critique
+- 25-44% Faible
+- 45-64% Intermediaire
+- 65-79% Correct
+- 80-89% Bon
+- 90-100% Excellent
+
+Note: score estime sur la base de l'audit statique actuel (code + config + docs visibles), sans test d'intrusion complet en prod.

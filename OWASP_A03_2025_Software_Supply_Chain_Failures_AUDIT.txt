@@ -1,0 +1,140 @@
+﻿Audit OWASP A03:2025 - Software Supply Chain Failures
+Date: 2026-07-18
+Perimetre: backend Symfony + frontend Next.js + GitHub Actions + Docker
+
+Reference:
+https://owasp.org/Top10/2025/A03_2025-Software_Supply_Chain_Failures/
+
+==================================================
+1) CE QUE TU AS (OK)
+==================================================
+
+[OK] Verrouillage des dependances (directes + transitives)
+- Backend: composer.lock present.
+- Frontend: package-lock.json present (avec integrity hashes npm).
+- Fichiers:
+  - backend/composer.lock
+  - frontend/package-lock.json
+
+[OK] Installation deterministic en Docker
+- Backend installe via composer install a partir de lockfile.
+- Frontend Docker utilise npm ci (bonne pratique reproductible).
+- Fichiers:
+  - backend/Dockerfile
+  - frontend/Dockerfile
+
+[OK] Presence d'un scan de securite statique dans CI (Semgrep)
+- Workflow dedie Security Scan avec regles OWASP/secrets/langages.
+- Fichier:
+  - .github/workflows/security-scanner.yml
+
+[OK] Versions de base explicitement choisies
+- Exemples: next 16.2.6, react 19.2.4, symfony 7.4.*, php >=8.4.
+- Fichiers:
+  - frontend/package.json
+  - backend/composer.json
+
+[OK] Processus de release trace (changelog/versions)
+- Release Please + changelog formate et pousse.
+- Fichier:
+  - .github/workflows/release.yml
+
+==================================================
+2) CE QUE TU N'AS PAS OU A RENFORCER
+==================================================
+
+[MANQUANT] Scan de vulnerabilites dependances automatise dans CI
+- Je ne vois pas d'etape CI explicite pour:
+  - npm audit
+  - composer audit
+  - SCA dedie (Dependabot alerts gate, Snyk, OSV scanner, Trivy deps)
+- Semgrep seul ne couvre pas le cycle complet des CVE sur transitive deps.
+
+[MANQUANT] SBOM (Software Bill of Materials)
+- Aucune generation/publication CycloneDX/SPDX detectee.
+- OWASP A03 recommande un SBOM central et maintenu.
+
+[MANQUANT] Dependabot/Renovate
+- Aucun fichier de gestion automatique de MAJ dependances detecte.
+- Pas de .github/dependabot.yml ni config Renovate.
+
+[PARTIEL] Security workflow present mais non branche dans pipeline principal
+- Le workflow Security Scan existe, mais le pipeline principal CI ne l'appelle pas.
+- Fichiers:
+  - .github/workflows/security-scanner.yml
+  - .github/workflows/ci-cd.yml
+
+[PARTIEL] Installs CI non deterministes cote frontend
+- Le workflow frontend utilise npm install (et meme install dynamique de paquets en test) au lieu de npm ci partout.
+- Cela augmente la variabilite de build et le risque supply-chain.
+- Fichier:
+  - .github/workflows/frontend-ci.yml
+
+[PARTIEL] Actions GitHub non pinnees par SHA
+- Les actions sont referencees par tags (v4, v6, etc.) plutot que commit SHA.
+- Bonne pratique A03: pin par SHA pour limiter risque de compromission upstream.
+- Fichiers:
+  - .github/workflows/*.yml
+
+[PARTIEL] Images Docker pinnees par tag, pas par digest
+- Exemples: php:8.4-cli-alpine, node:20-alpine, postgres:18-alpine, redis:7-alpine.
+- Bonne pratique: digest pinning + politique de mise a jour.
+- Fichiers:
+  - backend/Dockerfile
+  - frontend/Dockerfile
+  - docker-compose.yaml
+
+[PARTIEL] Aucune preuve de signature/provenance d'artefacts
+- Pas de cosign/sigstore, ni attestations de provenance detectees.
+- Pas de promotion d'artefact immuable visible dans ce repo.
+
+[PARTIEL] Gouvernance supply-chain peu formalisee
+- Je ne vois pas de CODEOWNERS/SECURITY.md repo-level pour process de triage vuln et roles de validation.
+- Cela complique separation of duties et revues critiques.
+
+==================================================
+3) VERDICT RAPIDE
+==================================================
+
+Niveau actuel sur A03: INTERMEDIAIRE.
+
+Points forts:
+- lockfiles en place
+- bases de versions explicites
+- scan Semgrep present
+
+Principaux gaps:
+- pas de SCA vulns automatise (composer/npm audit ou equivalent) en gate CI
+- pas de SBOM
+- pas d'auto-update deps (Dependabot/Renovate)
+- scan securite non integre au pipeline principal
+- pinning faible (actions/images par tag)
+
+==================================================
+4) PRIORITES CONSEILLEES (ordre)
+==================================================
+
+1. Integrer le workflow security-scanner dans .github/workflows/ci-cd.yml (job bloquant). (on le fait)
+2. Ajouter des jobs CI: composer audit et npm audit (avec seuil/strategie de fail). (on le fait)
+3. Mettre en place Dependabot (ou Renovate) pour mises a jour securite automatisees. (on le fait)
+4. Generer un SBOM CycloneDX (backend + frontend) a chaque release. (ntm)
+5. Passer frontend-ci de npm install a npm ci partout, et supprimer les installs dynamiques en job test. (on le fait peut être)
+6. Pinner les GitHub Actions par SHA et les images Docker par digest. (oskour)
+7. Ajouter une politique supply-chain documentee (triage CVE, delais  de patch, approbations). (on le fait)
+
+==================================================
+5) NOTE (POUR REPERAGE RAPIDE)
+==================================================
+
+Score estime: 58%
+Niveau: INTERMEDIAIRE
+
+Grille:
+- 0-24% Critique
+- 25-44% Faible
+- 45-64% Intermediaire
+- 65-79% Correct
+- 80-89% Bon
+- 90-100% Excellent
+
+Note: score estime sur la base de l'audit statique actuel (code + config + docs visibles), sans test d'intrusion complet en prod.

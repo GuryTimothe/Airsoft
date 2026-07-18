@@ -1,0 +1,137 @@
+﻿Audit OWASP A08:2025 - Software or Data Integrity Failures
+Date: 2026-07-18
+Perimetre: backend Symfony/API Platform + frontend Next.js + CI/CD GitHub Actions
+
+Reference:
+https://owasp.org/Top10/2025/A08_2025-Software_or_Data_Integrity_Failures/
+
+==================================================
+1) CE QUE TU AS (OK)
+==================================================
+
+[OK] Lockfiles presents (integrite des versions)
+- Backend: composer.lock
+- Frontend: package-lock.json (avec hashes integrity npm)
+- Cela limite les variations non voulues entre installations.
+
+[OK] Whitelist des plugins Composer
+- allow-plugins explicite dans composer.json (plugins autorises uniquement).
+- Reduit la surface d'execution de plugins non approuves.
+- Fichier:
+  - backend/composer.json
+
+[OK] Contraintes serveur sur champs sensibles (integrite metier)
+- Au register public, le role est force cote serveur a ROLE_USER, canSeePrivate force a false.
+- Evite qu'un client injecte des privileges via payload.
+- Fichier:
+  - backend/src/State/RegisterProcessor.php
+
+[OK] Garde-fous lors des updates utilisateurs
+- Restriction explicite des changements de role selon le role de l'acteur.
+- Blocage des changements de password via route non dediee.
+- Fichier:
+  - backend/src/State/UserUpdateProcessor.php
+
+[OK] Validation forte avant persistance
+- Validation Symfony + DTOs + contraintes d'entite avant ecriture.
+- Fichiers:
+  - backend/src/Dto/*.php
+  - backend/src/Entity/*.php
+
+[OK] Integrite de session JWT renforcee
+- Ajout et verification de jti, issuer, audience, signature de mot de passe et nonce de session.
+- Rejet des tokens invalides/revoques/inactifs.
+- Fichier:
+  - backend/src/Security/Jwt/TokenVersionSubscriber.php
+
+[OK] CI deja en place avec scans de securite
+- Workflows frontend/backend + scan Semgrep present.
+- Fichiers:
+  - .github/workflows/frontend-ci.yml
+  - .github/workflows/backend-ci.yml
+  - .github/workflows/security-scanner.yml
+
+==================================================
+2) CE QUE TU N'AS PAS OU A RENFORCER
+==================================================
+
+[PARTIEL] Integrite de pipeline CI/CD non durcie au niveau max
+- Les GitHub Actions sont majoritairement referencees par tags (v4, v2...) et non par commit SHA.
+- Bonne pratique A08: pinning par SHA pour limiter le risque de compromission upstream.
+- Fichiers:
+  - .github/workflows/*.yml
+
+[PARTIEL] Installs non deterministes dans CI
+- Frontend CI utilise npm install (et installe dynamiquement des paquets en job test).
+- Backend CI fait des composer require en pipeline (modifie le set de deps au runtime CI).
+- Ceci affaiblit la reproductibilite et l'integrite des builds.
+- Fichiers:
+  - .github/workflows/frontend-ci.yml
+  - .github/workflows/backend-ci.yml
+
+[PARTIEL] Absence de preuve de signature/attestation d'artefacts
+- Pas de cosign/sigstore/SLSA attestations detectees dans le repo.
+- Pas de verification explicite de provenance d'artefacts avant deploiement.
+
+[PARTIEL] Security scan non integre explicitement comme gate du pipeline principal
+- Le workflow security-scanner existe, mais n'est pas appele dans ci-cd.yml.
+- Fichiers:
+  - .github/workflows/security-scanner.yml
+  - .github/workflows/ci-cd.yml
+
+[PARTIEL] Flux logout decode le payload JWT sans verification cryptographique dans ce controleur
+- Le controleur extrait jti/exp depuis token base64 decode pour la revocation.
+- La validation forte du token existe dans la couche JWT globale, mais ce point merite d'etre explicite/documente pour eviter toute ambiguite de confiance locale.
+- Fichier:
+  - backend/src/Controller/LogoutController.php
+
+[MANQUANT] Politique formelle d'integrite logicielle et donnees
+- Pas d'artefact visible de type policy "artifact trust", "provenance", "signature verification", "build provenance".
+- A formaliser pour A08.
+
+==================================================
+3) VERDICT RAPIDE
+==================================================
+
+Niveau actuel sur A08: INTERMEDIAIRE.
+
+Forces:
+- verrouillage des dependances par lockfiles
+- contraintes serveur sur donnees critiques (roles/champs sensibles)
+- verification d'integrite JWT solide cote backend
+
+Gaps principaux:
+- reproductibilite CI perfectible (npm install + installs dynamiques + composer require en job)
+- absence de signatures/attestations de provenance
+- pinning des actions non strict (pas SHA)
+- scan securite pas branche explicitement en gate globale
+
+==================================================
+4) PRIORITES CONSEILLEES (ordre)
+==================================================
+
+1. Pinner toutes les GitHub Actions par commit SHA (au lieu des tags version). (on le fait)
+2. Rendre les builds CI deterministes: (on le fait)
+   - frontend: npm ci partout, supprimer les installs dynamiques en cours de job
+   - backend: supprimer les composer require en pipeline, utiliser strictement composer.lock
+3. Integrer security-scanner comme job obligatoire dans .github/workflows/ci-cd.yml. (on le fait)
+4. Ajouter verification de provenance/signature des artefacts (ex: cosign + attestations). 
+5. Formaliser une policy A08 d'integrite (sources de confiance, verification, promotion d'artefacts immuables).
+6. Revoir/documenter le flux logout pour clarifier les hypotheses de confiance sur les donnees JWT decodees localement. (on le fait)
+
+==================================================
+5) NOTE (POUR REPERAGE RAPIDE)
+==================================================
+
+Score estime: 57%
+Niveau: INTERMEDIAIRE
+
+Grille:
+- 0-24% Critique
+- 25-44% Faible
+- 45-64% Intermediaire
+- 65-79% Correct
+- 80-89% Bon
+- 90-100% Excellent
+
+Note: score estime sur la base de l'audit statique actuel (code + config + docs visibles), sans test d'intrusion complet en prod.

@@ -1,0 +1,126 @@
+﻿Audit OWASP A07:2025 - Authentication Failures
+Date: 2026-07-18
+Perimetre: backend Symfony/API Platform + frontend Next.js
+
+Reference:
+https://owasp.org/Top10/2025/A07_2025-Authentication_Failures/
+
+==================================================
+1) CE QUE TU AS (OK)
+==================================================
+
+[OK] Auth centralisee via Symfony Security + Lexik JWT
+- Firewall dedie login + firewall JWT sur /api protegee.
+- Acces control explicite sur routes publiques/privees.
+- Fichier:
+  - backend/config/packages/security.yaml
+
+[OK] Protection contre bruteforce / credential stuffing de base
+- login_throttling actif sur /api/login.
+- Rate limiting supplementaire par IP sur /api/login et /api/register (429 + Retry-After).
+- Fichiers:
+  - backend/config/packages/security.yaml
+  - backend/config/packages/rate_limiter.yaml
+  - backend/src/Security/LoginRequestRateLimiterSubscriber.php
+
+[OK] Mots de passe forts en creation de compte
+- Politique frontend exigeante (>= 12, minuscule, majuscule, chiffre, symbole).
+- Hashing serveur via password_hashers auto (bcrypt/argon selon config Symfony).
+- Fichiers:
+  - frontend/src/lib/schemas/auth.ts
+  - backend/config/packages/security.yaml
+
+[OK] Anti-enumeration sur login
+- Message d'erreur generique identique en echec auth.
+- Fichier:
+  - backend/src/Security/Jwt/GenericAuthenticationFailureHandler.php
+
+[OK] Hygiene session/token JWT avancee
+- Validation claims iss/aud.
+- jti unique + nonce de session + signature liee au hash password.
+- Invalidation/revocation token et activite via Redis.
+- Cookie auth HttpOnly + SameSite=Lax.
+- Fichiers:
+  - backend/config/packages/lexik_jwt_authentication.yaml
+  - backend/src/Security/Jwt/TokenVersionSubscriber.php
+  - backend/src/Security/Jwt/JwtCookieManager.php
+  - backend/src/Security/Jwt/JwtRevocationStore.php
+
+[OK] Rotation session apres changement mot de passe
+- Changement de password force rotation nonce => anciens tokens invalides.
+- Fichier:
+  - backend/src/State/MePasswordUpdateProcessor.php
+
+[OK] Tests securite presents sur flux JWT sensibles
+- Tests unitaires robustes sur revocation/nonce/invalidation.
+- Fichiers:
+  - backend/tests/Security/Jwt/JwtRevocationStoreTest.php
+  - backend/tests/Security/Jwt/TokenVersionSubscriberTest.php
+  - backend/tests/State/MePasswordUpdateProcessorTest.php
+
+==================================================
+2) CE QUE TU N'AS PAS OU A RENFORCER
+==================================================
+
+[PARTIEL] MFA / 2FA absent
+- Pas d'implementation MFA (TOTP/WebAuthn/passkeys) detectee.
+- C'est un gros plus OWASP A07 pour comptes sensibles (admin/organizer).
+
+[PARTIEL] Recuperation de compte oubli mot de passe
+- Pas de flux "forgot/reset password" public avec token time-boxed detecte.
+- Seulement changement mot de passe pour utilisateur deja authentifie.
+
+[PARTIEL] Verification mot de passe contre bases compromises
+- Pas de controle visible type HaveIBeenPwned/k-anonymity sur creation/changement mdp.
+
+[PARTIEL] Uniformisation stricte des timeouts de session
+- Inactivite JWT geree via Redis, mais politique complete (inactivity + absolute timeout + docs d'exploitation)
+  pourrait etre formalisee davantage.
+
+[PARTIEL] Alerting securite auth (liaison A09)
+- Protection anti-bruteforce en place, mais pas de preuve claire d'alerting SOC
+  sur patterns d'attaques auth repetes.
+
+==================================================
+3) VERDICT RAPIDE
+==================================================
+
+Niveau actuel sur A07: BON (proche Correct+ / Bon solide).
+
+Tu es globalement bien fini sur l'auth core:
+- stack auth saine
+- throttling/restrictions en place
+- tokens JWT bien verifies et revocables
+- messages d'erreur non verbeux
+
+Ce qui t'empeche de viser "Excellent":
+- pas de MFA
+- pas de reset password public securise
+- pas de controle de mdp compromis
+
+==================================================
+4) PRIORITES CONSEILLEES (ordre)
+==================================================
+
+1. Ajouter MFA au moins pour ROLE_ADMIN / ROLE_SUPER_ADMIN (TOTP ou WebAuthn/passkeys).
+2. Implementer un flux forgot/reset password securise (token court, one-time, revoke on use).
+3. Verifier les nouveaux mots de passe contre listes de credentials compromis (k-anonymity).
+4. Formaliser la politique de session (idle timeout + absolute timeout + invalidation cross-device).
+5. Connecter l'auth a un alerting operationnel (seuils bruteforce/password spray) en continu.
+
+==================================================
+5) NOTE (POUR REPERAGE RAPIDE)
+==================================================
+
+Score estime: 84%
+Niveau: BON
+
+Grille:
+- 0-24% Critique
+- 25-44% Faible
+- 45-64% Intermediaire
+- 65-79% Correct
+- 80-89% Bon
+- 90-100% Excellent
+
+Note: score estime sur la base de l'audit statique actuel (code + config + docs visibles), sans test d'intrusion complet en prod.
