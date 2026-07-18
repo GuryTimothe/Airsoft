@@ -368,39 +368,69 @@ npm audit  # Check vulnerabilities
 
 ### ✓ Implémenté
 
-**Authentication Method**: JWT Bearer tokens
+**Authentication Method**: JWT (cookie httpOnly + Bearer fallback)
 
 ```php
 // Login endpoint: POST /api/login
-// Returns: {token, user}
-// Token used in: Authorization: Bearer <token>
+// Cookie auth: ma_access_token (httpOnly, SameSite=Lax)
+// Fallback API clients: Authorization: Bearer <token>
 ```
 
-**Session Management**:
+**Session & Token Management**:
 
 ```php
 // Token TTL: 1 hour (3600 seconds)
 // Expired tokens return 401 Unauthorized
-// Token rotation on password change (nonce system)
+// JWT inactivity timeout: sliding window (JWT_INACTIVITY_TIMEOUT)
+// Token invalidation on password/email changes (pwd_sig + nonce)
+// Issuer/Audience claims validated (iss, aud)
 ```
+
+**Brute-force Protection**:
+
+```yaml
+# config/packages/security.yaml
+login_throttling:
+  max_attempts: 3
+  interval: "5 minutes"
+
+# config/packages/rate_limiter.yaml
+login_request_limiter: 3 req / 5 min (IP)
+register_request_limiter: 3 req / 5 min (IP)
+```
+
+**CSRF Protection (auth bootstrap)**:
+
+```php
+// GET /api/csrf/token -> token CSRF
+// POST /api/login requires X-CSRF-Token for browser-style requests
+// Invalid/missing token -> 403 "Requête invalide."
+```
+
+**Transport & Cookie Hardening**:
+
+- Cookie d'authentification `ma_access_token` en `httpOnly`
+- `SameSite=Lax`
+- `secure` activé selon contexte HTTPS
 
 **Password Policy**:
 
-Currently no enforced policy. Recommended:
-- Minimum 8 characters
-- Mix of uppercase, lowercase, numbers, special chars
-- No dictionary words
+Minimum enforced via validation backend:
+
+- Longueur minimale 12 caractères
+- Complexité requise (majuscule, minuscule, chiffre, symbole)
+- Hashage fort via `password_hashers: auto` (bcrypt/argon2 selon environnement)
 
 **Tests**:
 - ✓ `tests/Security/Jwt/TokenVersionSubscriberTest.php` (100%)
-- ✓ Login/logout test cases
+- ✓ Login/logout + invalidation JWT
+- ✓ Rate limiting observé en runtime (`429 Too Many Requests`)
 
 ### ❌ Non Implémenté
 
-- [ ] **Rate limiting on login** - Brute force prevention missing
 - [ ] **Account lockout** - After N failed attempts
 - [ ] **Password reset flow** - Not implemented
-- [ ] **Session timeout** - Fixed TTL only, no inactivity tracking
+- [ ] **MFA / step-up authentication** - Not implemented
 - [ ] **Login attempt logging** - Audit trail missing
 
 ---
@@ -498,7 +528,7 @@ fix: corriger validation email
 | A4 - Insecure Design | ✓ | - | Formal STRIDE | 5 processors de sécurité, race-condition traitée |
 | A5 - Security Misconfiguration | ✓ | - | Security headers prod | .env, CORS restrictif |
 | A6 - Vulnerable Components | ✓ | - | Auto updates | composer/npm versions stables |
-| A7 - Authentication Failures | ✓ | - | Rate limiting | JWT auth, token rotation |
+| A7 - Authentication Failures | ✓ | - | MFA, password reset, audit logs | JWT auth, CSRF login, rate limiting |
 | A8 - Integrity Failures | - | ✓ | Signed commits | Conventional Commits + branch protection |
 | A9 - Logging & Monitoring | - | ✓ | Audit logs | Monolog erreurs, logs CI/CD |
 | A10 - SSRF | ✓ | - | - | N/A |
@@ -509,13 +539,13 @@ fix: corriger validation email
 
 ## Recommandations Prioritaires
 
-1. **Rate Limiting** (Auth endpoints) - Brute force protection
+1. **MFA Support** - TOTP or passkeys for privileged accounts
 2. **Audit Logging** - Track admin actions & failed access
 3. **Security Headers** - CSP, HSTS (production)
 4. **Password Policy** - Enforce complexity requirements
 5. **Penetration Testing** - Formal security audit
 6. **Monitoring & Alerting** - Error rate, suspicious patterns
-7. **MFA Support** - TOTP or SMS second factor
+7. **Password Reset Flow** - Secure token-based reset with expiry
 8. **HTTPS Enforcement** - HSTS header
 
 ---

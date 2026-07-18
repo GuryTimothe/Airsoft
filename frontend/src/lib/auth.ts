@@ -3,11 +3,51 @@ import type { LoginInput } from "@/lib/schemas/auth";
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 export const AUTH_TOKEN_KEY = "ma_access_token";
 export const AUTH_STATE_CHANGE_EVENT = "auth-state-changed";
-
-let authExpiryTimeout: number | null = null;
+const INVALID_CREDENTIALS_MESSAGE = "Identifiants invalides.";
+const LOGIN_CSRF_HEADER_NAME = "X-CSRF-Token";
+const CSRF_TOKEN_ENDPOINT = "/api/csrf/token";
 
 function buildUrl(path: string): string {
   return `${API_BASE_URL}${path}`;
+}
+
+async function fetchCsrfToken(): Promise<string> {
+  const csrfTokenResponse = await fetch(buildUrl(CSRF_TOKEN_ENDPOINT), {
+    method: "GET",
+    credentials: "include",
+    cache: "no-store",
+  });
+
+  let csrfTokenData: unknown = null;
+  try {
+    csrfTokenData = await csrfTokenResponse.json();
+  } catch {
+    csrfTokenData = null;
+  }
+
+  const csrfToken =
+    typeof csrfTokenData === "object" &&
+    csrfTokenData !== null &&
+    typeof (csrfTokenData as { csrfToken?: unknown }).csrfToken === "string"
+      ? (csrfTokenData as { csrfToken: string }).csrfToken
+      : "";
+
+  if (!csrfTokenResponse.ok || !csrfToken) {
+    throw new Error("Impossible d'initialiser la session.");
+  }
+
+  return csrfToken;
+}
+
+export async function withCsrfHeaders(
+  headers: HeadersInit = {},
+): Promise<HeadersInit> {
+  const csrfToken = await fetchCsrfToken();
+
+  return {
+    ...headers,
+    [LOGIN_CSRF_HEADER_NAME]: csrfToken,
+  };
 }
 
 async function parseApiErrorMessage(response: Response): Promise<string> {
@@ -45,67 +85,16 @@ type RegisterPayload = {
   phone?: string;
 };
 
-function getBrowserCookieValue(name: string): string | null {
-  if (typeof document === "undefined") {
-    return null;
-  }
-
-  const prefix = `${name}=`;
-  const match = document.cookie
-    .split(";")
-    .map((value) => value.trim())
-    .find((value) => value.startsWith(prefix));
-
-  if (!match) {
-    return null;
-  }
-
-  try {
-    return decodeURIComponent(match.slice(prefix.length));
-  } catch {
-    return match.slice(prefix.length);
-  }
-}
-
 export function getAuthToken(): string | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  const localStorageToken = window.localStorage.getItem(AUTH_TOKEN_KEY);
-  if (localStorageToken) {
-    if (isTokenExpired(localStorageToken)) {
-      clearAuthToken();
-
-      return null;
-    }
-
-    return localStorageToken;
-  }
-
-  const cookieToken = getBrowserCookieValue(AUTH_TOKEN_KEY);
-  if (cookieToken) {
-    if (isTokenExpired(cookieToken)) {
-      clearAuthToken();
-
-      return null;
-    }
-
-    window.localStorage.setItem(AUTH_TOKEN_KEY, cookieToken);
-    scheduleTokenExpiry(cookieToken);
-  }
-
-  return cookieToken;
+  // JWT is intentionally kept in an httpOnly cookie and must not be exposed to browser JS.
+  return null;
 }
 
-export function setAuthToken(token: string): void {
+export function setAuthToken(_token: string): void {
   if (typeof window === "undefined") {
     return;
   }
 
-  window.localStorage.setItem(AUTH_TOKEN_KEY, token);
-  document.cookie = `${AUTH_TOKEN_KEY}=${encodeURIComponent(token)}; path=/; max-age=604800; samesite=lax`;
-  scheduleTokenExpiry(token);
   window.dispatchEvent(new Event(AUTH_STATE_CHANGE_EVENT));
 }
 
@@ -114,25 +103,13 @@ export function clearAuthToken(): void {
     return;
   }
 
-  clearAuthExpiryTimeout();
-  window.localStorage.removeItem(AUTH_TOKEN_KEY);
-  document.cookie = `${AUTH_TOKEN_KEY}=; path=/; max-age=0; samesite=lax`;
   window.dispatchEvent(new Event(AUTH_STATE_CHANGE_EVENT));
 }
 
 export async function logout(): Promise<void> {
-  const token = getAuthToken();
-
-  if (!token) {
-    clearAuthToken();
-    return;
-  }
-
   const response = await fetch(buildUrl("/api/logout"), {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    credentials: "include",
   });
 
   if (!response.ok && response.status !== 401) {
@@ -196,37 +173,6 @@ function isTokenExpired(token: string | null): boolean {
   }
 
   return Date.now() >= expirationTimestamp;
-}
-
-function clearAuthExpiryTimeout(): void {
-  if (authExpiryTimeout !== null) {
-    window.clearTimeout(authExpiryTimeout);
-    authExpiryTimeout = null;
-  }
-}
-
-function scheduleTokenExpiry(token: string): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  clearAuthExpiryTimeout();
-
-  const expirationTimestamp = getTokenExpirationTimestamp(token);
-  if (expirationTimestamp === null) {
-    return;
-  }
-
-  const delay = expirationTimestamp - Date.now();
-  if (delay <= 0) {
-    clearAuthToken();
-
-    return;
-  }
-
-  authExpiryTimeout = window.setTimeout(() => {
-    clearAuthToken();
-  }, delay);
 }
 
 export function getRolesFromToken(token: string | null): string[] {
@@ -307,8 +253,11 @@ async function getServerAuthToken(): Promise<string | null> {
 export async function getAuthHeaders(
   headers: HeadersInit = {},
 ): Promise<HeadersInit> {
-  const token =
-    typeof window !== "undefined" ? getAuthToken() : await getServerAuthToken();
+  if (typeof window !== "undefined") {
+    return headers;
+  }
+
+  const token = await getServerAuthToken();
 
   if (!token) {
     return headers;
@@ -321,11 +270,14 @@ export async function getAuthHeaders(
 }
 
 export async function login(payload: LoginInput): Promise<string> {
+  const headers = await withCsrfHeaders({
+    "Content-Type": "application/json",
+  });
+
   const response = await fetch(buildUrl("/api/login"), {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    credentials: "include",
+    headers,
     body: JSON.stringify(payload),
   });
 
@@ -337,30 +289,12 @@ export async function login(payload: LoginInput): Promise<string> {
   }
 
   if (!response.ok) {
-    const errorMessage =
-      typeof data === "object" &&
-      data !== null &&
-      typeof (data as { message?: unknown }).message === "string"
-        ? (data as { message: string }).message
-        : "Email ou mot de passe invalide.";
-
-    throw new Error(errorMessage);
+    throw new Error(INVALID_CREDENTIALS_MESSAGE);
   }
 
-  const token =
-    typeof data === "object" &&
-    data !== null &&
-    typeof (data as { token?: unknown }).token === "string"
-      ? (data as { token: string }).token
-      : null;
+  window.dispatchEvent(new Event(AUTH_STATE_CHANGE_EVENT));
 
-  if (!token) {
-    throw new Error("Réponse de connexion invalide: token manquant.");
-  }
-
-  setAuthToken(token);
-
-  return token;
+  return "";
 }
 
 export async function registerUser(payload: RegisterPayload): Promise<void> {

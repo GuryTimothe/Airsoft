@@ -18,8 +18,18 @@ export const registerSchema = z
     email: z.string().email({ message: "Email invalide" }),
     password: z
       .string()
-      .min(8, { message: "Mot de passe trop court (8 caractères)" }),
-    confirm: z.string().min(8, { message: "Confirmation requise" }),
+      .min(12, { message: "Mot de passe trop court (12 caractères)" })
+      .regex(/[a-z]/, {
+        message: "Le mot de passe doit contenir une minuscule",
+      })
+      .regex(/[A-Z]/, {
+        message: "Le mot de passe doit contenir une majuscule",
+      })
+      .regex(/\d/, { message: "Le mot de passe doit contenir un chiffre" })
+      .regex(/[^\w\s]/, {
+        message: "Le mot de passe doit contenir un symbole",
+      }),
+    confirm: z.string().min(12, { message: "Confirmation requise" }),
     dateOfBirth: z
       .string()
       .min(1, { message: "Date de naissance requise" })

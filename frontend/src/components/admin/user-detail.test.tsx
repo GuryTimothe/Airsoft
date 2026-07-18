@@ -11,21 +11,15 @@ jest.mock("next/navigation", () => ({
 jest.mock("@/lib/user-api", () => ({
   getUser: jest.fn(),
   deleteUser: jest.fn(),
+  getCurrentUser: jest.fn(),
 }));
 
-jest.mock("@/lib/auth", () => ({
-  getAuthToken: jest.fn(),
-  getRolesFromToken: jest.fn(),
-}));
-
-import { getUser } from "@/lib/user-api";
-import { getAuthToken, getRolesFromToken } from "@/lib/auth";
+import { getCurrentUser, getUser } from "@/lib/user-api";
 
 describe("UserDetail", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (getAuthToken as jest.Mock).mockReturnValue(null);
-    (getRolesFromToken as jest.Mock).mockReturnValue([]);
+    (getCurrentUser as jest.Mock).mockResolvedValue({ role: "ROLE_USER" });
   });
 
   it("renders emergency contact card when a contact exists", async () => {
@@ -106,8 +100,7 @@ describe("UserDetail", () => {
   });
 
   it("disables edit and delete actions for admin actor on elevated targets", async () => {
-    (getAuthToken as jest.Mock).mockReturnValue("token");
-    (getRolesFromToken as jest.Mock).mockReturnValue(["ROLE_ADMIN"]);
+    (getCurrentUser as jest.Mock).mockResolvedValue({ role: "ROLE_ADMIN" });
     (getUser as jest.Mock).mockResolvedValue({
       id: 11,
       firstname: "Ada",

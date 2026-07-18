@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -14,12 +14,12 @@ import {
 } from "@/components/ui/table";
 import { Eye, PencilLine } from "lucide-react";
 import {
+  getCurrentUser,
   getUsers,
   type CollectionView,
   type User,
   type UserRole,
 } from "@/lib/user-api";
-import { getAuthToken, getRolesFromToken } from "@/lib/auth";
 
 type UserTableProps = {
   initialUsers: User[];
@@ -67,10 +67,7 @@ export default function UserTable({
   initialView,
   referenceDateIso,
 }: UserTableProps) {
-  const actorRoles = getRolesFromToken(getAuthToken());
-  const isAdminOnlyActor =
-    actorRoles.includes("ROLE_ADMIN") &&
-    !actorRoles.includes("ROLE_SUPER_ADMIN");
+  const [isAdminOnlyActor, setIsAdminOnlyActor] = useState(false);
   const [roleFilter, setRoleFilter] = useState<UserRole | "all">("all");
   const [privateFilter, setPrivateFilter] = useState<"all" | "yes" | "no">(
     "all",
@@ -79,6 +76,29 @@ export default function UserTable({
   const [view, setView] = useState<CollectionView | undefined>(initialView);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageLoading, setPageLoading] = useState(false);
+
+  useEffect(() => {
+    let isDisposed = false;
+
+    async function loadActorRole() {
+      try {
+        const currentUser = await getCurrentUser();
+        if (!isDisposed) {
+          setIsAdminOnlyActor(currentUser.role === "ROLE_ADMIN");
+        }
+      } catch {
+        if (!isDisposed) {
+          setIsAdminOnlyActor(false);
+        }
+      }
+    }
+
+    void loadActorRole();
+
+    return () => {
+      isDisposed = true;
+    };
+  }, []);
 
   function extractPage(url?: string): number | null {
     if (!url) return null;

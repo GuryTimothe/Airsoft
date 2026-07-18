@@ -30,7 +30,11 @@ class RegisterInput
     #[ApiProperty]
     #[Groups(['user:write'])]
     #[Assert\NotBlank(message: 'Le mot de passe est requis.')]
-    #[Assert\Length(min: 8, max: 255, minMessage: 'Le mot de passe doit contenir au moins 8 caractères.')]
+    #[Assert\Length(min: 12, max: 255, minMessage: 'Le mot de passe doit contenir au moins 12 caractères.')]
+    #[Assert\Regex(
+        pattern: '/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\w\s]).+$/',
+        message: 'Le mot de passe doit contenir une majuscule, une minuscule, un chiffre et un symbole.'
+    )]
     public ?string $password = null;
 
     #[ApiProperty]

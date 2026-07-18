@@ -31,8 +31,8 @@ describe("registerSchema", () => {
     lastname: "Dupont",
     firstname: "Jean",
     email: "jean@example.com",
-    password: "Password123",
-    confirm: "Password123",
+    password: "Password1234!",
+    confirm: "Password1234!",
     dateOfBirth: "1990-01-15",
   };
 
@@ -171,8 +171,8 @@ describe("Age calculation edge cases", () => {
     lastname: "Dupont",
     firstname: "Jean",
     email: "jean@example.com",
-    password: "Password123",
-    confirm: "Password123",
+    password: "Password1234!",
+    confirm: "Password1234!",
   };
 
   it("correctly identifies person as 17 years old (still minor)", () => {

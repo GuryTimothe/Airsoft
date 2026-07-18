@@ -61,10 +61,23 @@ async function countAllUsers(): Promise<number> {
 }
 
 export default async function AdminDashboard() {
-  const [{ games, totalItems }, usersCount] = await Promise.all([
-    getAllGames(),
-    countAllUsers(),
-  ]);
+  let games: Game[] = [];
+  let totalItems: number | undefined;
+  let usersCount = 0;
+  let dashboardError: string | null = null;
+
+  try {
+    const [gamesResult, usersTotal] = await Promise.all([
+      getAllGames(),
+      countAllUsers(),
+    ]);
+    games = gamesResult.games;
+    totalItems = gamesResult.totalItems;
+    usersCount = usersTotal;
+  } catch {
+    dashboardError =
+      "Impossible de charger toutes les statistiques du dashboard pour le moment.";
+  }
 
   const gamesCount = totalItems ?? games.length;
   // eslint-disable-next-line react-hooks/purity -- server-rendered timestamp used as one-shot cutoff for upcoming games list
@@ -80,6 +93,12 @@ export default async function AdminDashboard() {
   return (
     <main className="p-8 space-y-8">
       <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+
+      {dashboardError ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          {dashboardError}
+        </div>
+      ) : null}
 
       <div className="grid md:grid-cols-2 gap-4">
         <Card>

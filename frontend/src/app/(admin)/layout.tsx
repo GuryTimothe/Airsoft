@@ -5,7 +5,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { Sidebar } from "@/components/admin/Sidebar";
 import { Header } from "@/components/admin/Header";
 import { Footer } from "@/components/admin/Footer";
-import { getAuthToken } from "@/lib/auth";
 import { getCurrentUser, type UserRole } from "@/lib/user-api";
 
 export default function AdminLayout({
@@ -24,15 +23,6 @@ export default function AdminLayout({
     let isDisposed = false;
 
     async function verifyAccess() {
-      if (!getAuthToken()) {
-        if (!isDisposed) {
-          setIsAllowed(false);
-          setIsCheckingAccess(false);
-        }
-        router.replace("/auth/login");
-        return;
-      }
-
       try {
         const currentUser = await getCurrentUser();
         const canAccessAdminDashboard =

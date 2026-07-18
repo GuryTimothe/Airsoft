@@ -35,4 +35,9 @@ class RedisJwtClient
     {
         return (int) $this->client->exists($key);
     }
+
+    public function del(string $key): int
+    {
+        return (int) $this->client->del([$key]);
+    }
 }

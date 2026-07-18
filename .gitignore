@@ -1,0 +1,5 @@
+.env
+.env.local
+backend/.env.local
+backend/.env.local.php
+node_modules

@@ -6,12 +6,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  AUTH_STATE_CHANGE_EVENT,
-  getAuthToken,
-  hasAdminAccessToken,
-  logout,
-} from "@/lib/auth";
+import { AUTH_STATE_CHANGE_EVENT, logout } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/user-api";
 
 type HeaderProps = {
   initialIsAuthenticated: boolean;
@@ -48,22 +44,33 @@ export function Header({
   }
 
   useEffect(() => {
-    const syncAuthState = () => {
-      const isLoggedIn = Boolean(getAuthToken());
+    const syncAuthState = async () => {
+      try {
+        const currentUser = await getCurrentUser();
+        const canAccessAdmin =
+          currentUser.role === "ROLE_ADMIN" ||
+          currentUser.role === "ROLE_SUPER_ADMIN" ||
+          currentUser.role === "ROLE_ORGANIZER";
 
-      setIsAuthenticated(isLoggedIn);
-      setHasAdminAccess(isLoggedIn && hasAdminAccessToken());
+        setIsAuthenticated(true);
+        setHasAdminAccess(canAccessAdmin);
+      } catch {
+        setIsAuthenticated(false);
+        setHasAdminAccess(false);
+      }
     };
 
-    syncAuthState();
-    window.addEventListener("storage", syncAuthState);
-    window.addEventListener("focus", syncAuthState);
-    window.addEventListener(AUTH_STATE_CHANGE_EVENT, syncAuthState);
+    void syncAuthState();
+    const syncOnEvent = () => {
+      void syncAuthState();
+    };
+
+    window.addEventListener("focus", syncOnEvent);
+    window.addEventListener(AUTH_STATE_CHANGE_EVENT, syncOnEvent);
 
     return () => {
-      window.removeEventListener("storage", syncAuthState);
-      window.removeEventListener("focus", syncAuthState);
-      window.removeEventListener(AUTH_STATE_CHANGE_EVENT, syncAuthState);
+      window.removeEventListener("focus", syncOnEvent);
+      window.removeEventListener(AUTH_STATE_CHANGE_EVENT, syncOnEvent);
     };
   }, []);
 

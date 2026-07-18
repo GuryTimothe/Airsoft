@@ -22,6 +22,10 @@ RUN composer install --no-interaction --no-progress --prefer-dist --no-scripts
 
 COPY . .
 
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh \
+    && chown app-user:app-group /app/docker-entrypoint.sh
+
 RUN mkdir -p var/cache var/log \
     && chown -R app-user:app-group /app
 
@@ -29,6 +33,6 @@ USER app-user
 
 EXPOSE 8000
 
-ENTRYPOINT ["/sbin/tini", "--"]
+ENTRYPOINT ["/sbin/tini", "--", "/app/docker-entrypoint.sh"]
 
 CMD ["php", "-S", "0.0.0.0:8000", "-t", "public"]

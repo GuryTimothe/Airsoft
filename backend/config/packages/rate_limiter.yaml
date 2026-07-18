@@ -1,0 +1,17 @@
+framework:
+  rate_limiter:
+    login_request_limiter:
+      policy: fixed_window
+      limit: 3
+      interval: "5 minutes"
+      cache_pool: rate_limiter
+    register_request_limiter:
+      policy: fixed_window
+      limit: 3
+      interval: "5 minutes"
+      cache_pool: rate_limiter
+    login_attempt_limiter:
+      policy: sliding_window
+      limit: 3
+      interval: "5 minutes"
+      cache_pool: rate_limiter

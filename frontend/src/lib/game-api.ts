@@ -1,4 +1,4 @@
-import { getAuthHeaders } from "@/lib/auth";
+import { getAuthHeaders, withCsrfHeaders } from "@/lib/auth";
 import { getApiBaseUrl } from "@/lib/api-base-url";
 
 export interface Game {
@@ -161,9 +161,10 @@ export async function getGame(id: number): Promise<Game> {
 }
 
 export async function createGame(payload: GamePayload): Promise<Game> {
-  const headers = await getAuthHeaders({
+  let headers = await getAuthHeaders({
     "Content-Type": "application/ld+json",
   });
+  headers = await withCsrfHeaders(headers);
   const response = await fetch(buildUrl("/api/games"), {
     method: "POST",
     headers,
@@ -182,9 +183,10 @@ export async function updateGame(
   id: number,
   payload: GamePayload,
 ): Promise<Game> {
-  const headers = await getAuthHeaders({
+  let headers = await getAuthHeaders({
     "Content-Type": "application/ld+json",
   });
+  headers = await withCsrfHeaders(headers);
   const response = await fetch(buildUrl(`/api/games/${id}`), {
     method: "PUT",
     headers,
@@ -200,7 +202,8 @@ export async function updateGame(
 }
 
 export async function deleteGame(id: number): Promise<void> {
-  const headers = await getAuthHeaders();
+  let headers = await getAuthHeaders();
+  headers = await withCsrfHeaders(headers);
   const response = await fetch(buildUrl(`/api/games/${id}`), {
     method: "DELETE",
     headers,

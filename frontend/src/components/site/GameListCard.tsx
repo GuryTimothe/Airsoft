@@ -6,12 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, MapPin, Euro, Lock, Users } from "lucide-react";
 import Link from "next/link";
-import {
-  AUTH_STATE_CHANGE_EVENT,
-  getAuthToken,
-  hasAdminAccessToken,
-} from "@/lib/auth";
+import { AUTH_STATE_CHANGE_EVENT } from "@/lib/auth";
 import { getGames, type Game } from "@/lib/game-api";
+import { getCurrentUser } from "@/lib/user-api";
 import {
   cancelGameRegistration,
   getMyGameRegistrations,
@@ -137,10 +134,22 @@ export function GameListCard() {
     games: Game[];
     registrations: GameRegistration[];
   }> => {
-    const hasToken = getAuthToken() !== null;
-    const hasAdminAccess = hasAdminAccessToken();
+    let hasToken = false;
+    let hasAdminAccess = false;
 
     const fetchedGames = await getGames();
+
+    try {
+      const currentUser = await getCurrentUser();
+      hasToken = true;
+      hasAdminAccess =
+        currentUser.role === "ROLE_ADMIN" ||
+        currentUser.role === "ROLE_SUPER_ADMIN" ||
+        currentUser.role === "ROLE_ORGANIZER";
+    } catch {
+      hasToken = false;
+      hasAdminAccess = false;
+    }
 
     if (hasToken) {
       let registrations: GameRegistration[] = [];
@@ -202,10 +211,23 @@ export function GameListCard() {
 
   useEffect(() => {
     async function handleAuthStateChange(): Promise<void> {
-      const hasToken = getAuthToken() !== null;
+      let hasToken = false;
+      let hasAdminAccess = false;
+
+      try {
+        const currentUser = await getCurrentUser();
+        hasToken = true;
+        hasAdminAccess =
+          currentUser.role === "ROLE_ADMIN" ||
+          currentUser.role === "ROLE_SUPER_ADMIN" ||
+          currentUser.role === "ROLE_ORGANIZER";
+      } catch {
+        hasToken = false;
+        hasAdminAccess = false;
+      }
 
       setIsAuthenticated(hasToken);
-      setCanBypassFullCapacity(hasAdminAccessToken());
+      setCanBypassFullCapacity(hasAdminAccess);
 
       if (!hasToken) {
         setMyRegistrations([]);

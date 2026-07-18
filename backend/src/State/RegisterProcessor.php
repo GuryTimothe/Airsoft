@@ -8,8 +8,10 @@ use ApiPlatform\Validator\Exception\ValidationException;
 use App\Dto\RegisterInput;
 use App\Entity\EmergencyContact;
 use App\Entity\User;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Serializer\Normalizer\DenormalizerInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
@@ -68,8 +70,12 @@ class RegisterProcessor implements ProcessorInterface
         $hashedPassword = $this->passwordHasher->hashPassword($user, $input->password);
         $user->setPassword($hashedPassword);
 
-        $this->entityManager->persist($user);
-        $this->entityManager->flush();
+        try {
+            $this->entityManager->persist($user);
+            $this->entityManager->flush();
+        } catch (UniqueConstraintViolationException) {
+            throw new ConflictHttpException('Identifiants invalides.');
+        }
 
         return $user;
     }
