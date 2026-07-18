@@ -55,24 +55,24 @@ final class GameRegistrationPresenceController extends AbstractController
 
         $actor = $this->getUser();
         $this->logger->warning('Security registration presence updated by admin.', [
-            'event_id' => 'SEC.ADMIN.PRESENCE_UPDATED',
+            'event_id'       => 'SEC.ADMIN.PRESENCE_UPDATED',
             'event_category' => 'admin_action',
-            'severity' => 'WARNING',
-            'outcome' => 'success',
-            'action' => 'registration_presence_update',
-            'service' => 'backend-api',
-            'environment' => $this->environment,
-            'actor_type' => $actor instanceof User ? 'user' : 'anonymous',
-            'actor_id_hash' => $actor instanceof User && null !== $actor->getId()
+            'severity'       => 'WARNING',
+            'outcome'        => 'success',
+            'action'         => 'registration_presence_update',
+            'service'        => 'backend-api',
+            'environment'    => $this->environment,
+            'actor_type'     => $actor instanceof User ? 'user' : 'anonymous',
+            'actor_id_hash'  => $actor instanceof User && null !== $actor->getId()
                 ? hash_hmac('sha256', sprintf('user:%d', $actor->getId()), $this->appSecret)
                 : null,
-            'target_type' => 'game_registration',
+            'target_type'    => 'game_registration',
             'target_id_hash' => hash_hmac('sha256', sprintf('registration:%d', $id), $this->appSecret),
-            'http_method' => $request->getMethod(),
-            'http_path' => $request->getPathInfo(),
-            'http_status' => JsonResponse::HTTP_OK,
-            'reason_code' => 'ADMIN_UPDATE',
-            'message' => 'Registration presence updated by privileged actor.',
+            'http_method'    => $request->getMethod(),
+            'http_path'      => $request->getPathInfo(),
+            'http_status'    => JsonResponse::HTTP_OK,
+            'reason_code'    => 'ADMIN_UPDATE',
+            'message'        => 'Registration presence updated by privileged actor.',
         ]);
 
         return $this->json([

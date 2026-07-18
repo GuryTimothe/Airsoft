@@ -43,11 +43,11 @@ final class AdminExportController extends AbstractController
         $games = $this->gameRepository->findForExport($dateFrom, $dateTo);
 
         $this->logAdminAction('SEC.ADMIN.EXPORT_GAMES', $request, [
-            'reason_code' => 'EXPORT_REQUESTED',
-            'games_count' => \count($games),
+            'reason_code'     => 'EXPORT_REQUESTED',
+            'games_count'     => \count($games),
             'filters_applied' => [
                 'dateFrom' => null !== $dateFrom,
-                'dateTo' => null !== $dateTo,
+                'dateTo'   => null !== $dateTo,
             ],
             'message' => 'Admin exported games CSV.',
         ]);
@@ -74,11 +74,11 @@ final class AdminExportController extends AbstractController
         $registrations = $this->gameRegistrationRepository->findForGameExport($game);
 
         $this->logAdminAction('SEC.ADMIN.EXPORT_GAME_REGISTRATIONS', $request, [
-            'reason_code' => 'EXPORT_REQUESTED',
-            'target_type' => 'game',
-            'target_id_hash' => hash_hmac('sha256', sprintf('game:%d', $id), $this->appSecret),
+            'reason_code'         => 'EXPORT_REQUESTED',
+            'target_type'         => 'game',
+            'target_id_hash'      => hash_hmac('sha256', sprintf('game:%d', $id), $this->appSecret),
             'registrations_count' => \count($registrations),
-            'message' => 'Admin exported game registrations CSV.',
+            'message'             => 'Admin exported game registrations CSV.',
         ]);
 
         return $this->createCsvResponse(
@@ -131,11 +131,11 @@ final class AdminExportController extends AbstractController
         $users = $this->userRepository->findForExport($isMinor, $roles);
 
         $this->logAdminAction('SEC.ADMIN.EXPORT_USERS', $request, [
-            'reason_code' => 'EXPORT_REQUESTED',
-            'users_count' => \count($users),
+            'reason_code'     => 'EXPORT_REQUESTED',
+            'users_count'     => \count($users),
             'filters_applied' => [
                 'ageGroup' => null !== $isMinor,
-                'roles' => [] !== $roles,
+                'roles'    => []   !== $roles,
             ],
             'message' => 'Admin exported users CSV.',
         ]);
@@ -198,31 +198,31 @@ final class AdminExportController extends AbstractController
      */
     private function logAdminAction(string $eventId, ?Request $request, array $context): void
     {
-        $actor = $this->getUser();
+        $actor       = $this->getUser();
         $actorIdHash = null;
         if ($actor instanceof User && null !== $actor->getId()) {
             $actorIdHash = hash_hmac('sha256', sprintf('user:%d', $actor->getId()), $this->appSecret);
         }
 
         $baseContext = [
-            'event_id' => $eventId,
+            'event_id'       => $eventId,
             'event_category' => 'admin_action',
-            'severity' => 'WARNING',
-            'outcome' => 'success',
-            'action' => 'export',
-            'service' => 'backend-api',
-            'environment' => $this->environment,
-            'actor_type' => $actor instanceof User ? 'user' : 'anonymous',
-            'actor_id_hash' => $actorIdHash,
+            'severity'       => 'WARNING',
+            'outcome'        => 'success',
+            'action'         => 'export',
+            'service'        => 'backend-api',
+            'environment'    => $this->environment,
+            'actor_type'     => $actor instanceof User ? 'user' : 'anonymous',
+            'actor_id_hash'  => $actorIdHash,
         ];
 
         if ($request instanceof Request) {
-            $baseContext['request_id'] = (string) ($request->headers->get('X-Request-Id') ?? '');
-            $baseContext['correlation_id'] = (string) ($request->headers->get('X-Correlation-Id') ?? '');
-            $baseContext['http_method'] = $request->getMethod();
-            $baseContext['http_path'] = $request->getPathInfo();
+            $baseContext['request_id']       = (string) ($request->headers->get('X-Request-Id') ?? '');
+            $baseContext['correlation_id']   = (string) ($request->headers->get('X-Correlation-Id') ?? '');
+            $baseContext['http_method']      = $request->getMethod();
+            $baseContext['http_path']        = $request->getPathInfo();
             $baseContext['source_ip_masked'] = $this->maskIp($request->getClientIp());
-            $baseContext['http_status'] = 200;
+            $baseContext['http_status']      = 200;
         }
 
         $this->logger->warning('Security admin action executed.', array_merge($baseContext, $context));
@@ -243,8 +243,9 @@ final class AdminExportController extends AbstractController
 
         if (false !== filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
             $parts = explode(':', $ip);
-
-            return sprintf('%s:%s:%s::/48', $parts[0] ?? '0', $parts[1] ?? '0', $parts[2] ?? '0');
+            if (\count($parts) >= 3) {
+                return sprintf('%s:%s:%s::/48', $parts[0], $parts[1], $parts[2]);
+            }
         }
 
         return 'unknown';

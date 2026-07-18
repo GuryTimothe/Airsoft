@@ -48,22 +48,22 @@ final class LogoutController extends AbstractController
             }
 
             $this->logger->warning('Security logout received malformed token payload.', [
-                'event_id' => 'SEC.JWT.INVALID_TOKEN',
+                'event_id'       => 'SEC.JWT.INVALID_TOKEN',
                 'event_category' => 'token_security',
-                'severity' => 'WARNING',
-                'outcome' => 'blocked',
-                'action' => 'logout',
-                'service' => 'backend-api',
-                'environment' => $this->environment,
-                'actor_type' => 'anonymous',
-                'token_id_hash' => \is_string($tokenId) && '' !== $tokenId
+                'severity'       => 'WARNING',
+                'outcome'        => 'blocked',
+                'action'         => 'logout',
+                'service'        => 'backend-api',
+                'environment'    => $this->environment,
+                'actor_type'     => 'anonymous',
+                'token_id_hash'  => \is_string($tokenId) && '' !== $tokenId
                     ? hash_hmac('sha256', sprintf('jti:%s', $tokenId), $this->appSecret)
                     : null,
                 'http_method' => $request->getMethod(),
-                'http_path' => $request->getPathInfo(),
+                'http_path'   => $request->getPathInfo(),
                 'http_status' => JsonResponse::HTTP_NO_CONTENT,
                 'reason_code' => 'MALFORMED_TOKEN_PAYLOAD',
-                'message' => 'Logout executed with malformed token payload.',
+                'message'     => 'Logout executed with malformed token payload.',
             ]);
 
             return $response;
@@ -74,37 +74,37 @@ final class LogoutController extends AbstractController
             $this->jwtRevocationStore->revokeTokenActivity($tokenId);
 
             $this->logger->info('Security JWT token revoked on logout.', [
-                'event_id' => 'SEC.JWT.TOKEN_REVOKED',
+                'event_id'       => 'SEC.JWT.TOKEN_REVOKED',
                 'event_category' => 'token_security',
-                'severity' => 'INFO',
-                'outcome' => 'success',
-                'action' => 'logout',
-                'service' => 'backend-api',
-                'environment' => $this->environment,
-                'actor_type' => 'anonymous',
-                'token_id_hash' => hash_hmac('sha256', sprintf('jti:%s', $tokenId), $this->appSecret),
-                'http_method' => $request->getMethod(),
-                'http_path' => $request->getPathInfo(),
-                'http_status' => JsonResponse::HTTP_NO_CONTENT,
-                'reason_code' => 'LOGOUT_TOKEN_REVOKED',
-                'message' => 'JWT token revoked during logout.',
+                'severity'       => 'INFO',
+                'outcome'        => 'success',
+                'action'         => 'logout',
+                'service'        => 'backend-api',
+                'environment'    => $this->environment,
+                'actor_type'     => 'anonymous',
+                'token_id_hash'  => hash_hmac('sha256', sprintf('jti:%s', $tokenId), $this->appSecret),
+                'http_method'    => $request->getMethod(),
+                'http_path'      => $request->getPathInfo(),
+                'http_status'    => JsonResponse::HTTP_NO_CONTENT,
+                'reason_code'    => 'LOGOUT_TOKEN_REVOKED',
+                'message'        => 'JWT token revoked during logout.',
             ]);
         } catch (JwtRevocationUnavailableException $exception) {
             $this->logger->error('Security JWT revocation failed on logout.', [
-                'event_id' => 'SEC.JWT.REVOCATION_ERROR',
+                'event_id'       => 'SEC.JWT.REVOCATION_ERROR',
                 'event_category' => 'token_security',
-                'severity' => 'ERROR',
-                'outcome' => 'failure',
-                'action' => 'logout',
-                'service' => 'backend-api',
-                'environment' => $this->environment,
-                'actor_type' => 'anonymous',
-                'token_id_hash' => hash_hmac('sha256', sprintf('jti:%s', $tokenId), $this->appSecret),
-                'http_method' => $request->getMethod(),
-                'http_path' => $request->getPathInfo(),
-                'http_status' => JsonResponse::HTTP_SERVICE_UNAVAILABLE,
-                'reason_code' => 'REVOCATION_STORE_UNAVAILABLE',
-                'message' => 'JWT revocation store unavailable during logout.',
+                'severity'       => 'ERROR',
+                'outcome'        => 'failure',
+                'action'         => 'logout',
+                'service'        => 'backend-api',
+                'environment'    => $this->environment,
+                'actor_type'     => 'anonymous',
+                'token_id_hash'  => hash_hmac('sha256', sprintf('jti:%s', $tokenId), $this->appSecret),
+                'http_method'    => $request->getMethod(),
+                'http_path'      => $request->getPathInfo(),
+                'http_status'    => JsonResponse::HTTP_SERVICE_UNAVAILABLE,
+                'reason_code'    => 'REVOCATION_STORE_UNAVAILABLE',
+                'message'        => 'JWT revocation store unavailable during logout.',
             ]);
 
             throw new ServiceUnavailableHttpException(null, 'Redis is required to revoke JWT tokens.', $exception);

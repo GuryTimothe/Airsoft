@@ -48,26 +48,26 @@ final class AppSettingUpdateProcessor implements ProcessorInterface
 
         $result = $this->persistProcessor->process($singleton, $operation, $uriVariables, $context);
 
-        $actor = $this->security->getUser();
+        $actor       = $this->security->getUser();
         $actorIdHash = null;
         if ($actor instanceof User && null !== $actor->getId()) {
             $actorIdHash = hash_hmac('sha256', sprintf('user:%d', $actor->getId()), $this->appSecret);
         }
 
         $this->logger->warning('Security app settings updated.', [
-            'event_id' => 'SEC.ADMIN.SETTINGS_UPDATED',
+            'event_id'       => 'SEC.ADMIN.SETTINGS_UPDATED',
             'event_category' => 'admin_action',
-            'severity' => 'WARNING',
-            'outcome' => 'success',
-            'action' => 'app_settings_update',
-            'service' => 'backend-api',
-            'environment' => $this->environment,
-            'actor_type' => $actor instanceof User ? 'user' : 'anonymous',
-            'actor_id_hash' => $actorIdHash,
-            'target_type' => 'app_setting',
+            'severity'       => 'WARNING',
+            'outcome'        => 'success',
+            'action'         => 'app_settings_update',
+            'service'        => 'backend-api',
+            'environment'    => $this->environment,
+            'actor_type'     => $actor instanceof User ? 'user' : 'anonymous',
+            'actor_id_hash'  => $actorIdHash,
+            'target_type'    => 'app_setting',
             'target_id_hash' => hash_hmac('sha256', sprintf('app_setting:%d', (int) $singleton->getId()), $this->appSecret),
-            'reason_code' => 'ADMIN_UPDATE',
-            'message' => 'Application settings updated by privileged actor.',
+            'reason_code'    => 'ADMIN_UPDATE',
+            'message'        => 'Application settings updated by privileged actor.',
         ]);
 
         return $result;

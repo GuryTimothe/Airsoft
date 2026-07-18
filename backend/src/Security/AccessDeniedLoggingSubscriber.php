@@ -45,37 +45,37 @@ final class AccessDeniedLoggingSubscriber implements EventSubscriberInterface
             return;
         }
 
-        $request = $event->getRequest();
-        $actor = $this->security->getUser();
+        $request     = $event->getRequest();
+        $actor       = $this->security->getUser();
         $actorIdHash = null;
-        $actorType = 'anonymous';
+        $actorType   = 'anonymous';
 
         if ($actor instanceof User) {
             $actorType = 'user';
-            $actorId = $actor->getId();
+            $actorId   = $actor->getId();
             if (null !== $actorId) {
                 $actorIdHash = hash_hmac('sha256', sprintf('user:%d', $actorId), $this->appSecret);
             }
         }
 
         $this->logger->warning('Security access denied.', [
-            'event_id' => 'SEC.AUTHZ.ACCESS_DENIED',
-            'event_category' => 'authorization',
-            'severity' => 'WARNING',
-            'outcome' => 'blocked',
-            'action' => 'access_check',
-            'service' => 'backend-api',
-            'environment' => $this->environment,
-            'request_id' => (string) ($request->headers->get('X-Request-Id') ?? ''),
-            'correlation_id' => (string) ($request->headers->get('X-Correlation-Id') ?? ''),
-            'actor_type' => $actorType,
-            'actor_id_hash' => $actorIdHash,
+            'event_id'         => 'SEC.AUTHZ.ACCESS_DENIED',
+            'event_category'   => 'authorization',
+            'severity'         => 'WARNING',
+            'outcome'          => 'blocked',
+            'action'           => 'access_check',
+            'service'          => 'backend-api',
+            'environment'      => $this->environment,
+            'request_id'       => (string) ($request->headers->get('X-Request-Id') ?? ''),
+            'correlation_id'   => (string) ($request->headers->get('X-Correlation-Id') ?? ''),
+            'actor_type'       => $actorType,
+            'actor_id_hash'    => $actorIdHash,
             'source_ip_masked' => $this->maskIp($request->getClientIp()),
-            'http_method' => $request->getMethod(),
-            'http_path' => $request->getPathInfo(),
-            'http_status' => 403,
-            'reason_code' => 'ACCESS_DENIED',
-            'message' => 'Access denied.',
+            'http_method'      => $request->getMethod(),
+            'http_path'        => $request->getPathInfo(),
+            'http_status'      => 403,
+            'reason_code'      => 'ACCESS_DENIED',
+            'message'          => 'Access denied.',
         ]);
     }
 
@@ -94,8 +94,9 @@ final class AccessDeniedLoggingSubscriber implements EventSubscriberInterface
 
         if (false !== filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
             $parts = explode(':', $ip);
-
-            return sprintf('%s:%s:%s::/48', $parts[0] ?? '0', $parts[1] ?? '0', $parts[2] ?? '0');
+            if (\count($parts) >= 3) {
+                return sprintf('%s:%s:%s::/48', $parts[0], $parts[1], $parts[2]);
+            }
         }
 
         return 'unknown';

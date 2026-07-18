@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Security\Jwt;
 
 use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Security\Core\Exception\AuthenticationException;
 use Symfony\Component\Security\Http\Authentication\AuthenticationFailureHandlerInterface;
 
@@ -26,23 +26,23 @@ final class GenericAuthenticationFailureHandler implements AuthenticationFailure
     public function onAuthenticationFailure(Request $request, AuthenticationException $exception): JsonResponse
     {
         $this->logger->warning('Security authentication failure.', [
-            'event_id' => 'SEC.AUTH.LOGIN_FAILED',
-            'event_category' => 'authentication',
-            'severity' => 'WARNING',
-            'outcome' => 'failure',
-            'action' => 'login',
-            'service' => 'backend-api',
-            'environment' => $this->environment,
-            'request_id' => (string) ($request->headers->get('X-Request-Id') ?? ''),
-            'correlation_id' => (string) ($request->headers->get('X-Correlation-Id') ?? ''),
-            'actor_type' => 'anonymous',
-            'actor_id_hash' => $this->extractIdentifierHash($request),
+            'event_id'         => 'SEC.AUTH.LOGIN_FAILED',
+            'event_category'   => 'authentication',
+            'severity'         => 'WARNING',
+            'outcome'          => 'failure',
+            'action'           => 'login',
+            'service'          => 'backend-api',
+            'environment'      => $this->environment,
+            'request_id'       => (string) ($request->headers->get('X-Request-Id') ?? ''),
+            'correlation_id'   => (string) ($request->headers->get('X-Correlation-Id') ?? ''),
+            'actor_type'       => 'anonymous',
+            'actor_id_hash'    => $this->extractIdentifierHash($request),
             'source_ip_masked' => $this->maskIp($request->getClientIp()),
-            'http_method' => $request->getMethod(),
-            'http_path' => $request->getPathInfo(),
-            'http_status' => JsonResponse::HTTP_UNAUTHORIZED,
-            'reason_code' => 'INVALID_CREDENTIALS',
-            'message' => 'Authentication failed.',
+            'http_method'      => $request->getMethod(),
+            'http_path'        => $request->getPathInfo(),
+            'http_status'      => JsonResponse::HTTP_UNAUTHORIZED,
+            'reason_code'      => 'INVALID_CREDENTIALS',
+            'message'          => 'Authentication failed.',
         ]);
 
         return new JsonResponse([
@@ -85,8 +85,9 @@ final class GenericAuthenticationFailureHandler implements AuthenticationFailure
 
         if (false !== filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
             $parts = explode(':', $ip);
-
-            return sprintf('%s:%s:%s::/48', $parts[0] ?? '0', $parts[1] ?? '0', $parts[2] ?? '0');
+            if (\count($parts) >= 3) {
+                return sprintf('%s:%s:%s::/48', $parts[0], $parts[1], $parts[2]);
+            }
         }
 
         return 'unknown';

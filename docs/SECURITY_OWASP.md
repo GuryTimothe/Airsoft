@@ -1,33 +1,32 @@
 # Dossier de conformité OWASP Top 10 2025
 
-**Date**: 2026-07-18
 **Référence**: https://owasp.org/Top10/2025/
 **Périmètre**: backend Symfony/API Platform, frontend Next.js, CI/CD
 
-Ce document synthétise les contrôles de sécurité IMPLÉMENTÉS dans l'application Airsoft. Seules les implémentations complétées sont documentées ici.
+Ce document synthétise les contrôles de sécurité implémentés dans l'application Airsoft. Seules les implémentations complétées sont documentées ici.
 
 ---
 
 ## Résumé de couverture
 
-| Risque OWASP | Score | Niveau | Points clés |
-|--------------|-------|--------|------------|
-| A01 - Broken Access Control | 78% | CORRECT | Deny-by-default, RBAC, voters métier, filtrage ownership, JWT revocation |
-| A02 - Security Misconfiguration | 62% | INTERMEDIAIRE | Config env, CORS restreint, non-root containers, secrets sécurisés |
-| A03 - Software Supply Chain | 58% | INTERMEDIAIRE | Lockfiles, versions explicites, scan Semgrep, Git protégé |
-| A04 - Cryptographic Failures | 82% | BON | Hashing bcrypt/argon, JWT signé, validation claims, random_bytes |
-| A05 - Injection | 85% | BON | ORM Doctrine, requêtes paramétrées, validation Symfony/Zod, pas de exec |
-| A06 - Insecure Design | 74% | CORRECT | Contrôles métier explicites, RBAC, anti-abus (rate limiting), voters |
-| A07 - Authentication Failures | 84% | BON | JWT httpOnly, throttling, politique mot de passe, revocation/rotation |
-| A08 - Data Integrity | 57% | INTERMEDIAIRE | Lockfiles, contraintes serveur, validation DTO, JWT immuable |
-| A09 - Logging & Alerting** | **70%** | **BON** | **Politique logging, 8 composants SEC.*, alerting 6 règles, tests observabilité |
-| A10 - Exceptional Conditions | 72% | CORRECT | Exceptions typées, validations strictes, retries, tests erreurs JWT |
+| Risque OWASP | Score | Points clés |
+|--------------|-------|------------|
+| A01 - Broken Access Control | 78% | Deny-by-default, RBAC, voters métier, filtrage ownership, JWT revocation |
+| A02 - Security Misconfiguration | 62% | Config env, CORS restreint, non-root containers, secrets sécurisés |
+| A03 - Software Supply Chain | 58% | Lockfiles, versions explicites, scan Semgrep, Git protégé |
+| A04 - Cryptographic Failures | 82% | Hashing bcrypt/argon, JWT signé, validation claims, random_bytes |
+| A05 - Injection | 85% | ORM Doctrine, requêtes paramétrées, validation Symfony/Zod, pas de exec |
+| A06 - Insecure Design | 74% | Contrôles métier explicites, RBAC, anti-abus (rate limiting), voters |
+| A07 - Authentication Failures | 84% | JWT httpOnly, throttling, politique mot de passe, revocation/rotation |
+| A08 - Data Integrity | 57% | Lockfiles, contraintes serveur, validation DTO, JWT immuable |
+| A09 - Logging & Alerting | 70% | Politique logging, 8 composants SEC.*, alerting 6 règles, tests observabilité |
+| A10 - Exceptional Conditions | 72% | Exceptions typées, validations strictes, retries, tests erreurs JWT |
 
-**Score moyen**: 72.6% (CORRECT)
+**Score moyen**: 72.6%
 
 ---
 
-## A01 - Broken Access Control (78% - CORRECT)
+## A01 - Broken Access Control (78%)
 
 ### Implémentations
 
@@ -113,7 +112,7 @@ Batteries de tests couvrant contrôles d'accès:
 
 ---
 
-## A02 - Security Misconfiguration (62% - INTERMEDIAIRE)
+## A02 - Security Misconfiguration (62%)
 
 ### Implémentations
 
@@ -167,7 +166,7 @@ Login et auth renvoient messages génériques:
 
 ---
 
-## A03 - Software Supply Chain (58% - INTERMEDIAIRE)
+## A03 - Software Supply Chain (58%)
 
 ### Implémentations
 
@@ -221,7 +220,7 @@ Dépôt GitHub configuré:
 
 ---
 
-## A04 - Cryptographic Failures (82% - BON)
+## A04 - Cryptographic Failures (82%)
 
 ### Implémentations
 
@@ -299,7 +298,7 @@ Tests robustes sur révocation, nonce, invalidation, expiration:
 
 ---
 
-## A05 - Injection (85% - BON)
+## A05 - Injection (85%)
 
 ### Implémentations
 
@@ -363,7 +362,7 @@ Workflow CI détecte patterns injection:
 
 ---
 
-## A06 - Insecure Design (74% - CORRECT)
+## A06 - Insecure Design (74%)
 
 ### Implémentations
 
@@ -435,7 +434,7 @@ Couverture sur workflows sensibles:
 
 ---
 
-## A07 - Authentication Failures (84% - BON)
+## A07 - Authentication Failures (84%)
 
 ### Implémentations
 
@@ -512,7 +511,7 @@ Couverture complète sur scénarios critiques:
 
 ---
 
-## A08 - Data Integrity (57% - INTERMEDIAIRE)
+## A08 - Data Integrity (57%)
 
 ### Implémentations
 
@@ -582,7 +581,7 @@ Doctrine gère transactions implicites:
 
 ---
 
-## A09 - Security Logging and Alerting (70% - BON)
+## A09 - Security Logging and Alerting (70%)
 
 ### Implémentations
 
@@ -731,7 +730,7 @@ Manuels opérationnels:
 
 ---
 
-## A10 - Exceptional Conditions (72% - CORRECT)
+## A10 - Exceptional Conditions (72%)
 
 ### Implémentations
 
@@ -859,6 +858,4 @@ docker compose exec backend php bin/security_alert_check.php --file /app/var/log
 
 ---
 
-**Dernière mise à jour**: 2026-07-18
-**Score moyen**: 72.6% (CORRECT)
-**Niveau global**: En progression vers BON (80%+)
+**Score moyen**: 72.6%

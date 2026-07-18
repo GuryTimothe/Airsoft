@@ -65,19 +65,19 @@ class UserUpdateProcessor implements ProcessorInterface
 
         if ($previousData->getRole() !== $data->getRole()) {
             $this->logger->warning('Security role changed.', [
-                'event_id' => 'SEC.ADMIN.ROLE_CHANGED',
+                'event_id'       => 'SEC.ADMIN.ROLE_CHANGED',
                 'event_category' => 'admin_action',
-                'severity' => 'WARNING',
-                'outcome' => 'success',
-                'action' => 'role_change',
-                'service' => 'backend-api',
-                'environment' => $this->environment,
-                'actor_type' => 'user',
-                'actor_id_hash' => $this->hashUserId($actor),
-                'target_type' => 'user',
+                'severity'       => 'WARNING',
+                'outcome'        => 'success',
+                'action'         => 'role_change',
+                'service'        => 'backend-api',
+                'environment'    => $this->environment,
+                'actor_type'     => 'user',
+                'actor_id_hash'  => $this->hashUserId($actor),
+                'target_type'    => 'user',
                 'target_id_hash' => $this->hashUserId($data),
-                'reason_code' => 'ROLE_UPDATED',
-                'message' => 'User role changed by privileged actor.',
+                'reason_code'    => 'ROLE_UPDATED',
+                'message'        => 'User role changed by privileged actor.',
             ]);
         }
 
