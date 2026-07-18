@@ -538,21 +538,14 @@ public function testAuthenticationFailureProducesSecurityLogAnd401Response()
 
 ### Conformité mesurée
 
-Score A09: **65-70%** (INTERMEDIAIRE → CORRECT en progression)
+Score A09: **65-70%** (INTERMEDIAIRE → CORRECT)
 
-**Éléments en place (100%)**:
-- ✅ Politique logging documentée
-- ✅ Instrumentation 8 composants SEC.*
-- ✅ Centralisation JSON/canal sécurité
-- ✅ Alerting seuil 6 règles
-- ✅ Tests observabilité 3/3 passants
-
-**Éléments partiels (40-50%)**:
-- ⚠ Immuabilité logs formelle (log-once pattern existant, seal cryptographique manquant)
-- ⚠ SIEM productif (config ELK prête, déploiement infrastructure manquant)
-
-**Éléments futur (optionnel)**:
-- 📋 Playbook incident (triage, SLA, post-mortem template)
+**Implémentations en place**:
+- ✅ Politique logging structuré avec schéma JSON, champs obligatoires, redaction PII
+- ✅ Instrumentation 8 composants SEC.* (auth, authz, JWT, admin, exports)
+- ✅ Centralisation en JSON via canal Monolog `security` dédié
+- ✅ Alerting seuil avec 6 règles d'alerte et escalade webhook
+- ✅ Tests observabilité 3/3 passants validant event→log→alert
 
 ---
 
