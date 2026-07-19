@@ -41,6 +41,8 @@ import {
 
 interface UserFormProps {
   userId?: number;
+  initialUser?: User;
+  initialActorRole?: UserRole | null;
 }
 
 function RequiredMark() {
@@ -147,12 +149,20 @@ function toFormValues(user?: User): UserFormValues {
   };
 }
 
-export function UserForm({ userId }: UserFormProps) {
+export function UserForm({
+  userId,
+  initialUser,
+  initialActorRole,
+}: UserFormProps) {
   const router = useRouter();
-  const [values, setValues] = useState<UserFormValues>(emptyValues);
+  const [values, setValues] = useState<UserFormValues>(
+    initialUser ? toFormValues(initialUser) : emptyValues,
+  );
   const [targetRole, setTargetRole] = useState<UserRole | null>(null);
-  const [loading, setLoading] = useState(Boolean(userId));
-  const [actorRole, setActorRole] = useState<UserRole | null>(null);
+  const [loading, setLoading] = useState(Boolean(userId) && !initialUser);
+  const [actorRole, setActorRole] = useState<UserRole | null>(
+    initialActorRole ?? null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -186,6 +196,10 @@ export function UserForm({ userId }: UserFormProps) {
   );
 
   useEffect(() => {
+    if (initialActorRole) {
+      return;
+    }
+
     let active = true;
 
     getCurrentUser()
@@ -206,7 +220,7 @@ export function UserForm({ userId }: UserFormProps) {
   }, []);
 
   useEffect(() => {
-    if (!userId) {
+    if (!userId || initialUser) {
       return;
     }
 

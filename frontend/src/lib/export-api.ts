@@ -52,6 +52,7 @@ async function downloadCsv(
 ): Promise<void> {
   const headers = await getAuthHeaders();
   const response = await fetch(buildUrl(path), {
+    credentials: "include",
     headers,
     cache: "no-store",
   });
