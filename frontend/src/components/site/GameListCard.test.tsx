@@ -67,14 +67,17 @@ describe("GameListCard", () => {
     jest.clearAllMocks();
   });
 
-  it("renders upcoming public games and shows the static banner", async () => {
+  it("renders upcoming games (including private) and shows the static banner", async () => {
     const { container } = render(<GameListCard />);
 
     expect(screen.getByText("Chargement des parties…")).toBeInTheDocument();
     expect(await screen.findByText("Forêt")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Privée", level: 3 }),
+    ).toBeInTheDocument();
 
     const listItems = screen.getAllByRole("listitem");
-    expect(listItems).toHaveLength(1);
+    expect(listItems).toHaveLength(2);
 
     const banner = container.querySelector('[data-testid="game-banner"]');
     expect(banner).toBeInTheDocument();
@@ -227,7 +230,7 @@ describe("GameListCard", () => {
 
     await screen.findByText("Forêt");
     expect(
-      screen.getByRole("link", { name: "Se connecter pour s'inscrire" }),
-    ).toBeInTheDocument();
+      screen.getAllByRole("link", { name: "Se connecter pour s'inscrire" }),
+    ).toHaveLength(2);
   });
 });

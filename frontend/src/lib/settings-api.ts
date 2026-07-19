@@ -90,6 +90,7 @@ export async function getAppSettings(): Promise<AppSetting | null> {
   const headers = await getAuthHeaders();
   const response = await fetch(buildUrl("/api/app_settings"), {
     cache: "no-store",
+    credentials: "include",
     headers,
   });
 
@@ -118,6 +119,7 @@ export async function updateAppSettings(
   headers = await withCsrfHeaders(headers);
   const response = await fetch(buildUrl("/api/app_settings"), {
     method: "PATCH",
+    credentials: "include",
     headers,
     body: JSON.stringify(payload),
   });

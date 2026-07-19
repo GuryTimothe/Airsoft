@@ -1,6 +1,7 @@
 import type { LoginInput } from "@/lib/schemas/auth";
+import { getApiBaseUrl } from "@/lib/api-base-url";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const API_BASE_URL = getApiBaseUrl();
 export const AUTH_TOKEN_KEY = "ma_access_token";
 export const AUTH_STATE_CHANGE_EVENT = "auth-state-changed";
 const INVALID_CREDENTIALS_MESSAGE = "Identifiants invalides.";

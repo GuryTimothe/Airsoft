@@ -4,6 +4,8 @@ import { Calendar, Euro, Lock, MapPin, Users } from "lucide-react";
 import { getGamesPage, type Game } from "@/lib/game-api";
 import { getUsers } from "@/lib/user-api";
 import { formatWallClockDateTime } from "@/lib/date-time";
+import { cookies } from "next/headers";
+import { AUTH_TOKEN_KEY, getRolesFromToken } from "@/lib/auth";
 
 function extractPage(url?: string): number | null {
   if (!url) {
@@ -61,22 +63,34 @@ async function countAllUsers(): Promise<number> {
 }
 
 export default async function AdminDashboard() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(AUTH_TOKEN_KEY)?.value ?? null;
+  const roles = getRolesFromToken(token);
+  const isOrganizer = roles.includes("ROLE_ORGANIZER");
+
   let games: Game[] = [];
   let totalItems: number | undefined;
-  let usersCount = 0;
+  let usersCount: number | null = null;
   let dashboardError: string | null = null;
 
-  try {
-    const [gamesResult, usersTotal] = await Promise.all([
-      getAllGames(),
-      countAllUsers(),
-    ]);
+  const gamesResult = await getAllGames().catch(() => null);
+  if (gamesResult) {
     games = gamesResult.games;
     totalItems = gamesResult.totalItems;
-    usersCount = usersTotal;
-  } catch {
+  } else {
     dashboardError =
-      "Impossible de charger toutes les statistiques du dashboard pour le moment.";
+      "Impossible de charger les parties du dashboard pour le moment.";
+  }
+
+  if (!isOrganizer) {
+    const usersTotal = await countAllUsers().catch(() => null);
+    if (usersTotal !== null) {
+      usersCount = usersTotal;
+    } else {
+      dashboardError = dashboardError
+        ? `${dashboardError} Les statistiques utilisateurs sont indisponibles.`
+        : "Impossible de charger les statistiques utilisateurs pour le moment.";
+    }
   }
 
   const gamesCount = totalItems ?? games.length;
@@ -111,7 +125,9 @@ export default async function AdminDashboard() {
         <Card>
           <CardContent className="p-6">
             <p className="text-sm text-muted-foreground">Total utilisateurs</p>
-            <p className="text-2xl font-bold">{usersCount}</p>
+            <p className="text-2xl font-bold">
+              {isOrganizer ? "-" : (usersCount ?? "-")}
+            </p>
           </CardContent>
         </Card>
       </div>

@@ -61,6 +61,7 @@ security:
 
   # Note: Only the *first* matching rule is applied
   access_control:
+    - { path: ^/api, roles: PUBLIC_ACCESS, methods: [OPTIONS] }
     - { path: ^/api/csrf, roles: IS_AUTHENTICATED_ANONYMOUSLY }
     - { path: ^/api/login, roles: IS_AUTHENTICATED_ANONYMOUSLY }
     - { path: ^/api/register, roles: IS_AUTHENTICATED_ANONYMOUSLY }

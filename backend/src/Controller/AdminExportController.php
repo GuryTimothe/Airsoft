@@ -345,16 +345,22 @@ final class AdminExportController extends AbstractController
             foreach ($games as $game) {
                 $registrations = $this->gameRegistrationRepository->findForGameExport($game);
 
-                fputcsv($handle, ['Partie', $game->getTitle()], ';');
-                fputcsv($handle, ['Adresse', $game->getAddress()], ';');
-                fputcsv($handle, ['PAF', number_format($game->getPrice(), 2, '.', '').' EUR'], ';');
-                fputcsv($handle, ['Nombre de places', (string) $game->getMaxPlaces()], ';');
-                fputcsv($handle, ['Date', $game->getStartDateTime()->format('d/m/Y H:i')], ';');
-                fputcsv($handle, [], ';');
-                fputcsv($handle, ['Nom', 'Prenom', 'Age', 'Adresse mail', 'Tel', 'Presence'], ';');
+                $gameTitle     = $game->getTitle();
+                $gameAddress   = $game->getAddress();
+                $gamePrice     = $game->getPrice();
+                $gameMaxPlaces = $game->getMaxPlaces();
+                $gameDate      = $game->getStartDateTime()->format('d/m/Y H:i');
+
+                fputcsv($handle, ['Partie', $gameTitle], ';', '"', '');
+                fputcsv($handle, ['Adresse', $gameAddress], ';', '"', '');
+                fputcsv($handle, ['PAF', number_format($gamePrice, 2, '.', '').' EUR'], ';', '"', '');
+                fputcsv($handle, ['Nombre de places', (string) $gameMaxPlaces], ';', '"', '');
+                fputcsv($handle, ['Date', $gameDate], ';', '"', '');
+                fputcsv($handle, [], ';', '"', '');
+                fputcsv($handle, ['Nom', 'Prenom', 'Age', 'Adresse mail', 'Tel', 'Presence'], ';', '"', '');
 
                 if ([] === $registrations) {
-                    fputcsv($handle, ['Aucun joueur inscrit', '', '', '', '', ''], ';');
+                    fputcsv($handle, ['Aucun joueur inscrit', '', '', '', '', ''], ';', '"', '');
                 }
 
                 foreach ($registrations as $registration) {
@@ -367,11 +373,11 @@ final class AdminExportController extends AbstractController
                         $user?->getEmail() ?? '',
                         $user?->getPhone() ?? '',
                         $registration->isPresent() ? 'Present' : 'Absent',
-                    ], ';');
+                    ], ';', '"', '');
                 }
 
-                fputcsv($handle, [], ';');
-                fputcsv($handle, [], ';');
+                fputcsv($handle, [], ';', '"', '');
+                fputcsv($handle, [], ';', '"', '');
             }
 
             fclose($handle);
@@ -399,11 +405,10 @@ final class AdminExportController extends AbstractController
                 throw new \RuntimeException('Impossible de preparer le flux CSV.');
             }
 
-            fwrite($handle, "\xEF\xBB\xBF");
-            fputcsv($handle, $headers, ';');
+            fputcsv($handle, $headers, ';', '"', '');
 
             foreach ($rows as $row) {
-                fputcsv($handle, $row, ';');
+                fputcsv($handle, $row, ';', '"', '');
             }
 
             fclose($handle);

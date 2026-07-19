@@ -42,7 +42,8 @@ final class GameVoter extends Voter
 
             $user = $token->getUser();
 
-            return $user instanceof User && $this->canAccessPrivateGames($user);
+            return $user instanceof User
+                && ($this->canCreateGame($user) || $user->getCanSeePrivate());
         }
 
         $user = $token->getUser();
@@ -77,14 +78,4 @@ final class GameVoter extends Voter
         return $this->canCreateGame($user);
     }
 
-    private function canAccessPrivateGames(User $user): bool
-    {
-        $roles = $user->getRoles();
-
-        if (\in_array('ROLE_ADMIN', $roles, true)) {
-            return true;
-        }
-
-        return $user->getCanSeePrivate();
-    }
 }

@@ -316,11 +316,7 @@ export function GameListCard() {
     const referenceTime = new Date(referenceDateIso).getTime();
 
     return games
-      .filter(
-        (game) =>
-          game.isPublic &&
-          new Date(game.startDateTime).getTime() > referenceTime,
-      )
+      .filter((game) => new Date(game.startDateTime).getTime() > referenceTime)
       .sort(
         (a, b) =>
           new Date(a.startDateTime).getTime() -
@@ -345,7 +341,7 @@ export function GameListCard() {
         </div>
       ) : upcomingGames.length === 0 ? (
         <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-600">
-          Aucune partie publique à venir pour le moment.
+          Aucune partie a venir pour le moment.
         </div>
       ) : (
         <ul className="space-y-4 list-none p-0 m-0" role="list">

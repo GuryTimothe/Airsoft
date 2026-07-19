@@ -94,10 +94,18 @@ export async function getGamesPage(page?: number): Promise<GamesResult> {
     page && page > 1
       ? buildUrl(`/api/games?page=${page}`)
       : buildUrl("/api/games");
-  const response = await fetch(url, {
+  let response = await fetch(url, {
     cache: "no-store",
+    credentials: "include",
     headers,
   });
+
+  // If auth cookie/header is stale, retry the public games endpoint without auth.
+  if (response.status === 401) {
+    response = await fetch(url, {
+      cache: "no-store",
+    });
+  }
 
   if (!response.ok) {
     throw new Error("Impossible de charger les parties");
@@ -150,6 +158,7 @@ export async function getGame(id: number): Promise<Game> {
   const headers = await getAuthHeaders();
   const response = await fetch(buildUrl(`/api/games/${id}`), {
     cache: "no-store",
+    credentials: "include",
     headers,
   });
 
@@ -167,6 +176,7 @@ export async function createGame(payload: GamePayload): Promise<Game> {
   headers = await withCsrfHeaders(headers);
   const response = await fetch(buildUrl("/api/games"), {
     method: "POST",
+    credentials: "include",
     headers,
     body: JSON.stringify(payload),
   });
@@ -189,6 +199,7 @@ export async function updateGame(
   headers = await withCsrfHeaders(headers);
   const response = await fetch(buildUrl(`/api/games/${id}`), {
     method: "PUT",
+    credentials: "include",
     headers,
     body: JSON.stringify(payload),
   });
@@ -206,6 +217,7 @@ export async function deleteGame(id: number): Promise<void> {
   headers = await withCsrfHeaders(headers);
   const response = await fetch(buildUrl(`/api/games/${id}`), {
     method: "DELETE",
+    credentials: "include",
     headers,
   });
 

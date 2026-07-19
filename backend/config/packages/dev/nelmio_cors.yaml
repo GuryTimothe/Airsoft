@@ -1,0 +1,6 @@
+nelmio_cors:
+  defaults:
+    origin_regex: true
+    allow_origin:
+      - "%env(CORS_ALLOW_ORIGIN)%"
+      - "^https?://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?$"

@@ -9,24 +9,22 @@ Ce document synthétise les contrôles de sécurité implémentés dans l'applic
 
 ## Résumé de couverture
 
-| Risque OWASP | Score | Points clés |
-|--------------|-------|------------|
-| A01 - Broken Access Control | 78% | Deny-by-default, RBAC, voters métier, filtrage ownership, JWT revocation |
-| A02 - Security Misconfiguration | 62% | Config env, CORS restreint, non-root containers, secrets sécurisés |
-| A03 - Software Supply Chain | 58% | Lockfiles, versions explicites, scan Semgrep, Git protégé |
-| A04 - Cryptographic Failures | 82% | Hashing bcrypt/argon, JWT signé, validation claims, random_bytes |
-| A05 - Injection | 85% | ORM Doctrine, requêtes paramétrées, validation Symfony/Zod, pas de exec |
-| A06 - Insecure Design | 74% | Contrôles métier explicites, RBAC, anti-abus (rate limiting), voters |
-| A07 - Authentication Failures | 84% | JWT httpOnly, throttling, politique mot de passe, revocation/rotation |
-| A08 - Data Integrity | 57% | Lockfiles, contraintes serveur, validation DTO, JWT immuable |
-| A09 - Logging & Alerting | 70% | Politique logging, 8 composants SEC.*, alerting 6 règles, tests observabilité |
-| A10 - Exceptional Conditions | 72% | Exceptions typées, validations strictes, retries, tests erreurs JWT |
-
-**Score moyen**: 72.6%
+| Risque OWASP | Points clés |
+|--------------|------------|
+| A01 - Broken Access Control | Deny-by-default, RBAC, voters métier, filtrage ownership, JWT revocation |
+| A02 - Security Misconfiguration | Config env, CORS restreint, non-root containers, secrets sécurisés |
+| A03 - Software Supply Chain | Lockfiles, versions explicites, scan Semgrep, Git protégé |
+| A04 - Cryptographic Failures | Hashing bcrypt/argon, JWT signé, validation claims, random_bytes |
+| A05 - Injection | ORM Doctrine, requêtes paramétrées, validation Symfony/Zod, pas de exec |
+| A06 - Insecure Design | Contrôles métier explicites, RBAC, anti-abus (rate limiting), voters |
+| A07 - Authentication Failures | JWT httpOnly, throttling, politique mot de passe, revocation/rotation |
+| A08 - Data Integrity | Lockfiles, contraintes serveur, validation DTO, JWT immuable |
+| A09 - Security Logging and Alerting | Politique logging, 8 composants SEC.*, alerting 6 règles, tests observabilité |
+| A10 - Exceptional Conditions | Exceptions typées, validations strictes, retries, tests erreurs JWT |
 
 ---
 
-## A01 - Broken Access Control (78%)
+## A01 - Broken Access Control
 
 ### Implémentations
 
@@ -112,7 +110,7 @@ Batteries de tests couvrant contrôles d'accès:
 
 ---
 
-## A02 - Security Misconfiguration (62%)
+## A02 - Security Misconfiguration
 
 ### Implémentations
 
@@ -166,7 +164,7 @@ Login et auth renvoient messages génériques:
 
 ---
 
-## A03 - Software Supply Chain (58%)
+## A03 - Software Supply Chain
 
 ### Implémentations
 
@@ -220,7 +218,7 @@ Dépôt GitHub configuré:
 
 ---
 
-## A04 - Cryptographic Failures (82%)
+## A04 - Cryptographic Failures
 
 ### Implémentations
 
@@ -298,7 +296,7 @@ Tests robustes sur révocation, nonce, invalidation, expiration:
 
 ---
 
-## A05 - Injection (85%)
+## A05 - Injection
 
 ### Implémentations
 
@@ -362,7 +360,7 @@ Workflow CI détecte patterns injection:
 
 ---
 
-## A06 - Insecure Design (74%)
+## A06 - Insecure Design
 
 ### Implémentations
 
@@ -434,7 +432,7 @@ Couverture sur workflows sensibles:
 
 ---
 
-## A07 - Authentication Failures (84%)
+## A07 - Authentication Failures
 
 ### Implémentations
 
@@ -511,7 +509,7 @@ Couverture complète sur scénarios critiques:
 
 ---
 
-## A08 - Data Integrity (57%)
+## A08 - Data Integrity
 
 ### Implémentations
 
@@ -581,7 +579,7 @@ Doctrine gère transactions implicites:
 
 ---
 
-## A09 - Security Logging and Alerting (70%)
+## A09 - Security Logging and Alerting
 
 ### Implémentations
 
@@ -730,7 +728,7 @@ Manuels opérationnels:
 
 ---
 
-## A10 - Exceptional Conditions (72%)
+## A10 - Exceptional Conditions
 
 ### Implémentations
 
@@ -857,5 +855,3 @@ docker compose exec backend php bin/security_alert_check.php --file /app/var/log
 - [Monolog Logger](https://seldaek.github.io/monolog/)
 
 ---
-
-**Score moyen**: 72.6%

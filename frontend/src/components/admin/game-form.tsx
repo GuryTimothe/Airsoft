@@ -26,6 +26,7 @@ import { getAppSettings } from "@/lib/settings-api";
 
 interface GameFormProps {
   gameId?: number;
+  initialGame?: Game;
 }
 
 function RequiredMark() {
@@ -58,10 +59,12 @@ function toFormValues(game?: Game): GameFormValues {
   };
 }
 
-export function GameForm({ gameId }: GameFormProps) {
+export function GameForm({ gameId, initialGame }: GameFormProps) {
   const router = useRouter();
-  const [values, setValues] = useState<GameFormValues>(emptyValues);
-  const [loading, setLoading] = useState(Boolean(gameId));
+  const [values, setValues] = useState<GameFormValues>(
+    initialGame ? toFormValues(initialGame) : emptyValues,
+  );
+  const [loading, setLoading] = useState(Boolean(gameId) && !initialGame);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -71,7 +74,7 @@ export function GameForm({ gameId }: GameFormProps) {
   );
 
   useEffect(() => {
-    if (!gameId) {
+    if (!gameId || initialGame) {
       return;
     }
 
