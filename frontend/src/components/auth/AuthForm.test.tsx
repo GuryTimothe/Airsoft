@@ -1,10 +1,12 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import AuthForm from "./AuthForm";
-import { registerUser } from "@/lib/auth";
+import { login, registerUser } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/user-api";
 
 const push = jest.fn();
 const refresh = jest.fn();
+const getSearchParam = jest.fn(() => null);
 
 jest.mock("next/navigation", () => ({
   useRouter: () => ({
@@ -12,19 +14,27 @@ jest.mock("next/navigation", () => ({
     refresh,
   }),
   useSearchParams: () => ({
-    get: () => null,
+    get: getSearchParam,
   }),
 }));
 
-jest.mock("@/lib/auth", () => ({
-  login: jest.fn(),
-  registerUser: jest.fn(),
+jest.mock("@/lib/auth", () => {
+  const actual = jest.requireActual("@/lib/auth");
+  return {
+    ...actual,
+    login: jest.fn(),
+    registerUser: jest.fn(),
+  };
+});
+
+jest.mock("@/lib/user-api", () => ({
   getCurrentUser: jest.fn(),
 }));
 
 describe("AuthForm", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    getSearchParam.mockReturnValue(null);
   });
 
   it("sends the emergency contact when registering as an adult", async () => {
@@ -67,6 +77,94 @@ describe("AuthForm", () => {
         pseudo: undefined,
         phone: undefined,
       });
+    });
+  });
+
+  it("prefills email in login mode from query string", async () => {
+    getSearchParam.mockImplementation((name: string) =>
+      name === "email" ? "prefilled@example.com" : null,
+    );
+
+    render(<AuthForm mode="login" />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Email")).toHaveValue(
+        "prefilled@example.com",
+      );
+    });
+  });
+
+  it("redirects organizer to admin after successful login", async () => {
+    const user = userEvent.setup();
+    (login as jest.Mock).mockResolvedValueOnce("");
+    (getCurrentUser as jest.Mock).mockResolvedValueOnce({
+      role: "ROLE_ORGANIZER",
+    });
+
+    render(<AuthForm mode="login" />);
+
+    await user.type(screen.getByLabelText("Email"), "orga@example.com");
+    await user.type(screen.getByLabelText("Mot de passe"), "Password1234!");
+    await user.click(screen.getByRole("button", { name: "Connexion" }));
+
+    await waitFor(() => {
+      expect(login).toHaveBeenCalledWith({
+        email: "orga@example.com",
+        password: "Password1234!",
+      });
+      expect(push).toHaveBeenCalledWith("/admin");
+      expect(refresh).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "Connexion réussie.",
+      );
+    });
+  });
+
+  it("shows authentication error when login fails", async () => {
+    const user = userEvent.setup();
+    (login as jest.Mock).mockRejectedValueOnce(
+      new Error("Identifiants invalides."),
+    );
+
+    render(<AuthForm mode="login" />);
+
+    await user.type(screen.getByLabelText("Email"), "bad@example.com");
+    await user.type(screen.getByLabelText("Mot de passe"), "bad-password");
+    await user.click(screen.getByRole("button", { name: "Connexion" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "Identifiants invalides.",
+      );
+    });
+  });
+
+  it("shows validation summary for minor registration without guardian fields", async () => {
+    const user = userEvent.setup();
+
+    render(<AuthForm mode="register" />);
+
+    await user.type(screen.getByLabelText("Nom"), "Martin");
+    await user.type(screen.getByLabelText("Prénom"), "Alex");
+    await user.type(screen.getByLabelText("Email"), "alex@example.com");
+    await user.type(screen.getByLabelText("Mot de passe"), "Password1234!");
+    await user.type(screen.getByLabelText("Confirmer"), "Password1234!");
+    await user.type(screen.getByLabelText("Date de naissance"), "2012-01-01");
+    await user.click(screen.getByRole("button", { name: "Créer un compte" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Veuillez corriger les erreurs du formulaire."),
+      ).toBeInTheDocument();
+      expect(screen.getAllByText("Nom du responsable requis").length).toBe(2);
+      expect(screen.getAllByText("Prénom du responsable requis").length).toBe(
+        2,
+      );
+      expect(screen.getAllByText("Email du responsable requis").length).toBe(2);
+      expect(
+        screen.getAllByText("Téléphone du responsable requis").length,
+      ).toBe(2);
+      expect(registerUser).not.toHaveBeenCalled();
     });
   });
 });

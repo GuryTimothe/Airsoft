@@ -1,8 +1,13 @@
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { GameListCard } from "./GameListCard";
 import { getGames } from "@/lib/game-api";
-import { getMyGameRegistrations } from "@/lib/game-registration-api";
+import {
+  getMyGameRegistrations,
+  registerToGame,
+  cancelGameRegistration,
+} from "@/lib/game-registration-api";
 import { getCurrentUser } from "@/lib/user-api";
+import { AUTH_STATE_CHANGE_EVENT } from "@/lib/auth";
 
 jest.mock("@/lib/game-api", () => ({
   getGames: jest.fn(),
@@ -28,11 +33,29 @@ const mockedGetMyGameRegistrations =
 const mockedGetCurrentUser = getCurrentUser as jest.MockedFunction<
   typeof getCurrentUser
 >;
+const mockedRegisterToGame = registerToGame as jest.MockedFunction<
+  typeof registerToGame
+>;
+const mockedCancelGameRegistration =
+  cancelGameRegistration as jest.MockedFunction<typeof cancelGameRegistration>;
 
 describe("GameListCard", () => {
   beforeEach(() => {
+    jest.clearAllMocks();
     mockedGetCurrentUser.mockRejectedValue(new Error("unauthenticated"));
     mockedGetMyGameRegistrations.mockResolvedValue([]);
+    mockedRegisterToGame.mockResolvedValue({
+      id: 99,
+      gameId: 1,
+      userId: 1,
+      userFirstname: "Jean",
+      userLastname: "Dupont",
+      userEmail: "jean@test.com",
+      userAge: 30,
+      isPresent: false,
+      createdAt: new Date().toISOString(),
+    });
+    mockedCancelGameRegistration.mockResolvedValue(undefined);
     mockedGetGames.mockResolvedValue([
       {
         id: 1,
@@ -187,23 +210,7 @@ describe("GameListCard", () => {
   });
 
   it("handles register action successfully", async () => {
-    const { registerToGame } = await import("@/lib/game-registration-api");
-    const mockedRegisterToGame = registerToGame as jest.MockedFunction<
-      typeof registerToGame
-    >;
-
     mockedGetCurrentUser.mockResolvedValue({ role: "ROLE_USER" } as never);
-    mockedRegisterToGame.mockResolvedValue({
-      id: 99,
-      gameId: 1,
-      userId: 1,
-      userFirstname: "Jean",
-      userLastname: "Dupont",
-      userEmail: "jean@test.com",
-      userAge: 30,
-      isPresent: false,
-      createdAt: new Date().toISOString(),
-    });
 
     render(<GameListCard />);
 
@@ -213,6 +220,110 @@ describe("GameListCard", () => {
     await waitFor(() => {
       expect(mockedRegisterToGame).toHaveBeenCalledWith(1);
     });
+  });
+
+  it("shows register error when API fails", async () => {
+    mockedGetCurrentUser.mockResolvedValue({ role: "ROLE_USER" } as never);
+    mockedRegisterToGame.mockRejectedValueOnce(
+      new Error("Inscription impossible"),
+    );
+
+    render(<GameListCard />);
+
+    await screen.findByRole("button", { name: "S'inscrire à Forêt" });
+    fireEvent.click(screen.getByRole("button", { name: "S'inscrire à Forêt" }));
+
+    expect(
+      await screen.findByText("Inscription impossible"),
+    ).toBeInTheDocument();
+  });
+
+  it("handles cancel action successfully", async () => {
+    mockedGetCurrentUser.mockResolvedValue({ role: "ROLE_USER" } as never);
+    mockedGetMyGameRegistrations.mockResolvedValueOnce([
+      {
+        id: 42,
+        gameId: 1,
+        userId: 1,
+        userFirstname: "Jean",
+        userLastname: "Dupont",
+        userEmail: "jean@test.com",
+        userAge: 30,
+        isPresent: false,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+
+    render(<GameListCard />);
+
+    await screen.findByRole("button", {
+      name: "Annuler l'inscription à Forêt",
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Annuler l'inscription à Forêt" }),
+    );
+
+    await waitFor(() => {
+      expect(mockedCancelGameRegistration).toHaveBeenCalledWith(42);
+    });
+  });
+
+  it("reacts to auth state changes by loading registrations", async () => {
+    mockedGetCurrentUser.mockRejectedValueOnce(new Error("unauthenticated"));
+    mockedGetCurrentUser.mockResolvedValueOnce({ role: "ROLE_USER" } as never);
+    mockedGetMyGameRegistrations.mockResolvedValueOnce([
+      {
+        id: 77,
+        gameId: 1,
+        userId: 1,
+        userFirstname: "Jean",
+        userLastname: "Dupont",
+        userEmail: "jean@test.com",
+        userAge: 30,
+        isPresent: false,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+
+    render(<GameListCard />);
+
+    await screen.findByText("Forêt");
+    expect(
+      screen.getAllByRole("link", { name: "Se connecter pour s'inscrire" }),
+    ).toHaveLength(2);
+
+    window.dispatchEvent(new Event(AUTH_STATE_CHANGE_EVENT));
+
+    await waitFor(() => {
+      expect(mockedGetMyGameRegistrations).toHaveBeenCalled();
+      expect(
+        screen.getByRole("button", { name: "Annuler l'inscription à Forêt" }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("shows empty state when there are no upcoming games", async () => {
+    mockedGetGames.mockResolvedValueOnce([
+      {
+        id: 1,
+        title: "Ancienne partie",
+        description: "Partie passée",
+        startDateTime: new Date(Date.now() - 86400000).toISOString(),
+        address: "Domaine de la Forêt",
+        price: 15,
+        maxPlaces: 24,
+        registrationCount: 0,
+        availablePlaces: 24,
+        full: false,
+        isPublic: true,
+      },
+    ]);
+
+    render(<GameListCard />);
+
+    expect(
+      await screen.findByText("Aucune partie a venir pour le moment."),
+    ).toBeInTheDocument();
   });
 
   it("shows error when games cannot be loaded", async () => {
