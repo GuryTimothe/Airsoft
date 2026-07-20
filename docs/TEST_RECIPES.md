@@ -34,7 +34,7 @@ Chaque cas teste une **fonction spécifique** :
 ### Rapporter un Bug
 
 Si le résultat ≠ résultat attendu :
-1. Créer GitHub Issue avec tag `bug`
+1. Créer un ticket Notion avec tag `bug`
 2. Référencer le cas test (ex: TC-AUTH-005)
 3. Inclure screenshot/logs
 
@@ -64,7 +64,7 @@ Si le résultat ≠ résultat attendu :
 | TC-LOGIN-002 | Login email incorrect | Compte existant | 1. `/login` 2. Email incorrect 3. Submit | Erreur "Identifiants invalides" | ✅ PASS |
 | TC-LOGIN-003 | Login password incorrect | Compte existant | 1. `/login` 2. Password incorrect 3. Submit | Erreur "Identifiants invalides" | ✅ PASS |
 | TC-LOGIN-004 | Login compte inexistant | — | 1. `/login` 2. Email inexistant 3. Submit | Erreur "Identifiants invalides" | ✅ PASS |
-| TC-LOGIN-005 | Login 5 tentatives échouées | Compte existant | 1. `/login` 2. Soumettre plusieurs fois avec password faux | Rate limiting: 429 + Retry-After | ✅ PASS |
+| TC-LOGIN-005 | Login 3 tentatives échouées | Compte existant | 1. `/login` 2. Soumettre plusieurs fois avec password faux | Rate limiting: 429 + Retry-After | ✅ PASS |
 | TC-LOGIN-006 | Inscription rate limitée | Pas loggé | 1. POST `/api/register` au-delà du quota | Rate limiting: 429 + message inscription | ✅ PASS |
 | TC-LOGIN-007 | Pré-remplissage email login | Email dans query string | 1. Aller `/auth/login?email=user@example.com` | Champ email pré-rempli | ✅ PASS |
 | TC-LOGIN-008 | Redirection admin après login organizer | Compte ROLE_ORGANIZER | 1. Login valide 2. Profil courant organizer | Redirection `/admin` + refresh router | ✅ PASS |
@@ -168,13 +168,12 @@ Si le résultat ≠ résultat attendu :
 | TC-REG-002 | S'inscrire partie pleine | USER loggé, partie full | 1. Détail partie 2. "S'inscrire" | Erreur "Partie complète" | ✅ PASS |
 | TC-REG-003 | Doublon inscription | USER déjà inscrit | 1. Tenter s'inscrire à nouveau | Erreur "Vous êtes déjà inscrit" | ✅ PASS |
 | TC-REG-004 | S'inscrire partie privée (USER) | USER loggé, partie privée | 1. Tenter s'inscrire directement | Erreur "Accès refusé" | ✅ PASS |
-| TC-REG-005 | Afficher mes inscriptions | USER loggé | 1. `/my-registrations` | Liste parties où inscrit | ⏳ À TESTER |
-| TC-REG-006 | Places dispo diminue après inscription | Partie avec 5 places | 1. Ajouter registration 2. Vérifier `getAvailablePlaces()` | Places passent de 5 à 4 | ✅ PASS |
-| TC-REG-007 | Annuler inscription | USER loggé, inscrit | 1. DELETE /api/game_registrations/{id} | Inscription supprimée | ✅ PASS |
-| TC-REG-008 | Inscription frontend réussie | USER loggé, partie disponible | 1. Cliquer "S'inscrire" | Appel API register et rafraîchissement état | ✅ PASS |
-| TC-REG-009 | Erreur inscription frontend | USER loggé, API register échoue | 1. Cliquer "S'inscrire" | Message erreur affiché | ✅ PASS |
-| TC-REG-010 | Annulation frontend réussie | USER déjà inscrit | 1. Cliquer "Annuler l'inscription" | Appel API cancel et état mis à jour | ✅ PASS |
-| TC-REG-011 | Refresh auth state inscriptions | Changement auth frontend | 1. Event `auth-state-changed` | Inscriptions utilisateur rechargées | ✅ PASS |
+| TC-REG-005 | Places dispo diminue après inscription | Partie avec 5 places | 1. Ajouter registration 2. Vérifier `getAvailablePlaces()` | Places passent de 5 à 4 | ✅ PASS |
+| TC-REG-006 | Annuler inscription | USER loggé, inscrit | 1. DELETE /api/game_registrations/{id} | Inscription supprimée | ✅ PASS |
+| TC-REG-007 | Inscription frontend réussie | USER loggé, partie disponible | 1. Cliquer "S'inscrire" | Appel API register et rafraîchissement état | ✅ PASS |
+| TC-REG-008 | Erreur inscription frontend | USER loggé, API register échoue | 1. Cliquer "S'inscrire" | Message erreur affiché | ✅ PASS |
+| TC-REG-009 | Annulation frontend réussie | USER déjà inscrit | 1. Cliquer "Annuler l'inscription" | Appel API cancel et état mis à jour | ✅ PASS |
+| TC-REG-010 | Refresh auth state inscriptions | Changement auth frontend | 1. Event `auth-state-changed` | Inscriptions utilisateur rechargées | ✅ PASS |
 
 ---
 
@@ -254,7 +253,7 @@ Si le résultat ≠ résultat attendu :
 |---|---|---|---|---|
 | TC-PERF-001 | GET /api/games < 500ms | 100 games DB | Temps réponse | ❌ FAIL |
 | TC-PERF-002 | POST inscription < 200ms | DB normal | Temps création | ❌ FAIL |
-| TC-PERF-003 | Export CSV < 2s | 1000 users | Temps génération | ✅ PASS |
+| TC-PERF-003 | Export CSV < 2s | 1000 users | Temps génération | ❌ FAIL |
 | TC-PERF-004 | Lighthouse Performance > 80 | Build prod | Score CI/CD | ✅ PASS |
 | TC-PERF-005 | Lighthouse Accessibilité > 90 | Build prod | Score CI/CD | ✅ PASS |
 
