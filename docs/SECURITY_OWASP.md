@@ -3,7 +3,7 @@
 **Référence**: https://owasp.org/Top10/2025/
 **Périmètre**: backend Symfony/API Platform, frontend Next.js, CI/CD
 
-Ce document synthétise les contrôles de sécurité implémentés dans l'application Airsoft. Seules les implémentations complétées sont documentées ici.
+Ce document synthétise les contrôles de sécurité implémentés dans l'application Airsoft.
 
 ---
 
@@ -50,31 +50,31 @@ ROLE_SUPER_ADMIN (accès complet)
 ```
 
 Restrictions par endpoint:
-- `/api/users` (GET, DELETE): ADMIN+ seulement
-- `/api/games` (POST, PATCH, DELETE): ADMIN+ seulement
-- `/api/exports/*`: ADMIN+ seulement
-- `/api/games/{id}/register`: USER+ (soumis aux voters)
+- `/api/users` (GET, DELETE): ADMIN et SUPER_ADMIN seulement
+- `/api/games` (POST, PATCH, DELETE): ADMIN et SUPER_ADMIN seulement
+- `/api/exports/*`: ADMIN, ORGANIZER et SUPER_ADMIN seulement
+- `/api/games/{id}/register`: Tous (soumis aux voters)
 
 **Fichier**: `backend/config/packages/security.yaml`
 
 #### 3. Voters métier côté serveur
 
-4 voters implémentés pour contrôles métier décentralisés:
+4 voters sont implémentés pour contrôles métier décentralisés:
 
 | Voter | Ressource | Décision |
 |-------|-----------|----------|
-| `UserVoter` | Modification utilisateur | Bloque change role sauf par SUPER_ADMIN, bloque password via PATCH |
+| `UserVoter` | Modification utilisateur | Bloque le changement de role sauf pour le SUPER_ADMIN qui peut tout modifier et ADMIN qui peut modifier que en USER ou ORGANIZER, bloque le password via PATCH |
 | `GameVoter` | Création/modification partie | Autorise création/modif selon rôle et ownership |
 | `GameRegistrationVoter` | Inscription à partie | Valide visibilité, complétude, quotas, rôle |
-| `AppSettingVoter` | Paramètres applicatifs | ADMIN+ uniquement |
+| `AppSettingVoter` | Paramètres applicatifs | ADMIN et SUPER_ADMIN uniquement |
 
 **Fichiers**: `backend/src/Security/Voter/*.php`
 
 #### 4. Protection IDOR et filtrage visibility
 
 Ressources filtrées par le serveur:
-- Games privées accessibles uniquement à propriétaire + ADMIN+
-- GameRegistrations filtrées par utilisateur courant (sauf ADMIN)
+- Games privées accessibles uniquement aux ADMIN, SUPER_ADMIN, ORGANIZER et aux USER qui possède le droit de voir les games privées
+- GameRegistrations filtrées par utilisateur courant (Sauf pour ADMIN, SUPER_ADMIN, et ORGANIZER qui voient tous)
 - Endpoint `/api/me` pour auto-consultation
 
 **Fichiers**:
@@ -101,8 +101,8 @@ Batteries de tests couvrant contrôles d'accès:
 
 | Test | Scope |
 |------|-------|
-| `UserVoterTest`, `GameVoterTest`, etc. | Logique voters (15+ scénarios) |
-| `*VisibilityExtensionTest` | Filtrage ownership/visibility |
+| `UserVoterTest`, `GameVoterTest`, etc. | Logique voters (65 scénarios) |
+| `GameVisibilityExtensionTest`, `GameRegistrationVisibilityExtensionTest` | Filtrage ownership/visibility |
 | `AdminExportControllerTest` | Tests 401/403 sur exports |
 | `GameApiTest`, `GameRegistrationApiTest` | Tests API full-flow |
 
@@ -148,7 +148,7 @@ Conteneurs backend et frontend exécutent des utilisateurs non-root:
 #### 4. Isolation des services
 
 Docker Compose utilise un réseau interne:
-- Backend accessible via `backend:9000`
+- Backend accessible via `backend:8000`
 - Frontend accessible via `frontend:3000`
 - PostgreSQL/Redis internes au réseau (non exposés)
 
@@ -158,7 +158,7 @@ Docker Compose utilise un réseau interne:
 
 Login et auth renvoient messages génériques:
 - `401 Unauthorized` (pas de distinction "user not found" vs "wrong password")
-- Codes HTTP typés (401/403/429 selon contexte)
+- Codes HTTP typés (401/403/429 selon le contexte)
 
 **Fichier**: `backend/src/Security/GenericAuthenticationFailureHandler.php`
 
@@ -204,7 +204,7 @@ Workflow GitHub Actions dédié:
 
 Dépôt GitHub configuré:
 - Branche `main` protégée (force PR)
-- Commits conventionnels (type: scope: message)
+- Commits conventionnels (type(scope): message)
 - Builds CI avant merge
 
 **Configuration**: GitHub dépôt
@@ -253,11 +253,23 @@ lexik_jwt_authentication:
 
 #### 3. Validation avancée des claims
 
-TokenVersionSubscriber valide:
-- Claims `iss` (issuer) et `aud` (audience)
-- JTI (JWT ID) unique + immuable
-- Signature liée au hash password (impossibilité reuse post-password-change)
-- Nonce de session (impossibilité reuse cross-device)
+Le `TokenVersionSubscriber` applique des contrôles supplémentaires lors de la création et de la validation des tokens JWT :
+
+- **Validation des claims `iss` et `aud`**
+  - Vérification de l'émetteur (`issuer`) du token.
+  - Vérification de l'audience (`audience`) attendue par l'API.
+
+- **JTI (`JWT ID`) unique et révocable**
+  - Chaque token reçoit un identifiant unique (`jti`) généré aléatoirement.
+  - Les tokens révoqués sont stockés et refusés lors des prochaines requêtes.
+
+- **Signature liée au hash du mot de passe**
+  - Le token contient une signature (`pwd_sig`) calculée à partir du hash du mot de passe utilisateur.
+  - Après un changement de mot de passe, les anciens tokens deviennent invalides automatiquement.
+
+- **Nonce de session**
+  - Chaque utilisateur possède un nonce de session (`tok_nce`) vérifié à chaque requête.
+  - Une modification du nonce invalide les anciens tokens, empêchant leur réutilisation depuis une autre session ou un autre appareil.
 
 **Fichier**: `backend/src/Security/Jwt/TokenVersionSubscriber.php`
 
@@ -282,7 +294,7 @@ Cookie d'authentification `ma_access_token`:
 
 #### 6. Timeout applicatif
 
-Inactivité JWT gérée via `JWT_INACTIVITY_TIMEOUT` env. Revocation implicite après inactivité.
+Expiration par inactivité des JWT configurée via `JWT_INACTIVITY_TIMEOUT`, les tokens non utilisés pendant cette durée deviennent automatiquement invalides.
 
 **Fichier**: `backend/src/Security/Jwt/TokenVersionSubscriber.php`
 
@@ -371,9 +383,9 @@ Règles métier centralisées et testées:
 | Risque métier | Contrôle |
 |---------------|----------|
 | Inscription après complétude | `GameRegistrationCreateProcessor` valide capacité avant persist |
-| Élévation privilège utilisateur | `UserVoter` bloque change role sauf SUPER_ADMIN |
-| Exposition mot de passe | Groupes sérialisation exclude password en output |
-| Visibilité ressource | `GameVisibilityExtension` filtre parties privées |
+| Élévation privilège utilisateur | `UserVoter` bloque le changement de role sauf pour SUPER_ADMIN et pour ADMIN qui peut changer que en ORGANIZER ou USER |
+| Exposition mot de passe | Groupes sérialisation exclu password en output |
+| Visibilité ressource | `GameVisibilityExtension` restreint les résultats aux parties publiques lorsque l'utilisateur n'a pas les droits nécessaires |
 
 **Fichiers**: `backend/src/Security/Voter/*.php`, `backend/src/State/*.php`
 
@@ -385,13 +397,13 @@ Règles métier centralisées et testées:
 
 Exemple inscription:
 ```php
-// Validation DTO
+//Validation DTO
 $validator->validate($dto);
 
-// Voter check
+//Voter check
 $this->authorizationChecker->isGranted('REGISTER_GAME', $game);
 
-// Processor métier
+//Processor métier
 if ($game->isAtCapacity()) throw new BadRequestHttpException();
 ```
 
@@ -401,13 +413,12 @@ if ($game->isAtCapacity()) throw new BadRequestHttpException();
 
 Throttling sur endpoints d'entrée:
 - Login: max 3 tentatives / 5 minutes (429 + Retry-After)
-- Register: max 10 requêtes / 10 minutes
+- Register: max 3 requêtes / 5 minutes (429 + Retry-After)
 - Implémenté via Symfony Rate Limiter + subscriber
 
 **Fichiers**:
 - `backend/config/packages/rate_limiter.yaml`
 - `backend/src/Security/LoginRequestRateLimiterSubscriber.php`
-- `backend/src/EventListener/RegisterRequestRateLimiterSubscriber.php`
 
 #### 4. Fail-closed sur erreurs
 
@@ -695,8 +706,8 @@ Règles d'évaluation sliding-window:
 ```php
 public function testAuthenticationFailureProducesSecurityLogAnd401Response()
 {
-  // Assert: logger emitted SEC.AUTH.LOGIN_FAILED
-  // Assert: response 401
+  //Assert: logger emitted SEC.AUTH.LOGIN_FAILED
+  //Assert: response 401
 }
 ```
 
@@ -710,7 +721,7 @@ public function testAuthenticationFailureProducesSecurityLogAnd401Response()
    - Unique SEC.AUTH.LOGIN_FAILED
    - Vérifie exit code 0 (pas d'alerte)
 
-**Résultat**: 3/3 tests ✅, 13 assertions, couverture chain complète
+**Résultat**: 3/3 tests, 13 assertions, couverture chain complète
 
 **Fichiers**:
 - `backend/tests/Security/Jwt/GenericAuthenticationFailureHandlerTest.php`
@@ -768,7 +779,7 @@ Prévient états partiellement persistés.
 
 Rate limiting sur endpoints à risque:
 - Login: 3 tentatives / 5 minutes → 429
-- Register: 10 requêtes / 10 minutes
+- Register: 3 requêtes / 5 minutes → 429
 - Retry-After header
 - Limite pression sur chemins d'erreurs
 
@@ -814,35 +825,6 @@ Couverture scénarios exceptionnels:
 **Fichiers**: `backend/tests/Security/Jwt/*.php`
 
 ---
-
-## Commandes de validation
-
-Exécuter tests/vérifications:
-
-```bash
-# Tests sécurité (backend)
-cd backend
-php bin/phpunit tests/Security/ --display-skipped
-
-# Tests voters
-php bin/phpunit tests/Security/Voter/ -v
-
-# Tests API
-php bin/phpunit tests/Api/ -v
-
-# Audit dépendances
-composer audit
-npm audit
-
-# Scan statique (local si Semgrep installé)
-semgrep --config=p/owasp-top-ten backend/src/
-
-# Tests observabilité A09
-php bin/phpunit tests/Security/Jwt/GenericAuthenticationFailureHandlerTest.php tests/Security/SecurityAlertCheckTest.php -v
-
-# Validation alertes
-docker compose exec backend php bin/security_alert_check.php --file /app/var/log/dev.security.log --rules /app/config/security_alert_rules.yaml
-```
 
 ---
 
