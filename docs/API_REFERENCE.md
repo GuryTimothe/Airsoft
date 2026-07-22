@@ -1,661 +1,872 @@
-# API Reference - Airsoft
+# Référence API - Airsoft
 
-## Overview
+## Vue d'ensemble
 
-REST API built with Symfony 7.4 + API Platform 4.3.15  
-Base URL: `http://localhost:8000/api` (dev) | `https://api.production.com/api` (prod)
+API REST construite avec Symfony + API Platform.
 
-**Format**: JSON-LD (JSON Linked Data) with hydra namespace
-**Authentication**: JWT Bearer tokens (Lexik JWT Authentication)
-**Pagination**: 15 items per page (User, Game endpoints)
+- Formats principaux: `application/ld+json` et `application/json`
+- Version API Platform: `1.0.0`
+- Pagination: `15` éléments/page sur `User` et `Game`
 
----
+## Authentification
 
-## Authentication
+### Token CSRF (Public)
 
-### Login (Public)
+```http
+GET /api/csrf/token
+GET /api/csrf/login
+```
+
+Réponse:
+
+```json
+{
+  "csrfToken": "<token>"
+}
+```
+
+### Connexion (Public)
 
 ```http
 POST /api/login
-Content-Type: application/json
+Content-Type: application/ld+json
+X-CSRF-Token: <csrfToken>
 
 {
-  "email": "user@example.com",
-  "password": "SecurePassword123"
+  "email": "mail@gmail.com",
+  "password": "motdepassesécurisé1234!"
 }
 ```
 
-**Response (200 OK)**:
+Réponse (200):
+
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": {
-    "id": 1,
-    "email": "user@example.com",
-    "firstname": "John",
-    "lastname": "Doe",
-    "role": "ROLE_USER"
-  }
+  "token": "<jwt>"
 }
 ```
 
-**Error (401 Unauthorized)**:
+Notes:
+
+- Sans header `X-CSRF-Token`, la réponse observée est `403` avec `{"message":"Requête invalide."}`.
+- Le JWT est aussi défini dans le cookie httpOnly `ma_access_token`.
+- Le throttling de connexion est actif (voir section Limitation de débit).
+
+Exemple d'erreur de connexion (401/403 selon le cas):
+
 ```json
 {
-  "code": 401,
-  "message": "Invalid credentials"
+  "message": "Identifiants invalides."
 }
 ```
 
-### Register (Public)
+### Inscription (Public)
 
 ```http
 POST /api/register
-Content-Type: application/json
+Content-Type: application/ld+json
 
 {
-  "firstname": "John",
-  "lastname": "Doe",
-  "email": "john.doe@example.com",
-  "password": "SecurePassword123",
+  "firstname": "firstname",
+  "lastname": "lastname",
+  "email": "mail@gmail.com",
+  "password": "motdepassesécurisé1234!",
   "dateOfBirth": "2000-01-15",
-  "pseudo": "JohnD",
-  "phone": "+33612345678",
+  "pseudo": "pseudo",
+  "phone": "0739664821",
   "emergencyContact": {
-    "firstname": "Jane",
-    "lastname": "Doe",
-    "phone": "+33687654321",
-    "relationship": "Mère"
+    "lastname": "lastname",
+    "firstname": "firstname",
+    "email": "mail@gmail.com",
+    "phone": "0739664821"
   }
 }
 ```
 
-**Response (201 Created)**:
+Réponse (201): retourne la ressource `User` créée (pas de token dans la réponse).
+
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": {
-    "id": 2,
-    "email": "john.doe@example.com",
-    "firstname": "John",
-    "lastname": "Doe",
-    "role": "ROLE_USER"
-  }
+  "@context": "/api/contexts/User",
+  "@id": "/api/me",
+  "@type": "User",
+  "id": 67,
+  "lastname": "lastname",
+  "firstname": "firstname",
+  "email": "mail@gmail.com",
+  "dateOfBirth": "2000-01-15T00:00:00+00:00",
+  "emergencyContact": {
+    "@id": "/api/emergency_contacts/40",
+    "@type": "EmergencyContact",
+    "id": 40,
+    "lastname": "lastname",
+    "firstname": "firstname",
+    "email": "mail@gmail.com",
+    "phone": "0739664821"
+  },
+  "pseudo": "pseudo",
+  "phone": "0739664821",
+  "role": "ROLE_USER",
+  "canSeePrivate": false,
+  "createdAt": "2026-07-22T21:27:22+00:00",
+  "updatedAt": "2026-07-22T21:27:22+00:00",
+  "emergencyContactLastname": "lastname",
+  "emergencyContactFirstname": "firstname",
+  "emergencyContactEmail": "mail@gmail.com",
+  "emergencyContactPhone": "0739664821"
 }
 ```
 
-### Authentication Headers
+Notes:
 
-All authenticated requests require:
-```
-Authorization: Bearer <jwt_token>
-Content-Type: application/ld+json
-```
+- `emergencyContact` doit actuellement être envoyé comme une chaîne JSON. Un objet JSON brut retourne `400` avec `The input data is misformatted.`
+- Le format legacy `"Nom - téléphone"` est aussi accepté côté backend.
 
----
-
-## Users
-
-### Get All Users (ADMIN only)
+### Déconnexion (Public)
 
 ```http
-GET /api/users?page=1
-Authorization: Bearer <token>
+POST /api/logout
 ```
 
-**Response (200 OK)**:
+Réponse: `204 No Content`.
+
+Notes:
+
+- Supprime le cookie d'authentification.
+- Si un JWT est présent, une révocation est tentée côté serveur.
+
+### Requêtes authentifiées
+
+Privilégier l'authentification Bearer:
+
+```http
+Authorization: Bearer <jwt>
+```
+
+Pour les requêtes API non-GET effectuées avec authentification par cookie (sans en-tête Bearer), la protection CSRF est imposée via `X-CSRF-Token` (sauf routes exemptées comme `/api/register` et `/api/logout`).
+
+## Utilisateurs
+
+### Endpoints utilisateurs
+
+- `GET /api/users` - `ROLE_ADMIN` et `ROLE_SUPER_ADMIN` uniquement (`VIEW_ALL_USERS`)
+- `GET /api/users/{id}` - `ROLE_ADMIN` et `ROLE_SUPER_ADMIN` uniquement (`VIEW_ALL_USERS`)
+- `POST /api/users` - contrôle par rôle via voter (`CREATE_USER`)
+- `PATCH /api/users/{id}` - contrôle par rôle via voter (`UPDATE_USER`)
+- `DELETE /api/users/{id}` - contrôle par rôle via voter (`DELETE_USER`)
+
+### Endpoints utilisateur courant
+
+- `GET /api/me` - authentifié
+- `PATCH /api/me` - authentifié
+- `PATCH /api/me/email` - authentifié
+- `PATCH /api/me/password` - authentifié
+- `DELETE /api/me` - authentifié
+
+### Exemples de réponse JSON (Utilisateurs)
+
+`GET /api/users` (200):
+
 ```json
 {
   "@context": "/api/contexts/User",
   "@id": "/api/users",
-  "@type": "hydra:Collection",
-  "hydra:member": [
+  "@type": "Collection",
+  "totalItems": 32,
+  "member": [
     {
-      "@id": "/api/users/1",
+      "@id": "/api/me",
       "@type": "User",
       "id": 1,
-      "email": "user@example.com",
-      "firstname": "John",
-      "lastname": "Doe",
-      "pseudo": "JohnD",
-      "phone": "+33612345678",
-      "role": "ROLE_USER",
-      "dateOfBirth": "2000-01-15",
-      "createdAt": "2026-01-15T10:30:00+00:00",
-      "updatedAt": "2026-01-15T10:30:00+00:00"
+      "lastname": "lastname",
+      "firstname": "firstname",
+      "email": "mail@gmail.com",
+      "dateOfBirth": "1990-01-01T00:00:00+00:00",
+      "pseudo": "pseudo",
+      "role": "ROLE_SUPER_ADMIN",
+      "canSeePrivate": true,
+      "createdAt": "2026-07-18T09:40:38+00:00",
+      "updatedAt": "2026-07-19T11:06:51+00:00"
     }
-  ],
-  "hydra:totalItems": 42,
-  "hydra:itemsPerPage": 15
+  ]
 }
 ```
 
-### Get Single User (ADMIN only)
+`GET /api/users/{id}` (200):
 
-```http
-GET /api/users/{id}
-Authorization: Bearer <token>
+```json
+{
+  "@context": "/api/contexts/User",
+  "@id": "/api/users/2",
+  "@type": "User",
+  "id": 2,
+  "lastname": "lastname",
+  "firstname": "firstname",
+  "email": "mail@gmail.com",
+  "dateOfBirth": "2003-11-15T00:00:00+00:00",
+  "emergencyContact": {
+    "@id": "/api/emergency_contacts/34",
+    "@type": "EmergencyContact",
+    "id": 34,
+    "lastname": "lastname",
+    "firstname": "firstname",
+    "email": "mail@gmail.com",
+    "phone": "0739664821"
+  },
+  "pseudo": "pseudo",
+  "role": "ROLE_USER",
+  "canSeePrivate": false,
+  "createdAt": "2026-07-18T14:37:12+00:00",
+  "updatedAt": "2026-07-19T11:47:10+00:00",
+  "emergencyContactLastname": "lastname",
+  "emergencyContactFirstname": "firstname",
+  "emergencyContactEmail": "mail@gmail.com",
+  "emergencyContactPhone": "0739664821"
+}
 ```
 
-### Update My Profile (Authenticated)
+`POST /api/users` (201):
 
-```http
-PATCH /api/users/me
-Authorization: Bearer <token>
-Content-Type: application/ld+json
-
+```json
 {
-  "firstname": "John",
-  "lastname": "Doe",
+  "@context": "/api/contexts/User",
+  "@id": "/api/users/24",
+  "@type": "User",
+  "id": 24,
+  "firstname": "firstname",
+  "lastname": "lastname",
+  "email": "mail@gmail.com",
+  "role": "ROLE_ORGANIZER",
+  "canSeePrivate": true
+}
+```
+
+`PATCH /api/users/{id}` (200):
+
+```json
+{
+  "@context": "/api/contexts/User",
+  "@id": "/api/users/2",
+  "@type": "User",
+  "id": 2,
+  "lastname": "lastname",
+  "firstname": "firstname",
+  "email": "mail@gmail.com",
+  "dateOfBirth": "2003-11-15T00:00:00+00:00",
+  "emergencyContact": {
+    "@id": "/api/emergency_contacts/34",
+    "@type": "EmergencyContact",
+    "id": 34,
+    "lastname": "lastname",
+    "firstname": "firstname",
+    "email": "mail@gmail.com",
+    "phone": "0739664821"
+  },
+  "pseudo": "pseudo",
+  "phone": "0739664821",
+  "role": "ROLE_USER",
+  "canSeePrivate": true,
+  "createdAt": "2026-07-18T14:37:12+00:00",
+  "updatedAt": "2026-07-22T22:19:53+00:00",
+  "emergencyContactLastname": "lastname",
+  "emergencyContactFirstname": "firstname",
+  "emergencyContactEmail": "mail@gmail.com",
+  "emergencyContactPhone": "0739664821"
+}
+```
+
+### Payloads de requête (Utilisateurs)
+
+`POST /api/users`:
+
+```json
+{
+  "firstname": "firstname",
+  "lastname": "lastname",
+  "email": "mail@gmail.com",
+  "password": "motdepassesécurisé1234!",
   "dateOfBirth": "2000-01-15",
-  "pseudo": "JohnD",
-  "phone": "+33612345678"
+  "pseudo": "pseudo",
+  "phone": "0739664821",
+  "role": "ROLE_USER",
+  "canSeePrivate": false,
+  "emergencyContact": {
+    "lastname": "lastname",
+    "firstname": "firstname",
+    "email": "mail@gmail.com",
+    "phone": "0739664821"
+  }
 }
 ```
 
-**Note**: `email` and `password` are NOT editable via this endpoint.
+`PATCH /api/users/{id}`:
 
-### Update My Email (Authenticated)
-
-```http
-PATCH /api/users/me/email
-Authorization: Bearer <token>
-Content-Type: application/ld+json
-
+```json
 {
-  "password": "CurrentPassword123",
-  "newEmail": "newemail@example.com"
+  "firstname": "firstname",
+  "lastname": "lastname",
+  "email": "mail@gmail.com",
+  "pseudo": "pseudo",
+  "phone": "0739664821",
+  "canSeePrivate": true
 }
 ```
 
-### Update My Password (Authenticated)
+`GET /api/me` (200):
 
-```http
-PATCH /api/users/me/password
-Authorization: Bearer <token>
-Content-Type: application/ld+json
-
+```json
 {
-  "password": "CurrentPassword123",
-  "newPassword": "NewPassword456"
+  "@context": "/api/contexts/User",
+  "@id": "/api/me",
+  "@type": "User",
+  "id": 1,
+  "lastname": "lastname",
+  "firstname": "firstname",
+  "email": "mail@gmail.com",
+  "dateOfBirth": "1990-01-01T00:00:00+00:00",
+  "pseudo": "pseudo",
+  "role": "ROLE_SUPER_ADMIN",
+  "createdAt": "2026-07-18T09:40:38+00:00",
+  "updatedAt": "2026-07-19T11:06:51+00:00"
 }
 ```
 
-**Security**: Triggers JWT token rotation (token nonce updated)
+`PATCH /api/me` (200):
 
-### Delete My Account (Authenticated)
-
-```http
-DELETE /api/users/me
-Authorization: Bearer <token>
-```
-
-### Create User (ADMIN only)
-
-```http
-POST /api/users
-Authorization: Bearer <token>
-Content-Type: application/ld+json
-
+```json
 {
-  "firstname": "Jane",
-  "lastname": "Smith",
-  "email": "jane.smith@example.com",
-  "password": "SecurePassword123",
-  "dateOfBirth": "1995-05-20",
-  "role": "ROLE_ORGANIZER"
+  "@context": "/api/contexts/User",
+  "@id": "/api/me",
+  "@type": "User",
+  "id": 69,
+  "firstname": "firstname",
+  "lastname": "lastname",
+  "email": "mail@gmail.com",
+  "dateOfBirth": "2000-02-20T00:00:00+00:00",
+  "emergencyContact": {
+    "@id": "/api/emergency_contacts/42",
+    "@type": "EmergencyContact",
+    "id": 42,
+    "lastname": "lastname",
+    "firstname": "firstname",
+    "email": "mail@gmail.com",
+    "phone": "0739664821"
+  },
+  "pseudo": "pseudo",
+  "phone": "0739664821",
+  "role": "ROLE_USER",
+  "canSeePrivate": false,
+  "createdAt": "2026-07-22T22:17:27+00:00",
+  "updatedAt": "2026-07-22T22:17:28+00:00",
+  "emergencyContactLastname": "lastname",
+  "emergencyContactFirstname": "firstname",
+  "emergencyContactEmail": "mail@gmail.com",
+  "emergencyContactPhone": "0739664821"
 }
 ```
 
-**Note**: Only ADMIN can assign `ROLE_USER` or `ROLE_ORGANIZER`. `ROLE_SUPER_ADMIN` assignment restricted.
+`PATCH /api/me/email` (200):
 
-### Update User (ADMIN only)
-
-```http
-PATCH /api/users/{id}
-Authorization: Bearer <token>
-Content-Type: application/ld+json
-
+```json
 {
-  "firstname": "Jane",
-  "pseudo": "JaneS",
-  "role": "ROLE_ORGANIZER"
+  "@context": {
+    "@vocab": "http://localhost:8000/api/docs.jsonld#",
+    "hydra": "http://www.w3.org/ns/hydra/core#",
+    "user": "MeUpdateOutput/user",
+    "token": "MeUpdateOutput/token"
+  },
+  "@type": "MeUpdateOutput",
+  "@id": "/api/.well-known/genid/...",
+  "user": {
+    "@id": "/api/me",
+    "@type": "User",
+    "id": 69,
+    "lastname": "lastname",
+    "firstname": "firstname",
+    "email": "mail@gmail.com",
+    "dateOfBirth": "2000-02-20T00:00:00+00:00",
+    "emergencyContact": {
+      "@id": "/api/emergency_contacts/42",
+      "@type": "EmergencyContact",
+      "id": 42,
+      "lastname": "lastname",
+      "firstname": "firstname",
+      "email": "mail@gmail.com",
+      "phone": "0739664821"
+    },
+    "pseudo": "pseudo",
+    "phone": "0739664821",
+    "role": "ROLE_USER",
+    "canSeePrivate": false,
+    "createdAt": "2026-07-22T22:17:27+00:00",
+    "updatedAt": "2026-07-22T22:17:29+00:00",
+    "emergencyContactLastname": "lastname",
+    "emergencyContactFirstname": "firstname",
+    "emergencyContactEmail": "mail@gmail.com",
+    "emergencyContactPhone": "0739664821"
+  },
+  "token": "<jwt>"
 }
 ```
 
-**Note**: Cannot modify `email`, `password`, or `dateOfBirth` via this endpoint.
+`PATCH /api/me/password` (200):
 
-### Delete User (ADMIN only)
-
-```http
-DELETE /api/users/{id}
-Authorization: Bearer <token>
+```json
+{
+  "@context": {
+    "@vocab": "http://localhost:8000/api/docs.jsonld#",
+    "hydra": "http://www.w3.org/ns/hydra/core#",
+    "user": "MeUpdateOutput/user",
+    "token": "MeUpdateOutput/token"
+  },
+  "@type": "MeUpdateOutput",
+  "@id": "/api/.well-known/genid/...",
+  "user": {
+    "@id": "/api/me",
+    "@type": "User",
+    "id": 69,
+    "lastname": "lastname",
+    "firstname": "firstname",
+    "email": "mail@gmail.com",
+    "dateOfBirth": "2000-02-20T00:00:00+00:00",
+    "emergencyContact": {
+      "@id": "/api/emergency_contacts/42",
+      "@type": "EmergencyContact",
+      "id": 42,
+      "lastname": "lastname",
+      "firstname": "firstname",
+      "email": "mail@gmail.com",
+      "phone": "0739664821"
+    },
+    "pseudo": "pseudo",
+    "phone": "0739664821",
+    "role": "ROLE_USER",
+    "canSeePrivate": false,
+    "createdAt": "2026-07-22T22:17:27+00:00",
+    "updatedAt": "2026-07-22T22:17:29+00:00",
+    "emergencyContactLastname": "lastname",
+    "emergencyContactFirstname": "firstname",
+    "emergencyContactEmail": "mail@gmail.com",
+    "emergencyContactPhone": "0739664821"
+  },
+  "token": "<jwt>"
+}
 ```
 
----
+### Notes payload
 
-## Games
+`PATCH /api/me` attend par exemple:
 
-### Get All Games (Public)
-
-```http
-GET /api/games?page=1
+```json
+{
+  "firstname": "firstname",
+  "lastname": "lastname",
+  "dateOfBirth": "2000-02-20",
+  "pseudo": "pseudo",
+  "phone": "0739664821",
+  "emergencyContact": {
+    "lastname": "lastname",
+    "firstname": "firstname",
+    "email": "mail@gmail.com",
+    "phone": "0739664821"
+  }
+}
 ```
 
-**Response (200 OK)**:
+`PATCH /api/me/email` attend:
+
+```json
+{
+  "email": "mail@gmail.com",
+  "currentPassword": "motdepassesécurisé1234!"
+}
+```
+
+`PATCH /api/me/password` attend:
+
+```json
+{
+  "currentPassword": "motdepassesécurisé1234!",
+  "newPassword": "motdepassesécurisé1234!"
+}
+```
+
+`/api/me/email` et `/api/me/password` retournent un objet contenant les données utilisateur mises à jour et un nouveau token.
+
+`PATCH /api/me` retourne directement la ressource `User` mise à jour.
+
+### Règles de rôle
+
+- `ROLE_SUPER_ADMIN` peut créer/supprimer/modifier les utilisateurs via les voters.
+- `ROLE_ADMIN` peut créer/supprimer uniquement des utilisateurs dont le rôle cible est `ROLE_USER` ou `ROLE_ORGANIZER`.
+- `ROLE_ADMIN` ne peut pas attribuer `ROLE_ADMIN` ou `ROLE_SUPER_ADMIN`.
+- Les changements de mot de passe sont bloqués sur `PATCH /api/users/{id}` (utiliser `/api/me/password`).
+
+## Parties
+
+### Endpoints parties
+
+- `GET /api/games` - public
+- `GET /api/games/{id}` - public
+- `POST /api/games` - `ROLE_ORGANIZER`, `ROLE_ADMIN` ou `ROLE_SUPER_ADMIN`
+- `PUT /api/games/{id}` - `ROLE_ORGANIZER`, `ROLE_ADMIN` ou `ROLE_SUPER_ADMIN`
+- `DELETE /api/games/{id}` - `ROLE_ORGANIZER`, `ROLE_ADMIN` ou `ROLE_SUPER_ADMIN`
+
+### Exemples de réponse JSON (Parties)
+
+`GET /api/games` (200):
+
 ```json
 {
   "@context": "/api/contexts/Game",
   "@id": "/api/games",
-  "@type": "hydra:Collection",
-  "hydra:member": [
+  "@type": "Collection",
+  "totalItems": 2,
+  "member": [
     {
       "@id": "/api/games/1",
       "@type": "Game",
       "id": 1,
-      "title": "CQB Night Session",
-      "description": "Indoor close quarters battle scenario",
-      "startDateTime": "2026-07-15T20:00:00+00:00",
-      "address": "Terrain Nord, Paris 75",
-      "price": 10.0,
+      "title": "Titre",
+      "description": "",
+      "startDateTime": "2026-07-31T17:08:00+00:00",
+      "address": "Terrain principal",
+      "price": 10,
       "maxPlaces": 24,
-      "registrationCount": 12,
-      "availablePlaces": 12,
-      "full": false,
-      "isPublic": true,
-      "image": "/uploads/games/cqb.jpg",
-      "createdAt": "2026-01-10T14:30:00+00:00",
-      "updatedAt": "2026-01-10T14:30:00+00:00"
+      "createdAt": "2026-07-19T11:16:26+00:00",
+      "updatedAt": "2026-07-19T11:16:26+00:00",
+      "public": true,
+      "registrationCount": 2,
+      "availablePlaces": 22,
+      "full": false
     }
-  ],
-  "hydra:totalItems": 5,
-  "hydra:itemsPerPage": 15
+  ]
 }
 ```
 
-**Public games**: Visible to all without authentication  
-**Private games**: Only visible to ADMIN/ORGANIZER
+`GET /api/games/{id}` (200):
 
-### Get Single Game (Public)
-
-```http
-GET /api/games/{id}
+```json
+{
+  "@context": "/api/contexts/Game",
+  "@id": "/api/games/1",
+  "@type": "Game",
+  "id": 1,
+  "title": "Titre",
+  "description": "",
+  "startDateTime": "2026-07-31T17:08:00+00:00",
+  "address": "Terrain principal",
+  "price": 10,
+  "maxPlaces": 24,
+  "createdAt": "2026-07-19T11:16:26+00:00",
+  "updatedAt": "2026-07-19T11:16:26+00:00",
+  "public": true,
+  "registrationCount": 2,
+  "availablePlaces": 22,
+  "full": false
+}
 ```
 
-### Create Game (ADMIN only)
+`POST /api/games` (201) / `PUT /api/games/{id}` (200):
 
-```http
-POST /api/games
-Authorization: Bearer <token>
-Content-Type: application/ld+json
-
+```json
 {
-  "title": "New Scenario",
-  "description": "New game description",
-  "startDateTime": "2026-07-20T19:00:00+00:00",
-  "address": "Terrain Nord, Paris 75",
-  "price": 15.0,
-  "maxPlaces": 30,
+  "@context": "/api/contexts/Game",
+  "@id": "/api/games/7",
+  "@type": "Game",
+  "id": 7,
+  "title": "Titre",
+  "address": "Terrain principal",
+  "isPublic": false,
+  "price": 15,
+  "maxPlaces": 20
+}
+```
+
+### Payloads de requête (Parties)
+
+`POST /api/games`:
+
+```json
+{
+  "title": "Titre",
+  "description": "",
+  "startDateTime": "2026-07-31T17:08:00+00:00",
+  "address": "Terrain principal",
+  "price": 10,
+  "maxPlaces": 24,
   "isPublic": true
 }
 ```
 
-### Update Game (ADMIN only)
+`PUT /api/games/{id}`:
 
-```http
-PUT /api/games/{id}
-Authorization: Bearer <token>
-Content-Type: application/ld+json
-
+```json
 {
-  "title": "Updated Title",
-  "price": 12.0,
-  "maxPlaces": 32
+  "title": "Titre",
+  "description": "",
+  "startDateTime": "2026-07-31T17:08:00+00:00",
+  "address": "Terrain principal",
+  "price": 10,
+  "maxPlaces": 24,
+  "isPublic": true
 }
 ```
 
-### Delete Game (ADMIN only)
+### Visibilité
 
-```http
-DELETE /api/games/{id}
-Authorization: Bearer <token>
-```
+- Les parties publiques sont visibles par tout le monde.
+- Les parties privées sont visibles par les utilisateurs avec `ROLE_ADMIN` ou avec `canSeePrivate = true`.
 
----
+## Inscriptions aux parties
 
-## Game Registrations
+### Endpoints inscriptions
 
-### Get My Registrations (Authenticated)
+- `GET /api/game_registrations` - authentifié (filtré automatiquement par extension de visibilité)
+- `GET /api/game_registrations/mine` - authentifié, utilisateur courant uniquement
+- `POST /api/game_registrations` - authentifié + voter `REGISTER_GAME` (partie publique pour tous les authentifiés, partie privée: `ROLE_ADMIN`, `ROLE_SUPER_ADMIN`, `ROLE_ORGANIZER` ou `canSeePrivate=true`)
+- `PATCH /api/game_registrations/{id}` - `ROLE_ADMIN`, `ROLE_SUPER_ADMIN`, `ROLE_ORGANIZER` (mise à jour présence)
+- `DELETE /api/game_registrations/{id}` - `ROLE_ADMIN`, `ROLE_SUPER_ADMIN`, `ROLE_ORGANIZER`, ou propriétaire de l'inscription (voter `DELETE_GAME_REGISTRATION`)
 
-```http
-GET /api/game_registrations/mine
-Authorization: Bearer <token>
-```
+Note: sur l'instance observée, `GET /api/game_registrations/{id}` retourne `404` avec `This route does not aim to be called.`
 
-**Response (200 OK)**:
+### Exemples de réponse JSON (Inscriptions)
+
+`GET /api/game_registrations` (200):
+
 ```json
-[
-  {
-    "id": 5,
-    "gameId": 1,
-    "gameTite": "CQB Night Session",
-    "userId": 2,
-    "userFirstname": "John",
-    "userLastname": "Doe",
-    "userEmail": "john@example.com",
-    "userAge": 24,
-    "isPresent": false,
-    "createdAt": "2026-01-12T15:45:00+00:00"
-  }
-]
+{
+  "@context": "/api/contexts/GameRegistration",
+  "@id": "/api/game_registrations",
+  "@type": "Collection",
+  "totalItems": 3,
+  "member": [
+    {
+      "@id": "/api/game_registrations/2",
+      "@type": "GameRegistration",
+      "id": 2,
+      "createdAt": "2026-07-19T15:26:14+00:00",
+      "gameId": 1,
+      "userId": 2,
+      "userFirstname": "firstname",
+      "userLastname": "lastname",
+      "userEmail": "mail@gmail.com",
+      "userAge": 22
+    }
+  ]
+}
 ```
 
-### Get All Registrations (ADMIN only)
+`GET /api/game_registrations/mine` (200):
 
-```http
-GET /api/game_registrations?page=1
-Authorization: Bearer <token>
+```json
+{
+  "@context": "/api/contexts/GameRegistration",
+  "@id": "/api/game_registrations/mine",
+  "@type": "hydra:Collection",
+  "hydra:member": [
+    {
+      "@id": "/api/game_registrations/10",
+      "@type": "GameRegistration",
+      "id": 10,
+      "gameId": 1,
+      "userId": 12,
+      "isPresent": false
+    }
+  ],
+  "hydra:totalItems": 1
+}
 ```
 
-### Get Single Registration (ADMIN or own registration)
+`POST /api/game_registrations` (201):
 
-```http
-GET /api/game_registrations/{id}
-Authorization: Bearer <token>
+```json
+{
+  "@context": "/api/contexts/GameRegistration",
+  "@id": "/api/game_registrations/5",
+  "@type": "GameRegistration",
+  "id": 5,
+  "createdAt": "2026-07-22T21:28:52+00:00",
+  "gameId": 4,
+  "userId": 1,
+  "userFirstname": "firstname",
+  "userLastname": "lastname",
+  "userEmail": "mail@gmail.com",
+  "userAge": 36
+}
 ```
 
-### Register to Game (Authenticated)
+`PATCH /api/game_registrations/{id}` (200):
 
-```http
-POST /api/game_registrations
-Authorization: Bearer <token>
-Content-Type: application/ld+json
+```json
+{
+  "@context": "/api/contexts/GameRegistration",
+  "@id": "/api/game_registrations/7",
+  "@type": "GameRegistration",
+  "id": 7,
+  "createdAt": "2026-07-22T22:19:54+00:00",
+  "gameId": 1,
+  "userId": 1,
+  "userFirstname": "firstname",
+  "userLastname": "lastname",
+  "userEmail": "mail@gmail.com",
+  "userAge": 36
+}
+```
 
+### Payloads de requête
+
+`POST /api/game_registrations`:
+
+```json
 {
   "game": "/api/games/1"
 }
 ```
 
-**Validation**:
-- User must be authenticated
-- Game must exist
-- Game must be public or user is ADMIN
-- User cannot be already registered
-- Game must not be full
+`PATCH /api/game_registrations/{id}`:
 
-**Response (201 Created)**:
 ```json
-{
-  "id": 10,
-  "gameId": 1,
-  "userId": 2,
-  "isPresent": false,
-  "createdAt": "2026-01-13T10:00:00+00:00"
-}
-```
-
-### Mark Presence (ADMIN only)
-
-```http
-PATCH /api/game_registrations/{id}
-Authorization: Bearer <token>
-Content-Type: application/ld+json
-
 {
   "isPresent": true
 }
 ```
 
-### Delete Registration (ADMIN or owner)
+(`present` est aussi accepté.)
 
-```http
-DELETE /api/game_registrations/{id}
-Authorization: Bearer <token>
-```
+### Règles d'inscription
 
----
+- L'utilisateur doit être authentifié.
+- La partie ciblée doit exister.
+- L'inscription à une partie privée nécessite un accès privé (`canSeePrivate`).
+- Une inscription en doublon est rejetée (`409`).
 
-## Emergency Contacts
+### Filtre de visibilité
 
-### Get Emergency Contacts by User (ADMIN only)
+- `ROLE_ADMIN`, `ROLE_SUPER_ADMIN`, `ROLE_ORGANIZER`: peuvent lister/lire toutes les inscriptions.
+- Autres utilisateurs authentifiés: uniquement leurs propres inscriptions.
 
-```http
-GET /api/emergency_contacts?user.id={userId}
-Authorization: Bearer <token>
-```
+## Contacts d'urgence
 
-**Response (200 OK)**:
+Endpoint direct non exposé actuellement.
+
+- `GET /api/emergency_contacts/{id}` retourne `404` avec `This route does not aim to be called.`
+
+En pratique, les données de contact d'urgence sont consommées via les ressources utilisateur (`/api/me`, `/api/users/{id}`), sous cette forme:
+
 ```json
 {
-  "@context": "/api/contexts/EmergencyContact",
-  "@id": "/api/emergency_contacts",
-  "@type": "hydra:Collection",
-  "hydra:member": [
-    {
-      "@id": "/api/emergency_contacts/1",
-      "@type": "EmergencyContact",
-      "id": 1,
-      "firstname": "Jane",
-      "lastname": "Doe",
-      "phone": "+33687654321",
-      "relationship": "Mère"
-    }
-  ]
+  "emergencyContact": {
+    "@id": "/api/emergency_contacts/34",
+    "@type": "EmergencyContact",
+    "id": 34,
+    "lastname": "lastname",
+    "firstname": "firstname",
+    "email": "mail@gmail.com",
+    "phone": "0739664821"
+  }
 }
 ```
 
-### Get Emergency Contact (ADMIN only)
+## Paramètres applicatifs
 
-```http
-GET /api/emergency_contacts/{id}
-Authorization: Bearer <token>
-```
+Endpoints singleton:
 
-**Note**: Emergency contacts are embedded in User entity via `emergencyContact` field.
+- `GET /api/app_settings` - `ROLE_ADMIN` ou `ROLE_SUPER_ADMIN`
+- `PATCH /api/app_settings` - `ROLE_ADMIN` ou `ROLE_SUPER_ADMIN`
 
----
+Exemple de réponse JSON `GET /api/app_settings` (200) / `PATCH /api/app_settings` (200):
 
-## App Settings
-
-### Get Settings (ADMIN only)
-
-```http
-GET /api/app_settings
-Authorization: Bearer <token>
-```
-
-**Response (200 OK)**:
 ```json
 {
   "@context": "/api/contexts/AppSetting",
   "@id": "/api/app_settings",
-  "@type": "hydra:Collection",
-  "hydra:member": [
-    {
-      "@id": "/api/app_settings/1",
-      "@type": "AppSetting",
-      "id": 1,
-      "defaultAddress": "Terrain Principal, Paris 75",
-      "defaultPrice": 10.0,
-      "defaultMaxPlaces": 24,
-      "createdAt": "2026-01-01T00:00:00+00:00",
-      "updatedAt": "2026-01-01T00:00:00+00:00"
-    }
-  ]
+  "@type": "AppSetting",
+  "id": 1,
+  "defaultAddress": "Terrain principal",
+  "defaultPrice": 10,
+  "defaultMaxPlaces": 24,
+  "createdAt": "2026-07-18T09:40:38+00:00",
+  "updatedAt": "2026-07-19T11:40:30+00:00"
 }
 ```
 
-### Create Settings (ADMIN only)
+Exemple de réponse observée sur une modification `PATCH /api/app_settings` (200):
 
-```http
-POST /api/app_settings
-Authorization: Bearer <token>
-Content-Type: application/ld+json
-
+```json
 {
-  "defaultAddress": "Terrain Principal, Paris 75",
-  "defaultPrice": 10.0,
+  "@context": "/api/contexts/AppSetting",
+  "@id": "/api/app_settings",
+  "@type": "AppSetting",
+  "id": 1,
+  "defaultAddress": "Terrain principal",
+  "defaultPrice": 11,
+  "defaultMaxPlaces": 25,
+  "createdAt": "2026-07-18T09:40:38+00:00",
+  "updatedAt": "2026-07-22T22:19:55+00:00"
+}
+```
+
+### Payloads de requête (Paramètres applicatifs)
+
+`PATCH /api/app_settings`:
+
+```json
+{
+  "defaultAddress": "Terrain principal",
+  "defaultPrice": 10,
   "defaultMaxPlaces": 24
 }
 ```
 
-### Update Settings (ADMIN only)
+## Exports CSV
+
+### Export des parties
 
 ```http
-PATCH /api/app_settings/{id}
-Authorization: Bearer <token>
-Content-Type: application/ld+json
-
-{
-  "defaultPrice": 12.0
-}
-```
-
-### Delete Settings (ADMIN only)
-
-```http
-DELETE /api/app_settings/{id}
-Authorization: Bearer <token>
-```
-
----
-
-## Exports (CSV)
-
-### Export Games (ADMIN only)
-
-```http
+GET /api/exports/games.csv
 GET /api/exports/games.csv?dateFrom=2026-01-01&dateTo=2026-12-31
-Authorization: Bearer <token>
 ```
 
-**Response**: CSV file
-```
-id,title,address,startDateTime,price,maxPlaces,registrationCount
-1,"CQB Night Session","Terrain Nord, Paris 75","2026-07-15 20:00","10.00",24,12
-```
+Accès: `ROLE_ORGANIZER`, `ROLE_ADMIN` ou `ROLE_SUPER_ADMIN`.
 
-### Export Users (ADMIN only)
+### Export des utilisateurs
 
 ```http
-GET /api/exports/users.csv?ageGroup=tous&role=ROLE_USER&role=ROLE_ORGANIZER
-Authorization: Bearer <token>
+GET /api/exports/users.csv
+GET /api/exports/users.csv?ageGroup=mineur&roles=ROLE_USER,ROLE_ORGANIZER
 ```
 
-**Query Parameters**:
-- `ageGroup`: `mineur`, `majeur`, `tous` (default: `tous`)
-- `role`: Can specify multiple times (ROLE_USER, ROLE_ORGANIZER, ROLE_ADMIN)
+Accès: `ROLE_ADMIN` ou `ROLE_SUPER_ADMIN`.
 
-**Response**: CSV file
-```
-id,firstname,lastname,email,pseudo,phone,dateOfBirth,role,createdAt
-1,"John","Doe","john@example.com","JohnD","+33612345678","2000-01-15","ROLE_USER","2026-01-10 14:30"
-```
+Filtres:
 
-### Export Game Registrations (ADMIN only)
+- `ageGroup`: `mineur`, `majeur`, `tous` (accepte aussi `minor`, `major`, `all`)
+- `roles`: liste séparée par virgules ou valeurs répétées
+
+### Export des inscriptions par partie
 
 ```http
-GET /api/exports/registrations.csv?gameId=1
-Authorization: Bearer <token>
+GET /api/exports/games/{id}/registrations.csv
 ```
 
-**Response**: CSV file
-```
-id,gameId,gameTitle,userId,userFirstname,userLastname,userEmail,isPresent
-1,1,"CQB Night Session",2,"John","Doe","john@example.com",1
-```
+Accès: `ROLE_ORGANIZER`, `ROLE_ADMIN` ou `ROLE_SUPER_ADMIN`.
 
----
+## Limitation de débit
 
-## Error Handling
+Configuration côté serveur:
 
-### Common Error Responses
+- `login_request_limiter`: `3` requêtes / `5 minutes`
+- `register_request_limiter`: `3` requêtes / `5 minutes`
+- `login_attempt_limiter`: `3` tentatives / `5 minutes`
 
-**400 Bad Request**:
-```json
-{
-  "@context": "/api/contexts/ConstraintViolationList",
-  "@type": "ConstraintViolationList",
-  "hydra:title": "An error occurred",
-  "hydra:description": "firstName: This value should not be blank.",
-  "violations": [
-    {
-      "propertyPath": "firstName",
-      "message": "This value should not be blank."
-    }
-  ]
-}
-```
+En cas de rejet: `429 Too Many Requests` + en-tête `Retry-After`.
 
-**401 Unauthorized**:
-```json
-{
-  "code": 401,
-  "message": "Expired JWT Token"
-}
-```
+## Erreurs courantes
 
-**403 Forbidden**:
-```json
-{
-  "code": 403,
-  "message": "Access Denied"
-}
-```
-
-**404 Not Found**:
-```json
-{
-  "@context": "/api/contexts/Error",
-  "@type": "hydra:Error",
-  "hydra:title": "An error occurred",
-  "hydra:description": "Not Found"
-}
-```
-
----
-
-## Security Headers & CORS
-
-**CORS Configuration** (dev):
-- Allowed Origins: `http://localhost:3000`
-- Allowed Methods: `GET, POST, PUT, PATCH, DELETE, OPTIONS`
-- Allowed Headers: `Content-Type, Authorization`
-
-**Recommended Production Headers**:
-```
-X-Frame-Options: DENY
-X-Content-Type-Options: nosniff
-X-XSS-Protection: 1; mode=block
-Strict-Transport-Security: max-age=31536000; includeSubDomains
-Content-Security-Policy: default-src 'self'
-```
-
----
-
-## Rate Limiting
-
-Not implemented yet. Recommended:
-- Auth endpoint: 5 attempts per 15 minutes per IP
-- API endpoint: 100 requests per minute per user
-
----
-
-## Versioning
-
-API version: **1.0.0** (see `docs/DEPLOYMENT.md` for versioning strategy)
-
-Future versions available via header:
-```
-Accept-Version: 2.0
-```
-
----
-
-## SDK / Client Libraries
-
-**Frontend TypeScript Client** available at:
-- `frontend/src/lib/game-api.ts`
-- `frontend/src/lib/user-api.ts`
-- `frontend/src/lib/auth.ts`
-- `frontend/src/lib/export-api.ts`
+- `400` payload invalide/erreur de validation
+- `401` token d'authentification invalide ou manquant
+- `403` permissions insuffisantes ou rejet CSRF (`{"message":"Requête invalide."}`)
+- `404` ressource introuvable
+- `409` conflit (ex: déjà inscrit)
+- `429` limite de débit dépassée
