@@ -4,7 +4,7 @@
 
 ---
 
-## 🚀 Démarrage
+## Démarrage
 
 ### 1. Accéder à l'application
 
@@ -31,7 +31,7 @@
    - Téléphone
 
 4. Cliquer **"S'inscrire"**
-5. ✅ Compte créé → Redirection vers la page d'**accueil**
+5. Compte créé → Redirection vers la page d'**accueil**
 
 
 ## Tous les utilisateurs
@@ -44,7 +44,7 @@
    - **Mot de passe** : mot de passe valide
 
 3. Cliquer **"Se connecter"**
-4. ✅ Redirection vers la page d'accueil
+4. Redirection vers la page d'accueil
 
 ## Joueurs
 
@@ -77,24 +77,24 @@
 
 1. Sur la page d'**accueil**, voir toutes les parties publiques
 2. Les parties affichent :
-   - 📅 Date et heure
-   - 📍 Lieu
-   - 💵 Prix de la place
-   - 👥 Places libres (ex : "12/20 places")
+   - Date et heure
+   - Lieu
+   - Prix de la place
+   - Places libres (ex : "12/20 places")
 
 
 ### 4. S'inscrire à une partie
 
 1. Sur la liste des parties, cliquer sur le bouton **"S'inscrire"** d'une partie
 2. Confirmer que le bouton soit passé en **"Annuler l'inscription"**
-3. ✅ Inscription validée
+3. Inscription validée
 
 
 ### 5. Annuler son inscription
 
 1. Sur la liste des parties, cliquer sur le bouton **"Annuler l'inscription"** d'une partie
 2. Confirmer que le bouton soit passé en **"S'inscrire"**
-3. ✅ Annulation validée
+3. Annulation validée
 
 
 ## Organisateur - Admin - Super-admin
@@ -118,7 +118,7 @@
    - **Privée** : cocher si réservée (non visible par les joueurs sans permission)
 
 3. Cliquer **"Créer"**
-4. ✅ Partie créée → Redirection vers la page **"Parties"**
+4. Partie créée → Redirection vers la page **"Parties"**
 
 
 ### 3. Voir les informations
@@ -133,7 +133,7 @@
 ### 4. Marquer la présence
 
 1. **"Inscriptions"** → Cocher la case présence du joueur
-2. ✅ Présence enregistrée
+2. Présence enregistrée
 
 
 ### 5. Modifier une partie
@@ -149,7 +149,7 @@
 2. Confirmer la suppression
 
 
-## 🛡️ Administrateur - Super administrateur
+## Administrateur - Super administrateur
 
 ### 1. Liste Utilisateurs
 
@@ -163,7 +163,7 @@
    - USER
    - ORGANIZER
 
-3. ✅ Utilisateur créé
+3. Utilisateur créé
 
 
 ### 3. Voir les informations
