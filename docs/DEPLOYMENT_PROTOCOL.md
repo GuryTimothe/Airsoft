@@ -344,6 +344,8 @@ frontend/
 | Architecture du projet | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | Sécurité (OWASP) | [docs/SECURITY_OWASP.md](docs/SECURITY_OWASP.md) |
 | Tests | [docs/TEST_RECIPES.md](docs/TEST_RECIPES.md) |
+| Manuel de mise à jour | [docs/UPDATE_MANUAL.md](docs/UPDATE_MANUAL.md) |
+| Gestion des bugs et des erreurs | [docs/BUGS_TRACKING.md](docs/UPDATE_MANUAL.md) | 
 | Accessibilité et performances | [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md) |
 
 ## Outils utilisés

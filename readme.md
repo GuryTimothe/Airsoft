@@ -22,7 +22,8 @@
 |----------|-------------|
 | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Architecture applicative, stack technique, dépendances et organisation du projet |
 | [docs/API_REFERENCE.md](./docs/API_REFERENCE.md) | Référence complète des endpoints REST (authentification, utilisateurs, parties, inscriptions, exports) |
-
+| [docs/UPDATE_MANUAL.md](docs/UPDATE_MANUAL.md) | Manuel de mise à jour |
+| [docs/BUGS_TRACKING.md](docs/UPDATE_MANUAL.md) | Gestion des bugs et des erreurs | 
 ---
 
 ## 👥 Utilisation
