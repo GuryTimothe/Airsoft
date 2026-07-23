@@ -22,7 +22,6 @@
 |----------|-------------|
 | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Architecture applicative, stack technique, dépendances et organisation du projet |
 | [docs/API_REFERENCE.md](./docs/API_REFERENCE.md) | Référence complète des endpoints REST (authentification, utilisateurs, parties, inscriptions, exports) |
-| [docs/ENVIRONMENT.md](./docs/ENVIRONMENT.md) | Configuration détaillée de l'environnement de développement |
 
 ---
 

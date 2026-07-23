@@ -336,8 +336,7 @@ Une documentation plus détaillée est disponible dans le dossier `docs/`.
 |--------|---------|
 | Référence de l'API | [docs/API_REFERENCE.md](docs/API_REFERENCE.md) |
 | Architecture du projet | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
-| Environnement de développement | [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) |
 | Déploiement et CI/CD | [docs/DEPLOYMENT_PROTOCOL.md](docs/DEPLOYMENT_PROTOCOL.md) |
 | Sécurité (OWASP) | [docs/SECURITY_OWASP.md](docs/SECURITY_OWASP.md) |
 | Tests | [docs/TEST_RECIPES.md](docs/TEST_RECIPES.md) |
-| Accessibilité et performances | [docs/ACCESSIBILITY_PERFORMANCE.md](docs/ACCESSIBILITY_PERFORMANCE.md) |
+| Accessibilité et performances | [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md) |
