@@ -10,6 +10,15 @@
 
 **Voir [QUICKSTART.md](./QUICKSTART.md) pour démarrer l'application**
 
+## Rôles d'Accès (RBAC)
+
+| Rôle | Permissions |
+|------|------------|
+| **ROLE_USER** | Voir parties publiques, s'inscrire |
+| **ROLE_ORGANIZER** | Créer/modifier parties, voir joueurs inscrits, marquer présence |
+| **ROLE_ADMIN** | Tous droits, exports CSV, gestion paramètres |
+| **ROLE_SUPER_ADMIN** | Tous droits + gestion rôles autres admins |
+
 ## Invités
 
 ### 1. Créer un compte
