@@ -1,4 +1,4 @@
-# Manuel de Mise à Jour et Migrations (C2.4.1)
+# Manuel de Mise à Jour et Migrations
 
 ## 1. Objectif
 
@@ -19,13 +19,8 @@ Ce manuel couvre:
 Avant toute mise à jour:
 - Avoir une branche `main` à jour.
 - Utiliser Docker Desktop (ou Docker Engine) avec Docker Compose v2.
-- Ne pas exécuter Node.js, npm, PHP ou Composer en local sur le poste.
 - Vérifier que les tests passent en local.
 - Disposer d'un backup BDD récent pour les environnements partagés.
-
-Versions utilisées par les workflows CI:
-- Node.js: 20
-- PHP: 8.4
 
 ## 4. Mise à Jour Locale (Développement)
 
@@ -229,25 +224,3 @@ Important:
 - [ ] Logs sans pic d'erreurs.
 - [ ] Fonctions critiques validées.
 - [ ] Vérification des jobs GitHub Actions: frontend, backend, scanner, lighthouse, pa11y, release.
-
-## 10. Dépannage Rapide
-
-### 10.1 Composer trop lent
-
-```bash
-docker compose exec backend composer config -g process-timeout 2000
-```
-
-### 10.2 Extensions PHP manquantes
-
-```bash
-docker compose exec backend php -m | grep pdo
-```
-
-Vérifier ensuite la configuration PHP (`pdo_pgsql` active).
-
-### 10.3 Erreur connexion PostgreSQL
-
-```bash
-docker compose exec database psql -U app -d app -h database
-```
