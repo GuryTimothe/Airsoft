@@ -1,4 +1,4 @@
-# Airsoft — Plateforme de gestion de parties airsoft
+# Airsoft - Plateforme de gestion de parties airsoft
 
 > Plateforme web permettant de gérer des parties airsoft : création d'événements, inscriptions joueurs, suivi des présences et exports administrateur.
 
