@@ -18,6 +18,10 @@ jobs:
       php-version: 8.4
       working-directory: backend
 
+  scanner:
+    needs: [frontend, backend]
+    uses: ./.github/workflows/security-scanner.yml
+
   lighthouse:
     needs: [frontend]
     uses: ./.github/workflows/lighthouse.yml
