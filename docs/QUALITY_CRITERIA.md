@@ -8,10 +8,8 @@
 
 | Composant | Outil | Cible | Actuel | Statut |
 |-----------|-------|-------|--------|--------|
-| **Backend PHP** | PHPUnit | > 70% | **71.73%** | ✅ Atteint (269 tests) |
-| **Frontend TS/React** | Jest | > 70% | **78.73%** | ✅ Dépassé (227 tests) |
-
-> ✅ **Note** : Les deux composants dépassent la cible de 70%. Backend plateau à 71.73% (limitée par absence test DB PostgreSQL). Frontend : +69 tests depuis baseline (+1.67%), 0 régression 
+| **Backend PHP** | PHPUnit | > 70% | **71,44%** | ✅ Atteint |
+| **Frontend TS/React** | Jest | > 70% | **80,95%** | ✅ Dépassé |
 
 **Exécution locale** :
 
