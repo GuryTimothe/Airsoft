@@ -61,8 +61,6 @@ npm test -- --coverage
 | **Entités BD** | Entity comment block | ✓ Tous les entities |
 | **API Endpoints** | API Platform docs | ✓ ApiResource #[Get], etc. |
 
----
-
 ## 2. Critères Performance
 
 ### 2.1 Performance API (Backend)
@@ -114,74 +112,87 @@ npm run build
 # F12 → Lighthouse → Generate report
 ```
 
-### 2.3 Utilisation Ressources
-
-| Ressource | Dev | Production | Monitoring |
-|-----------|-----|-----------|-----------|
-| **CPU API** | < 60% | < 70% | À surveiller |
-| **Mémoire API** | < 512 MB | < 1 GB | À surveiller |
-| **Connexions DB** | < 20 | < 100 | À surveiller |
-| **Disque DB** | < 1 GB | < 100 GB | Backup 1x/jour |
-
----
-
 ## 3. Critères Sécurité
 
-### 3.1 OWASP Top 10 Mitigations (2021)
+## 3.1 OWASP Top 10
 
-| Rang | Vulnérabilité | Implémentation | Vérification |
-|------|---------------|-----------------|------------|
-| **A1** | Broken Access Control | JWT + Voters Symfony | ✓ Tests auth |
-| **A2** | Cryptographic Failures | HTTPS (prod), secrets .env | ✓ Config review |
-| **A3** | Injection | Doctrine ORM (parameterized) | ✓ Pas raw SQL |
-| **A4** | Insecure Design | Architecture review | À faire |
-| **A5** | Security Misconfiguration | .env séparé, debug=false prod | ✓ CI check |
-| **A6** | Vulnerable Components | `composer audit`, deps update | À monitorer |
-| **A7** | Authentication Failures | JWT (Lexik), bcrypt passwords | ✓ Tests login |
-| **A8** | Software & Data Integrity | Git signed commits | À mettre en place |
-| **A9** | Logging & Monitoring | Symfony logs, audit trails | À ajouter |
-| **A10** | SSRF | Pas de external calls | ✓ Code review |
-
-**Vérifications implémentées** :
-
-✓ **Authentification** :
-```php
-// JWT validation dans security.yaml
-// Password hashing: bcrypt (Symfony default)
-```
-
-✓ **Autorisation** :
-```php
-// Voters: security/voters/*
-// RBAC: 4 roles (USER, ORGANIZER, ADMIN, SUPER_ADMIN)
-```
-
-✓ **Données** :
-```php
-// Doctrine ORM: parameterized queries
-// Validation: Symfony Validator + React Hook Form
-```
-
-✓ **Transport** :
-```
-// CORS: localhost:3000 en dev
-// HTTPS: À enforcer en prod
-```
-
-### 3.2 Checklist Sécurité
-
-- [ ] Pas de secrets en dur (`.env.local` en .gitignore)
-- [ ] HTTPS en production
-- [ ] CORS restrictif (pas `*`)
-- [ ] JWT secrets > 32 caractères
-- [ ] Passwords hashed (bcrypt)
-- [ ] DB firewall/access control
-- [ ] Audit logs admin actions
-- [ ] Rate limiting auth
-- [ ] CSRF tokens (si formulaires POST)
-- [ ] Security headers (X-Frame-Options, etc.)
+**Voir [SECURITY_OWASP.md](./SECURITY_OWASP.md) pour plus de détails**
 
 ---
+
+# 3.2 Mesures de Sécurité Implémentées
+
+
+## Authentification
+
+L'application utilise une authentification basée sur JWT.
+
+Mesures appliquées :
+
+- Authentification via JWT Bearer Token.
+- Validation des tokens côté backend.
+- Expiration des tokens configurée.
+- Hashage sécurisé des mots de passe via Symfony Password Hasher.
+- Accès aux routes sensibles protégé.
+
+
+## Autorisation
+
+Les contrôles d'accès sont réalisés exclusivement côté backend.
+
+Règles appliquées :
+
+- Utilisation des Symfony Security Voters.
+- Vérification des permissions selon les rôles utilisateurs.
+- RBAC avec rôles applicatifs.
+- Aucun contrôle de sécurité effectué uniquement côté frontend.
+
+
+## Validation des données
+
+Les données entrantes sont validées sur les deux couches.
+
+Backend :
+
+- Symfony Validator.
+- Contraintes sur les entités et DTO.
+- Validation avant traitement métier.
+
+Frontend :
+
+- Validation avec Zod.
+- React Hook Form pour la gestion des formulaires.
+- Amélioration de l'expérience utilisateur.
+
+
+## Protection contre les injections
+
+Mesures appliquées :
+
+- Utilisation de Doctrine ORM.
+- Requêtes paramétrées.
+- Absence de SQL brut non contrôlé.
+- Validation des entrées utilisateur.
+
+
+## Protection frontend
+
+Mesures appliquées :
+
+- Échappement automatique React.
+- Pas d'utilisation de `dangerouslySetInnerHTML` sans justification.
+- Validation des formulaires avant envoi.
+- Protection des routes sensibles côté serveur.
+
+
+## Gestion des secrets
+
+Règles :
+
+- Aucun secret dans le dépôt Git.
+- Variables sensibles dans `.env.local`.
+- Secrets JWT stockés dans des fichiers protégés.
+- Configuration différente entre développement et production.
 
 ## 4. Critères Fonctionnalité
 
@@ -207,9 +218,9 @@ npm run build
 | Login données invalides | 401 Unauthorized | ✓ Pass |
 | Accès ressource ajena | 403 Forbidden | ✓ Pass |
 | Requête sans JWT token | 401 Unauthorized | ✓ Pass |
-| Requête token expiré | 401 Unauthorized | À vérifier |
+| Requête token expiré | 401 Unauthorized | ✓ Pass |
 | POST données invalides | 422 Unprocessable | ✓ Pass |
-| DB indisponible | 500 Server Error | À tester |
+| DB indisponible | 500 Server Error | ✓ Pass |
 | Inscriptions concurrent | Unique constraint | ✓ Pass |
 
 ---
@@ -266,7 +277,6 @@ npm test -- --coverage
 
 Chaque workflow affiche :
 - ✓ Test results (pass/fail count)
-- ✓ Coverage % (si configuré)
 - ✓ Build time
 - ✓ Lint violations
 - ✓ All logs
@@ -283,32 +293,7 @@ Chaque workflow affiche :
 
 ---
 
-## 7. Exit Criteria (Conditions de Sortie)
-
-### ✅ Avant Merge vers Dev
-
-- [ ] Tous tests pass (100%)
-- [ ] Lint 0 erreur
-- [ ] No console.log en prod code
-- [ ] Code review approval
-
-### ✅ Avant Merge vers Main
-
-- [ ] Tous critères dev pass
-- [ ] Coverage > 70%
-- [ ] Performance seuils ok
-- [ ] Security review done
-
-### ✅ Avant Déploiement Production
-
-- [ ] Tous critères main pass
-- [ ] QA sign-off
-- [ ] Rollback plan ready
-- [ ] Monitoring configured
-
----
-
-## 8. Configuration Fichiers
+## 7. Configuration Fichiers
 
 | Fichier | Rôle | Localisation |
 |---------|------|-------------|
@@ -323,7 +308,7 @@ Chaque workflow affiche :
 
 ---
 
-## 9. Commands Rapides
+## 8. Commands Rapides
 
 ```bash
 # Tous les checks avant push
@@ -338,77 +323,8 @@ cd frontend && npm test -- --coverage
 
 ---
 
-## 10. Accessibilité (A11y) - WCAG 2.1 AA Conforme
+## 9. Accessibilité  - WCAG 2.1 AA Conforme
 
-### 10.1 Audits Automatisés (CI/CD)
+**Voir [ACCESSIBILITY.md](./ACCESSIBILITY.md) pour plus de détails**
 
-| Outil | Standard | Seuil | Statut |
-|-------|----------|-------|--------|
-| **Lighthouse** | WCAG 2.1 AA | Accessibility Score **> 80** | ✅ Pass (intégré) |
-| **Pa11y CI** | WCAG 2.1 AA | Max **3 errors** | ✅ Pass (non-bloquant) |
-
-**Audit local** :
-```bash
-# Frontend server et audits
-cd frontend
-npm start &
-sleep 3
-
-# Lighthouse (Chrome DevTools)
-npm run test:lighthouse:ci
-
-# Pa11y
-npm run test:pa11y:ci
-```
-
-### 10.2 Configuration
-
-**Lighthouse** (`.github/workflows/lighthouse.yml`):
-- Scans: Performance + Accessibility
-- Cible Perf: **50** (baseline pragmatique)
-- Cible A11y: **80** (WCAG AA)
-- Pages auditées: `/`, `/login`, `/register`, `/dashboard`
-
-**Pa11y** (`.pa11yci.json`):
-- Runners: `axe` + `htmlcs` (double audit)
-- Standard: `WCAG2AA`
-- Pages: 6 principales (auth + dashboard + admin)
-- Config Chromium: `--no-sandbox --disable-dev-shm-usage --disable-gpu --single-process`
-
-### 10.3 Critères Frontend
-
-✅ **Composants** :
-- Tous les `<button>` accessible (type, aria-label)
-- `<dialog>` + Radix UI (focus trap)
-- Tables avec `<thead>`, `<tbody>` correct
-- Images avec alt text
-- Badge/Links avec contrast suffisant
-
-✅ **Formulaires** :
-- `<label for="id">` linked
-- Erreurs avec aria-describedby
-- Password + Confirm password accessible
-- Age calculation feedback clair
-
-✅ **Navigation** :
-- Skip links si besoin
-- Keyboard navigation (Tab/Shift+Tab)
-- Focus visible (outline)
-- Landmark semantics (`<main>`, `<nav>`, etc.)
-
-### 10.4 Test Coverage
-
-- Unit tests: 227 FE + 269 BE = **496 tests**
-- A11y components: **50 tests** (badge, card, dialog, table)
-- Coverage frontend: **78.73% lines**
-- Coverage backend: **71.73% lines** (DB constraint)
-
----
-
-**Notes - Status Final** :
-- ✅ Coverage: Frontend 78.73% (227 tests), Backend 71.73% (269 tests)
-- ✅ Performance: Lighthouse Perf > 50, A11y > 80
-- ✅ Accessibilité: WCAG 2.1 AA via Lighthouse + Pa11y audits
-- ✅ Sécurité: OWASP mapping complété (10/10 mitigations)
-- ✅ CI/CD: Tous jobs passants en pipeline GitHub Actions
-- ✅ Zéro régression: 496 tests deterministic, 0 flaky failures
+------
