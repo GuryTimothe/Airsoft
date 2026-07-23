@@ -23,7 +23,7 @@ jobs:
     uses: ./.github/workflows/security-scanner.yml
 
   lighthouse:
-    needs: [frontend]
+    needs: [scanner]
     uses: ./.github/workflows/lighthouse.yml
 
   pa11y:
@@ -32,7 +32,7 @@ jobs:
 
   release:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    needs: [frontend, backend, lighthouse, pa11y]
+    needs: [frontend, backend, lighthouse, scanner, pa11y]
     uses: ./.github/workflows/release.yml
     with:
       node-version: 20
@@ -41,10 +41,10 @@ jobs:
 
   # deploy-dev:
   #   if: github.ref == 'refs/heads/dev' && github.event_name == 'push'
-  #   needs: [frontend, backend]
+  #   needs: [frontend, backend, scanner]
   #   uses: ./.github/workflows/deploy.yml
 
   # deploy-prod:
   #   if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-  #   needs: [frontend, backend, release]
+  #   needs: [frontend, backend, scanner, release]
   #   uses: ./.github/workflows/deploy.yml
