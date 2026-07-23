@@ -40,7 +40,7 @@
 |----------|-------------|
 | [docs/TEST_RECIPES.md](./docs/TEST_RECIPES.md) | Cas de tests fonctionnels, sécurité, performance et accessibilité |
 | [docs/QUALITY_CRITERIA.md](./docs/QUALITY_CRITERIA.md) | Critères qualité : couverture, linting, seuils de performance |
-| [docs/ACCESSIBILITY_PERFORMANCE.md](./docs/ACCESSIBILITY_PERFORMANCE.md) | Audit Lighthouse, Core Web Vitals et conformité WCAG |
+| [docs/ACCESSIBILITY.md](./docs/ACCESSIBILITY.md) | Audit Lighthouse, Pa11y et conformité WCAG |
 
 ---
 
