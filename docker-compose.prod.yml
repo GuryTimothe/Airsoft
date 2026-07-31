@@ -1,0 +1,63 @@
+services:
+  traefik:
+    container_name: airsoft-traefik
+    image: traefik:v3
+    command:
+      - "--api.insecure=true" # Dashboard Traefik sur :8080 (à désactiver en vraie prod)
+      - "--providers.docker=true" # Traefik lit les labels Docker automatiquement
+      - "--providers.docker.exposedbydefault=false" # Les services sont pas exposés par défaut
+      - "--entrypoints.web.address=:80" # Point d'entrée HTTP
+    ports:
+      - "80:80" # Tout le trafic passe par là
+      - "8080:8080" # Dashboard Traefik (pour débugger)
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro # Traefik lit les containers Docker
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    environment:
+      APP_ENV: prod
+      APP_DEBUG: "false"
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "10"
+        tag: "airsoft-backend"
+    labels:
+      - "traefik.enable=true"
+      # Toutes les requêtes /api/* vont vers le backend
+      - "traefik.http.routers.backend.rule=PathPrefix(`/api`)"
+      - "traefik.http.routers.backend.entrypoints=web"
+      - "traefik.http.services.backend.loadbalancer.server.port=8000"
+    # Pas de ports exposés → sécurité, uniquement accessible via Traefik
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    environment:
+      NODE_ENV: production
+      INTERNAL_API_URL: ${INTERNAL_API_URL}
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      # Tout le reste va vers le frontend
+      - "traefik.http.routers.frontend.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.frontend.entrypoints=web"
+      - "traefik.http.services.frontend.loadbalancer.server.port=3000"
+    # Pas de ports exposés → uniquement accessible via Traefik
+
+  database:
+    restart: unless-stopped
+    # Pas de port exposé → sécurité
+
+  redis:
+    restart: unless-stopped
+    # Pas de port exposé → sécurité

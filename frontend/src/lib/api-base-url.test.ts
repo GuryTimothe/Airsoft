@@ -15,7 +15,7 @@ describe("api-base-url", () => {
     const previousPublic = process.env.NEXT_PUBLIC_API_URL;
     process.env.NEXT_PUBLIC_API_URL = "https://api.example.test:8443";
 
-    expect(getApiBaseUrl()).toBe("http://localhost:8000");
+    expect(getApiBaseUrl()).toBe("http://localhost");
 
     process.env.NEXT_PUBLIC_API_URL = previousPublic;
   });
@@ -24,7 +24,7 @@ describe("api-base-url", () => {
     const previousPublic = process.env.NEXT_PUBLIC_API_URL;
     process.env.NEXT_PUBLIC_API_URL = "://not-a-valid-url";
 
-    expect(getApiBaseUrl()).toBe("http://localhost:8000");
+    expect(getApiBaseUrl()).toBe("http://localhost");
 
     process.env.NEXT_PUBLIC_API_URL = previousPublic;
   });
@@ -33,7 +33,7 @@ describe("api-base-url", () => {
     const previousPublic = process.env.NEXT_PUBLIC_API_URL;
     process.env.NEXT_PUBLIC_API_URL = "  ";
 
-    expect(getApiBaseUrl()).toBe("http://localhost:8000");
+    expect(getApiBaseUrl()).toBe("http://localhost");
 
     process.env.NEXT_PUBLIC_API_URL = previousPublic;
   });
