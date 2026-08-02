@@ -1,5 +1,7 @@
 .env
 .env.local
+.env.prod
+.env.dev
 backend/.env.local
 backend/.env.local.php
 node_modules
