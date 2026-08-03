@@ -1,6 +1,6 @@
 # Protocoles de Déploiement Continu et Intégration Continue
 
-**Environnements :** Development (`dev`), Production (`main`)
+**Environnements :** Development local (`dev` via Docker), Production distante (HexaLabs, services séparés)
 
 # 1. Protocole d'Intégration Continue (CI)
 
@@ -182,7 +182,7 @@ Une release est préparée après validation complète du pipeline CI sur la bra
 
 Le merge sur `main` déclenche deux mécanismes distincts et indépendants :
 - **`release-please`** : génère la version, le changelog et le tag Git (opérationnel)
-- **`deploy.yml`** : tente un déploiement via FTP (non opérationnel tant qu'aucun serveur n'est configuré)
+- **`deploy.yml`** : prépare un déploiement externe adapté à la cible d'hébergement
 
 ## 2.2 Convention des Commits
 
@@ -240,7 +240,7 @@ Exemple :
 
 ## 2.4 Déploiement par Environnement
 
-> Aucun environnement distant est existant
+> La production distante est hébergée sur un environnement à services séparés et ne dépend pas de Docker Compose.
 
 ---
 
@@ -257,14 +257,14 @@ L'environnement production est destiné à contenir la version accessible aux ut
 ```bash
 - Build des applications backend et frontend
 - Génération de la release (release-please)
-- Tentative de déploiement via FTP (deploy.yml)
+- Déploiement des artefacts vers l'hébergement cible
 ```
 
 ---
 
-## 2.5 Déploiement via FTP
+## 2.5 Déploiement production
 
-Le déploiement repose sur un transfert de fichiers par FTP plutôt que sur une conteneurisation.
+Le déploiement repose sur un transfert d'artefacts ou une procédure d'hébergement adaptée à la cible, plutôt que sur une conteneurisation.
 
 **Fichier :**
 
@@ -276,8 +276,8 @@ Le déploiement repose sur un transfert de fichiers par FTP plutôt que sur une 
 
 ```bash
 - Build des applications backend et frontend
-- Connexion au serveur cible via FTP
-- Transfert des fichiers buildés
+- Publication des artefacts vers l'hébergement cible
+- Redémarrage des services si nécessaire
 ```
 
 

@@ -31,7 +31,7 @@ class HealthController
         }
 
         try {
-            $redis = new RedisClient($_ENV['REDIS_URL'] ?? 'redis://redis:6379');
+            $redis = new RedisClient($_ENV['REDIS_URL'] ?? 'redis://127.0.0.1:6379');
             $redis->ping();
             $checks['redis'] = 'ok';
         } catch (\Throwable $e) {

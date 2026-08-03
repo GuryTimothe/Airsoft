@@ -38,7 +38,9 @@ function resolveBrowserApiBaseUrl(rawValue: string): string {
 export function getApiBaseUrl(): string {
   if (typeof window === "undefined") {
     return normalizeBaseUrl(
-      process.env.INTERNAL_API_URL || "http://backend:8000",
+      process.env.INTERNAL_API_URL ||
+        process.env.NEXT_PUBLIC_API_URL ||
+        "http://localhost:8000",
     );
   }
 

@@ -15,6 +15,8 @@ services:
       start_period: 30s
     volumes:
       - database_pgdata:/var/lib/postgresql
+    ports:
+      - "${DB_PORT:-5432}:5432"
 
   redis:
     container_name: airsoft-redis
@@ -24,17 +26,22 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
 
   backend:
     container_name: airsoft-backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     depends_on:
       database:
         condition: service_healthy
       redis:
         condition: service_healthy
     environment:
-      APP_DEBUG: ${APP_DEBUG}
-      APP_ENV: ${APP_ENV}
+      APP_DEBUG: "true"
+      APP_ENV: dev
       APP_SECRET: ${APP_SECRET}
       DEFAULT_URI: ${DEFAULT_URI}
       CORS_ALLOW_ORIGIN: ${CORS_ALLOW_ORIGIN}
@@ -57,16 +64,41 @@ services:
       timeout: 3s
       retries: 5
       start_period: 20s
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - ./backend:/app
+      - backend_vendor:/app/vendor
+      - backend_var:/app/var
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   frontend:
     container_name: airsoft-frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     user: "0:0"
     depends_on:
       backend:
         condition: service_healthy
     environment:
+      NODE_ENV: development
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
       INTERNAL_API_URL: ${INTERNAL_API_URL}
+    ports:
+      - "${FRONTEND_PORT}:3000"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+      - frontend_next:/app/.next
 
 volumes:
   database_pgdata:

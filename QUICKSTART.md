@@ -17,7 +17,9 @@ Cette page vous guide rapidement à travers les étapes essentielles pour démar
 
 # Variables d'environnement
 
-Le projet utilise un fichier `.env` situé à la racine du projet afin de configurer les différents services Docker :
+Le projet utilise un fichier `.env` situé à la racine du projet afin de configurer les services en local.
+
+En production sur HexaLabs, les variables sont différentes: chaque service a son propre conteneur et les URL/hosts doivent être fournis explicitement via `.env.prod`.
 
 - PostgreSQL
 - Redis
@@ -172,15 +174,15 @@ Redis est utilisé pour le cache et la gestion des données temporaires.
 
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:8000
-INTERNAL_API_URL=http://backend:8000
+INTERNAL_API_URL=
 ```
 
 | Variable | Description |
 |----------|-------------|
 | `NEXT_PUBLIC_API_URL` | URL de l'API utilisée côté navigateur |
-| `INTERNAL_API_URL` | URL utilisée côté serveur par Next.js dans Docker |
+| `INTERNAL_API_URL` | URL utilisée côté serveur par Next.js si un accès privé existe |
 
-`INTERNAL_API_URL` utilise le nom du service Docker (`backend`) afin que les conteneurs puissent communiquer entre eux.
+`INTERNAL_API_URL` est optionnelle. Sur HexaLabs, tu peux laisser cette variable vide si le frontend appelle l'API via son domaine public.
 
 ---
 
