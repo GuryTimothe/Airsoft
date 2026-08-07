@@ -4,73 +4,90 @@
 
 ### Processus rapide
 
-1. Verifier que le bug n'existe pas deja (Notion ou GitHub Issues).
-2. Creer un ticket.
-3. Renseigner:
-   - Description claire du probleme
-   - Etapes de reproduction
-   - Resultat attendu vs resultat observe
-   - Environnement (navigateur, version)
-4. Assigner les labels (`bug`, `severity:critical`, etc.).
-5. Notifier l'equipe.
+1. Si le bug provient d'un utilisateur, celui-ci est signalé via le formulaire dédié puis automatiquement enregistré dans Trello.
+2. Vérifier que l'anomalie n'existe pas déjà dans Notion afin d'éviter les doublons.
+3. Reproduire et valider l'anomalie.
+4. Créer ou mettre à jour un ticket Notion contenant les informations techniques.
+5. Renseigner :
+   - Description claire du problème
+   - Étapes de reproduction
+   - Résultat attendu et résultat observé
+   - Environnement (navigateur, version de l'application, système d'exploitation)
+   - Captures d'écran, logs ou rapports d'erreur si disponibles
+6. Attribuer un niveau de sévérité (`critical`, `major`, `minor`, `trivial`).
+7. Notifier l'équipe de développement.
+
+> Les tickets Trello sont destinés au suivi des retours utilisateurs. Les analyses techniques sont réalisées dans Notion afin d'éviter de divulguer des informations sensibles (logs, détails de sécurité, architecture interne, pistes de correction). Chaque ticket Notion référence, lorsque nécessaire, le ticket Trello correspondant afin d'assurer la traçabilité.
 
 ### Template de ticket
 
 ```text
-Title: [TYPE] Description concise
+Titre : [TYPE] Description concise
 
-Description:
+Source :
+- Utilisateur
+- Développeur
+- Sentry
+- Tests
+
+Description :
 - Comportement observé
 - Comportement attendu
-- Etapes pour reproduire
+- Étapes de reproduction
 
-Environnement:
+Environnement :
+- Système d'exploitation
 - Navigateur (si frontend)
 - Version de l'application
 
-Screenshots/Logs:
-- Captures d'écrans ou logs erreur
+Preuves :
+- Captures d'écran
+- Logs
+- Rapports Sentry
 ```
 
 ## 2. Classification
 
-| Severité | Exemples | Impact utilisateur |
+| Sévérité | Exemples | Impact utilisateur |
 |----------|----------|--------------------|
-| Critical | Perte de donnees, API down, acces non autorise, crash app | Total |
-| Major | Feature en panne, bug securite, donnees incorrectes | Bloquant |
-| Minor | UI glitch, message manquant, perf legerement degradee | Non-bloquant |
-| Trivial | Typo, cosmethique, suggestion | Cosmethique |
+| Critical | Perte de données, API indisponible, accès non autorisé, crash de l'application | Total |
+| Major | Fonctionnalité indisponible, faille de sécurité, données incorrectes | Bloquant |
+| Minor | Défaut d'interface, message manquant, légère dégradation des performances | Non bloquant |
+| Trivial | Coquille, amélioration esthétique, suggestion | Cosmétique |
 
 ## 3. Workflow de correction
 
-1. Triage
-   - Confirmer la reproduction
-   - Estimer l'impact
-   - Prioriser
-   - Assigner un developpeur
+1. Qualification
+   - Reproduire l'anomalie
+   - Vérifier son impact
+   - Déterminer son niveau de sévérité
+   - Assigner le ticket à un développeur
+
 2. Développement
-   - Créer branche `fix/nom-du-ticket`
-   - Écrire un test qui reproduit le bug
-   - Corriger le code
+   - Développer le correctif
+   - Ajouter ou mettre à jour les tests si nécessaire
    - Commit conventionnel (`fix(scope): message`)
-3. Code review et validation
-   - Ouvrir PR liée au bug
-   - Éxecuter CI/CD
-   - Faire une review (au moins 1 dev)
-4. Release et suivi
-   - Intégrer dans la prochaine version
-   - Déployer
-   - Cloturer le bug si stable
+
+3. Validation
+   - Vérifier le bon fonctionnement en local
+   - Exécuter la CI/CD
+   - Vérifier qu'aucune régression n'est détectée
+
+4. Déploiement
+   - Intégrer le correctif à la prochaine version
+   - Déployer l'application
+   - Clôturer le ticket une fois la correction validée
 
 ## 4. Détection des anomalies
 
-| Methode | Outil | Frequence | Seuil d'alerte |
+| Méthode | Outil | Fréquence | Seuil d'alerte |
 |---------|-------|-----------|----------------|
-| Tests CI/CD | GitHub Actions | A chaque push | 1 test en echec |
-| Couverture | Jest + PHPUnit | A chaque merge | < 70% |
-| Lint | ESLint + PHPStan | A chaque push | > 0 erreur |
-| Performance | Lighthouse CI (workflow `lighthouse.yml`) | A chaque push via `ci-cd.yml` après le frontend | Performance > 50, Accessibility > 80 |
-| Logs | Symfony Monolog | Production | Error rate > 1% |
+| Tests CI/CD | GitHub Actions | À chaque push | 1 test en échec |
+| Couverture | Jest + PHPUnit | À chaque merge | < 70 % |
+| Lint | ESLint + PHPStan | À chaque push | > 0 erreur |
+| Performance | Lighthouse CI (workflow `lighthouse.yml`) | À chaque push via `ci-cd.yml` | Performance < 50, Accessibility < 80 |
+| Logs | Symfony Monolog | Production | Error rate > 1 % |
+| Monitoring applicatif | Sentry | Temps réel | Nouvelle exception détectée |
 
 ## 5. Analyse des échecs de tests
 
@@ -81,10 +98,10 @@ Lorsqu'un test échoue, une analyse est réalisée afin d'identifier l'origine d
 1. Identifier le test en échec et le message d'erreur.
 2. Vérifier si l'échec est reproductible localement.
 3. Déterminer la cause :
-   - régression du code
-   - données de test, mocks ou fixtures incorrects
-   - problème d'environnement ou de configuration
-   - test instable
+   - régression du code ;
+   - données de test, mocks ou fixtures incorrects ;
+   - problème d'environnement ou de configuration ;
+   - test instable.
 4. Corriger le code ou le test selon la cause identifiée.
 
 ### Validation
