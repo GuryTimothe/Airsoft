@@ -22,8 +22,14 @@ use Symfony\Component\Validator\Constraints as Assert;
     operations: [
         new Get(security: "is_granted('VIEW_GAME', object)"),
         new GetCollection(security: "is_granted('LIST_GAMES')"),
-        new Post(security: "is_granted('CREATE_GAME')"),
-        new Put(security: "is_granted('UPDATE_GAME', object)"),
+        new Post(
+            security: "is_granted('CREATE_GAME')",
+            validationContext: ['groups' => ['Default', 'game:create']]
+        ),
+        new Put(
+            security: "is_granted('UPDATE_GAME', object)",
+            validationContext: ['groups' => ['Default']]
+        ),
         new Delete(security: "is_granted('DELETE_GAME', object)"),
     ]
 )]
@@ -43,7 +49,10 @@ class Game
 
     #[ORM\Column(type: 'datetime')]
     #[Assert\NotNull]
-    #[Assert\GreaterThanOrEqual('today', message: "La date de la partie doit \u00eatre aujourd'hui ou dans le futur.")]
+    #[Assert\GreaterThanOrEqual(
+        'today',
+        message: "La date de la partie doit \u00eatre aujourd'hui ou dans le futur."
+    )]
     private \DateTimeInterface $startDateTime;
 
     #[ORM\Column(type: 'string', length: 255)]
