@@ -25,6 +25,14 @@ final class AppSettingVoterTest extends TestCase
         $this->assertSame(1, $voter->vote($this->createToken($actor), null, [AppSettingVoter::MANAGE_APP_SETTINGS]));
     }
 
+    public function testOrganizerCanConsultAppSettings(): void
+    {
+        $voter = new AppSettingVoter();
+        $actor = (new User())->setRole('ROLE_ORGANIZER');
+
+        $this->assertSame(1, $voter->vote($this->createToken($actor), null, [AppSettingVoter::VIEW_APP_SETTINGS]));
+    }
+
     public function testOrganizerCannotManageAppSettings(): void
     {
         $voter = new AppSettingVoter();
@@ -56,6 +64,15 @@ final class AppSettingVoterTest extends TestCase
         $token->method('getUser')->willReturn(null);
 
         $this->assertSame(-1, $voter->vote($token, null, [AppSettingVoter::MANAGE_APP_SETTINGS]));
+    }
+
+    public function testUnauthenticatedUserCannotViewAppSettings(): void
+    {
+        $voter  = new AppSettingVoter();
+        $token  = $this->createMock(TokenInterface::class);
+        $token->method('getUser')->willReturn(null);
+
+        $this->assertSame(-1, $voter->vote($token, null, [AppSettingVoter::VIEW_APP_SETTINGS]));
     }
 
     private function createToken(User $user): TokenInterface

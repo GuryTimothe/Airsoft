@@ -21,7 +21,7 @@ use Symfony\Component\Validator\Constraints as Assert;
         new Get(
             uriTemplate: '/app_settings',
             provider: AppSettingProvider::class,
-            security: "is_granted('" . AppSettingVoter::MANAGE_APP_SETTINGS . "')",
+            security: "is_granted('" . AppSettingVoter::VIEW_APP_SETTINGS . "')",
         ),
         new Patch(
             uriTemplate: '/app_settings',

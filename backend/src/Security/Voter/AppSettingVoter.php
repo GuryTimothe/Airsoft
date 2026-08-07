@@ -11,11 +11,12 @@ use Symfony\Component\Security\Core\Authorization\Voter\Voter;
  */
 final class AppSettingVoter extends Voter
 {
+    public const VIEW_APP_SETTINGS   = 'VIEW_APP_SETTINGS';
     public const MANAGE_APP_SETTINGS = 'MANAGE_APP_SETTINGS';
 
     protected function supports(string $attribute, mixed $subject): bool
     {
-        return self::MANAGE_APP_SETTINGS === $attribute;
+        return \in_array($attribute, [self::VIEW_APP_SETTINGS, self::MANAGE_APP_SETTINGS], true);
     }
 
     protected function voteOnAttribute(string $attribute, mixed $subject, TokenInterface $token): bool
@@ -26,6 +27,12 @@ final class AppSettingVoter extends Voter
         }
 
         $roles = $user->getRoles();
+
+        if (self::VIEW_APP_SETTINGS === $attribute) {
+            return \in_array('ROLE_ADMIN', $roles, true)
+                || \in_array('ROLE_SUPER_ADMIN', $roles, true)
+                || \in_array('ROLE_ORGANIZER', $roles, true);
+        }
 
         return \in_array('ROLE_ADMIN', $roles, true) || \in_array('ROLE_SUPER_ADMIN', $roles, true);
     }
