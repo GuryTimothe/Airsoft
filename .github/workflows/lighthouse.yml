@@ -48,7 +48,7 @@ jobs:
           NEXT_PUBLIC_API_URL: http://localhost:3000
 
       - name: Run Lighthouse
-        uses: treosh/lighthouse-ci-action@v10
+        uses: treosh/lighthouse-ci-action@v12
         with:
           uploadArtifacts: false
           temporaryPublicStorage: true
