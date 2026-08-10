@@ -1,0 +1,53 @@
+# Changelog
+
+## [0.3.0](https://github.com/GuryTimothe/Airsoft/compare/v0.2.0...v0.3.0) (2026-08-10)
+
+
+### New Features
+
+* **app_settings:** secure app settings road ([fa18ea5](https://github.com/GuryTimothe/Airsoft/commit/fa18ea501b6053245a3f42f314925cca1ea6d24c))
+* **auth:** add login and register ([2273364](https://github.com/GuryTimothe/Airsoft/commit/227336455d5d03525e662a55482def1f5c6fb768))
+* **backend:** add healthcheck for api ([ba8f246](https://github.com/GuryTimothe/Airsoft/commit/ba8f2464985dcc50f658c57a6c22fcf063bdc4cf))
+* **composer:** change php version to 8.4 ([e4cc2de](https://github.com/GuryTimothe/Airsoft/commit/e4cc2dec9856c8e41804847b5eda2245d85f9537))
+* **docker:** add dev and prod mode ([fb3ac8a](https://github.com/GuryTimothe/Airsoft/commit/fb3ac8af1f545e02932c7b8128f97bedf6de4f0f))
+* documentations and test ([6f02dd1](https://github.com/GuryTimothe/Airsoft/commit/6f02dd19ae908ed05ec02452877c0702fb38f2db))
+* **documentation:** upgrade test ([cbe8d7f](https://github.com/GuryTimothe/Airsoft/commit/cbe8d7fab41ee2c605343e61015a71d9ca19ecfb))
+* **emegency-contact:** add emergency contact for user ([0a10044](https://github.com/GuryTimothe/Airsoft/commit/0a10044ee8801853726f2bf6977255b0b4a6359c))
+* **emegency-contact:** add emergency contact for user ([ff1d722](https://github.com/GuryTimothe/Airsoft/commit/ff1d722efab040120e9b298528397f5a4aabeed8))
+* **export-data:** add export for game and users ([e267a47](https://github.com/GuryTimothe/Airsoft/commit/e267a47313a5c15cd44364f9a9c048acbc50e602))
+* **export-data:** add export for game and users ([3987707](https://github.com/GuryTimothe/Airsoft/commit/3987707007995ef545ebd23e5e9b2095dbc61fd5))
+* **export-data:** add export for game and users ([b0f84a1](https://github.com/GuryTimothe/Airsoft/commit/b0f84a18c96a9efcb6dd8dfd4c2aae84452e128e))
+* **game-admin:** crud on game + test ([5fa8626](https://github.com/GuryTimothe/Airsoft/commit/5fa86261a23c2a4505334f8356b92b4d7030215e))
+* **game:** add game entity ([f77b082](https://github.com/GuryTimothe/Airsoft/commit/f77b0825e309c16232079639b338b143b3e6c213))
+* **game:** add game entity ([443a7e5](https://github.com/GuryTimothe/Airsoft/commit/443a7e5a82f615c30d2b09ed4e04505f0f21bc73))
+* **game:** composer and fixer ([6262c0c](https://github.com/GuryTimothe/Airsoft/commit/6262c0c9c7160dfcf70a4125d4905a266de63d1c))
+* **games:** securise game roads ([396b5ec](https://github.com/GuryTimothe/Airsoft/commit/396b5ecd77a375f937d07dfc630b06467ad79bde))
+* **inscription:** add inscription logic and player list for admin ([7f8c966](https://github.com/GuryTimothe/Airsoft/commit/7f8c9664acca3351c0daedbb7d1087e9dbaec228))
+* **minor-user:** add minor badge and hydration data fixes ([1d0858f](https://github.com/GuryTimothe/Airsoft/commit/1d0858fd76d125d58f4d82647116ca034b555e00))
+* **minor-user:** add minor badge and hydration data fixes ([632d350](https://github.com/GuryTimothe/Airsoft/commit/632d35027799ccb304af367730462a020a64e4e6))
+* **settings-admin:** add default settings for new games ([77ffd60](https://github.com/GuryTimothe/Airsoft/commit/77ffd608ca8eb14e68f467b9e5aa583fdaf8b64d))
+* **settings-admin:** add default settings for new games ([9501162](https://github.com/GuryTimothe/Airsoft/commit/9501162ffa556bc2dbd1f24d626a42dcd235a0e9))
+* **tests:** add additionnal tests ([9b08a1b](https://github.com/GuryTimothe/Airsoft/commit/9b08a1b15b2c2233d8077ef017b28f163e1a32d5))
+* **user-admin:** crud and test for user in backoffice ([958b5e9](https://github.com/GuryTimothe/Airsoft/commit/958b5e990de4506962e08fb9258570dcbeb07199))
+* **user-admin:** crud and test for user in backoffice ([4fa5819](https://github.com/GuryTimothe/Airsoft/commit/4fa5819dbc2fcc3fb2a16a9bc0947baf86664948))
+* **user-emergency-contact:** add emergency contact form and CRUD ([aead235](https://github.com/GuryTimothe/Airsoft/commit/aead235b1b2882de8e5acfb4dfa4e6e82b939e79))
+* **user-emergency-contact:** fix php cs fixer ([37f08b6](https://github.com/GuryTimothe/Airsoft/commit/37f08b67ece886cd04132b35da66122867a0dc18))
+* **users:** init user entity ([22fd564](https://github.com/GuryTimothe/Airsoft/commit/22fd564d5b7cf90b919b2e683e8ff7fde40cf861))
+
+
+### Bug Fixes
+
+* **admin-panel:** settings default parameters, game filters and game … ([9be471b](https://github.com/GuryTimothe/Airsoft/commit/9be471bab4e1625345c014ea9d48b4a352f5e6d4))
+* **admin-panel:** settings default parameters, game filters and game hour ([4e46691](https://github.com/GuryTimothe/Airsoft/commit/4e466917c6621521e333085d3d890509119b8256))
+* **app-settings:** Fix the ability for the organizer to view the app's settings ([45a69d0](https://github.com/GuryTimothe/Airsoft/commit/45a69d051b97faadbdce428ab20020c59e337f6a))
+* **cors:** fix regression ([ee9f995](https://github.com/GuryTimothe/Airsoft/commit/ee9f995462b1d6ea0d8a77148564bf1bfc699d71))
+* **docs:** update security owasp doc ([f481cec](https://github.com/GuryTimothe/Airsoft/commit/f481cec837856a127e403fa9a4d606b6bd75d4d8))
+* **documentation:** update documentations ([d61cc81](https://github.com/GuryTimothe/Airsoft/commit/d61cc81a899b93446024d9554435d906b36d7e7b))
+* **game-player:** player age data ([91c9912](https://github.com/GuryTimothe/Airsoft/commit/91c9912691fa97eedb028826a485e7cac830954d))
+* **game:** Prevent setting a past date when editing a game ([6d0714f](https://github.com/GuryTimothe/Airsoft/commit/6d0714fa6576b12489ba061af0ca931ea7371106))
+* **inscription:** php stan ([82482af](https://github.com/GuryTimothe/Airsoft/commit/82482af9ca29df32e723b0e45c7f758ee19af24f))
+* **jobs:** jobs memory improve ([d050768](https://github.com/GuryTimothe/Airsoft/commit/d0507689a8c3e5a60e3d7a0c78adb80de17add7f))
+* **security:** fix logging and alerting failures ([d052619](https://github.com/GuryTimothe/Airsoft/commit/d052619779d81c5c1ba994b055d5475043033017))
+* **security:** fix security ([937e1ef](https://github.com/GuryTimothe/Airsoft/commit/937e1efbcfffa689c06de2a6966f3947454cb124))
+* **user-emergency-contact:** pipelines code ([a1effd3](https://github.com/GuryTimothe/Airsoft/commit/a1effd35650e7269022bc6c8f64624573ddfee29))
+* **user:** user file code ([f2d78b8](https://github.com/GuryTimothe/Airsoft/commit/f2d78b8f01a2eb222b77a899c6fb744a78faa382))
