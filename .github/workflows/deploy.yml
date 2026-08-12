@@ -1,31 +1,99 @@
-name: Deploy website on push
+name: Deploy
 
 on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
   workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
 
 jobs:
   deploy:
-    name: Deploy
+    name: Deploy on VPS (SFTP)
     runs-on: ubuntu-latest
     environment:
-      name: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
+      name: production
+    env:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_PORT: ${{ secrets.VPS_PORT }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+      HAS_SSH_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY != '' }}
+      HAS_PASSWORD: ${{ secrets.VPS_PASSWORD != '' }}
 
     steps:
-      - name: Get latest code
+      - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Sync files (staging)
-        if: github.ref == 'refs/heads/dev'
-        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
-        with:
-          server: ${{ secrets.FTP_SERVER_DEV }}
-          username: ${{ secrets.FTP_USERNAME_DEV }}
-          password: ${{ secrets.FTP_PASSWORD_DEV }}
+      - name: Validate required settings
+        run: |
+          set -euo pipefail
+          test -n "$VPS_HOST" || (echo "Missing secret VPS_HOST" && exit 1)
+          test -n "$VPS_PORT" || (echo "Missing secret VPS_PORT" && exit 1)
+          test -n "$VPS_USER" || (echo "Missing secret VPS_USER" && exit 1)
+          test -n "$DEPLOY_PATH" || (echo "Missing secret DEPLOY_PATH" && exit 1)
 
-      - name: Sync files (Production)
-        if: github.ref == 'refs/heads/main'
-        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
-        with:
-          server: ${{ secrets.FTP_SERVER_PROD }}
-          username: ${{ secrets.FTP_USERNAME_PROD }}
-          password: ${{ secrets.FTP_PASSWORD_PROD }}
+      - name: Install SFTP client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lftp
+
+      - name: Setup SSH key authentication for SFTP
+        if: ${{ env.HAS_SSH_KEY == 'true' }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+      - name: Upload project files with SFTP (SSH key)
+        if: ${{ env.HAS_SSH_KEY == 'true' }}
+        run: |
+          set -euo pipefail
+          lftp -u "$VPS_USER", sftp://$VPS_HOST:$VPS_PORT <<EOF
+          set cmd:fail-exit yes
+          set net:max-retries 2
+          set net:timeout 20
+          set sftp:auto-confirm yes
+          set sftp:connect-program "ssh -a -x -i ~/.ssh/id_rsa -p $VPS_PORT -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+          mirror -R --delete --verbose \
+            --exclude-glob .git/ \
+            --exclude-glob .github/ \
+            --exclude-glob frontend/node_modules/ \
+            --exclude-glob backend/vendor/ \
+            ./ "$DEPLOY_PATH/"
+          bye
+          EOF
+
+      - name: Upload project files with SFTP (password)
+        if: ${{ env.HAS_SSH_KEY != 'true' && env.HAS_PASSWORD == 'true' }}
+        env:
+          LFTP_PASSWORD: ${{ secrets.VPS_PASSWORD }}
+        run: |
+          set -euo pipefail
+          lftp -u "$VPS_USER","$LFTP_PASSWORD" sftp://$VPS_HOST:$VPS_PORT <<EOF
+          set cmd:fail-exit yes
+          set net:max-retries 2
+          set net:timeout 20
+          set sftp:auto-confirm yes
+          mirror -R --delete --verbose \
+            --exclude-glob .git/ \
+            --exclude-glob .github/ \
+            --exclude-glob frontend/node_modules/ \
+            --exclude-glob backend/vendor/ \
+            ./ "$DEPLOY_PATH/"
+          bye
+          EOF
+
+      - name: Fail when no SFTP authentication secret is configured
+        if: ${{ env.HAS_SSH_KEY != 'true' && env.HAS_PASSWORD != 'true' }}
+        run: |
+          echo "Set one authentication method for SFTP: VPS_SSH_PRIVATE_KEY or VPS_PASSWORD"
+          exit 1
