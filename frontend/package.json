@@ -21,7 +21,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.16.0",
-    "next": "16.2.6",
+    "next": "16.3.0",
     "radix-ui": "^1.4.3",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -48,7 +48,7 @@
     "jest-transform-stub": "^2.0.0",
     "msw": "^2.14.6",
     "pa11y": "^6.2.3",
-    "pa11y-ci": "^3.1.0",
+    "pa11y-ci": "^4.1.1",
     "prettier": "3.9.5",
     "tailwindcss": "^4",
     "typescript": "^5"
