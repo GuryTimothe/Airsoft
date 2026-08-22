@@ -10,8 +10,6 @@ import { ProfileContent } from "./profile-content";
 import {
   deleteCurrentUser,
   getCurrentUser,
-  updateMyEmail,
-  updateMyPassword,
   updateMyProfile,
 } from "@/lib/user-api";
 import { clearAuthToken } from "@/lib/auth";
@@ -40,12 +38,6 @@ jest.mock("@/lib/user-api", () => ({
 
 const mockedGetCurrentUser = getCurrentUser as jest.MockedFunction<
   typeof getCurrentUser
->;
-const mockedUpdateMyEmail = updateMyEmail as jest.MockedFunction<
-  typeof updateMyEmail
->;
-const mockedUpdateMyPassword = updateMyPassword as jest.MockedFunction<
-  typeof updateMyPassword
 >;
 const mockedUpdateMyProfile = updateMyProfile as jest.MockedFunction<
   typeof updateMyProfile

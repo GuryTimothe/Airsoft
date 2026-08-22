@@ -4,11 +4,15 @@ namespace App\State;
 
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
+use ApiPlatform\Validator\Exception\ValidationException;
 use App\Entity\User;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
+use Symfony\Component\Validator\ConstraintViolation;
+use Symfony\Component\Validator\ConstraintViolationList;
 
 /**
  * @implements ProcessorInterface<User, User>
@@ -61,7 +65,20 @@ class UserUpdateProcessor implements ProcessorInterface
             $data->setCanSeePrivate(true);
         }
 
-        $result = $this->persistProcessor->process($data, $operation, $uriVariables, $context);
+        try {
+            $result = $this->persistProcessor->process($data, $operation, $uriVariables, $context);
+        } catch (UniqueConstraintViolationException) {
+            throw new ValidationException(new ConstraintViolationList([
+                new ConstraintViolation(
+                    'Un compte avec cet email existe deja.',
+                    null,
+                    [],
+                    null,
+                    'email',
+                    $data->getEmail(),
+                ),
+            ]));
+        }
 
         if ($previousData->getRole() !== $data->getRole()) {
             $this->logger->warning('Security role changed.', [

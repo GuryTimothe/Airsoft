@@ -307,6 +307,50 @@ final class GameRegistrationApiTest extends WebTestCase
         self::assertFalse($registration->isPresent());
     }
 
+    public function testOrganizerCanToggleRegistrationPresence(): void
+    {
+        $client = static::createClient();
+        $container = static::getContainer();
+
+        $entityManager = $container->get(EntityManagerInterface::class);
+        $passwordHasher = $container->get(UserPasswordHasherInterface::class);
+
+        try {
+            $entityManager->getConnection()->connect();
+        } catch (\Throwable $exception) {
+            self::markTestSkipped('Database is not available for API integration test: '.$exception->getMessage());
+        }
+
+        $game = $this->createGame($entityManager, 'Organizer presence toggle', 10);
+        [$organizer, $organizerPassword] = $this->createUser($entityManager, $passwordHasher, 'ROLE_ORGANIZER');
+        [$player] = $this->createUser($entityManager, $passwordHasher, 'ROLE_USER');
+
+        $registration = new GameRegistration();
+        $registration->setGame($game);
+        $registration->setUser($player);
+        $entityManager->persist($registration);
+        $entityManager->flush();
+
+        $organizerToken = $this->loginAndGetToken($client, $organizer->getEmail(), $organizerPassword);
+
+        $client->request('PATCH', '/api/game_registrations/'.$registration->getId(), server: [
+            'HTTP_AUTHORIZATION' => 'Bearer '.$organizerToken,
+            'CONTENT_TYPE' => 'application/merge-patch+json',
+        ], content: json_encode(['isPresent' => true], JSON_THROW_ON_ERROR));
+
+        self::assertResponseStatusCodeSame(200);
+
+        $entityManager->refresh($registration);
+        self::assertTrue($registration->isPresent());
+
+        $client->request('GET', '/api/game_registrations?game.id='.$game->getId(), server: [
+            'HTTP_AUTHORIZATION' => 'Bearer '.$organizerToken,
+        ]);
+
+        self::assertResponseIsSuccessful();
+        self::assertStringContainsString('"isPresent":true', (string) $client->getResponse()->getContent());
+    }
+
     private function createGame(EntityManagerInterface $entityManager, string $title, int $maxPlaces): Game
     {
         $game = new Game();

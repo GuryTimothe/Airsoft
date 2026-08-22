@@ -15,8 +15,20 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Trash2 } from "lucide-react";
+import {
   createGame,
+  deleteGame,
   getGame,
+  GameValidationError,
   updateGame,
   type Game,
   type GameFormValues,
@@ -27,10 +39,6 @@ import { getAppSettings } from "@/lib/settings-api";
 interface GameFormProps {
   gameId?: number;
   initialGame?: Game;
-}
-
-function RequiredMark() {
-  return <span className="ml-1 text-destructive">*</span>;
 }
 
 const emptyValues: GameFormValues = {
@@ -65,8 +73,10 @@ export function GameForm({ gameId, initialGame }: GameFormProps) {
     initialGame ? toFormValues(initialGame) : emptyValues,
   );
   const [loading, setLoading] = useState(Boolean(gameId) && !initialGame);
-  const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const pageTitle = useMemo(
     () => (gameId ? "Modifier la partie" : "Créer une partie"),
@@ -87,9 +97,9 @@ export function GameForm({ gameId, initialGame }: GameFormProps) {
       })
       .catch((err) => {
         if (active) {
-          setError(
+          setErrors([
             err instanceof Error ? err.message : "Une erreur est survenue",
-          );
+          ]);
         }
       })
       .finally(() => {
@@ -101,7 +111,7 @@ export function GameForm({ gameId, initialGame }: GameFormProps) {
     return () => {
       active = false;
     };
-  }, [gameId]);
+  }, [gameId, initialGame]);
 
   useEffect(() => {
     if (gameId) {
@@ -134,7 +144,46 @@ export function GameForm({ gameId, initialGame }: GameFormProps) {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError(null);
+    setErrors([]);
+
+    const clientErrors: string[] = [];
+
+    if (!values.title.trim()) {
+      clientErrors.push("Titre : ce champ ne doit pas etre vide.");
+    }
+
+    if (!values.address.trim()) {
+      clientErrors.push("Adresse : ce champ ne doit pas etre vide.");
+    }
+
+    if (!values.startDateTime.trim()) {
+      clientErrors.push("Date et heure : ce champ ne doit pas etre vide.");
+    } else if (Number.isNaN(new Date(values.startDateTime).getTime())) {
+      clientErrors.push("Date et heure : cette date n'est pas valide.");
+    }
+
+    if (!values.price.trim()) {
+      clientErrors.push("PAF : ce champ ne doit pas etre vide.");
+    } else if (Number.isNaN(Number(values.price)) || Number(values.price) < 0) {
+      clientErrors.push("PAF : cette valeur doit etre un nombre positif.");
+    }
+
+    if (!values.maxPlaces.trim()) {
+      clientErrors.push("Places max : ce champ ne doit pas etre vide.");
+    } else if (
+      Number.isNaN(Number(values.maxPlaces)) ||
+      Number(values.maxPlaces) < 1
+    ) {
+      clientErrors.push(
+        "Places max : cette valeur doit etre un nombre superieur ou egal a 1.",
+      );
+    }
+
+    if (clientErrors.length > 0) {
+      setErrors(clientErrors);
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -163,9 +212,39 @@ export function GameForm({ gameId, initialGame }: GameFormProps) {
       // Ensure server-side data is re-fetched
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Une erreur est survenue");
+      if (err instanceof GameValidationError) {
+        setErrors(err.messages);
+      } else {
+        setErrors([
+          err instanceof Error ? err.message : "Une erreur est survenue",
+        ]);
+      }
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!gameId) {
+      return;
+    }
+
+    setErrors([]);
+    setDeleting(true);
+
+    try {
+      await deleteGame(gameId);
+      setDeleteDialogOpen(false);
+      router.push("/admin/games");
+      router.refresh();
+    } catch (err) {
+      setErrors([
+        err instanceof Error
+          ? err.message
+          : "Impossible de supprimer la partie",
+      ]);
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -181,41 +260,54 @@ export function GameForm({ gameId, initialGame }: GameFormProps) {
         {loading ? (
           <p className="text-sm text-muted-foreground">Chargement…</p>
         ) : (
-          <form className="space-y-6" onSubmit={handleSubmit}>
-            {error ? (
-              <p className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-                {error}
-              </p>
+          <form className="space-y-6" onSubmit={handleSubmit} noValidate>
+            {errors.length > 0 ? (
+              <div
+                role="alert"
+                aria-live="assertive"
+                className="rounded border border-destructive/70 bg-destructive/10 p-3 text-sm text-destructive"
+              >
+                <p className="font-semibold">
+                  Veuillez corriger les erreurs suivantes :
+                </p>
+                <ul className="mt-2 list-disc space-y-1 pl-5">
+                  {errors.map((errorMessage, index) => (
+                    <li key={index}>{errorMessage}</li>
+                  ))}
+                </ul>
+              </div>
             ) : null}
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="title">
-                  Titre
-                  <RequiredMark />
-                </Label>
+                <div className="flex items-center gap-1">
+                  <Label htmlFor="title">Titre</Label>
+                  <span className="text-sm text-destructive" aria-hidden="true">
+                    *
+                  </span>
+                </div>
                 <Input
                   id="title"
                   value={values.title}
                   onChange={(event) =>
                     setValues({ ...values, title: event.target.value })
                   }
-                  required
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="address">
-                  Adresse
-                  <RequiredMark />
-                </Label>
+                <div className="flex items-center gap-1">
+                  <Label htmlFor="address">Adresse</Label>
+                  <span className="text-sm text-destructive" aria-hidden="true">
+                    *
+                  </span>
+                </div>
                 <Input
                   id="address"
                   value={values.address}
                   onChange={(event) =>
                     setValues({ ...values, address: event.target.value })
                   }
-                  required
                 />
               </div>
             </div>
@@ -234,10 +326,12 @@ export function GameForm({ gameId, initialGame }: GameFormProps) {
 
             <div className="grid gap-4 md:grid-cols-3">
               <div className="space-y-2">
-                <Label htmlFor="startDateTime">
-                  Date et heure
-                  <RequiredMark />
-                </Label>
+                <div className="flex items-center gap-1">
+                  <Label htmlFor="startDateTime">Date et heure</Label>
+                  <span className="text-sm text-destructive" aria-hidden="true">
+                    *
+                  </span>
+                </div>
                 <Input
                   id="startDateTime"
                   type="datetime-local"
@@ -245,15 +339,16 @@ export function GameForm({ gameId, initialGame }: GameFormProps) {
                   onChange={(event) =>
                     setValues({ ...values, startDateTime: event.target.value })
                   }
-                  required
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="price">
-                  PAF
-                  <RequiredMark />
-                </Label>
+                <div className="flex items-center gap-1">
+                  <Label htmlFor="price">PAF</Label>
+                  <span className="text-sm text-destructive" aria-hidden="true">
+                    *
+                  </span>
+                </div>
                 <Input
                   id="price"
                   type="number"
@@ -263,15 +358,16 @@ export function GameForm({ gameId, initialGame }: GameFormProps) {
                   onChange={(event) =>
                     setValues({ ...values, price: event.target.value })
                   }
-                  required
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="maxPlaces">
-                  Places max
-                  <RequiredMark />
-                </Label>
+                <div className="flex items-center gap-1">
+                  <Label htmlFor="maxPlaces">Places max</Label>
+                  <span className="text-sm text-destructive" aria-hidden="true">
+                    *
+                  </span>
+                </div>
                 <Input
                   id="maxPlaces"
                   type="number"
@@ -280,7 +376,6 @@ export function GameForm({ gameId, initialGame }: GameFormProps) {
                   onChange={(event) =>
                     setValues({ ...values, maxPlaces: event.target.value })
                   }
-                  required
                 />
               </div>
             </div>
@@ -298,6 +393,8 @@ export function GameForm({ gameId, initialGame }: GameFormProps) {
               </Label>
             </div>
 
+            <p className="text-xs text-muted-foreground">* Champ obligatoire</p>
+
             <div className="flex flex-wrap gap-3">
               <Button type="submit" disabled={submitting}>
                 {submitting
@@ -313,9 +410,47 @@ export function GameForm({ gameId, initialGame }: GameFormProps) {
               >
                 Annuler
               </Button>
-            </div>
 
-            <p className="text-xs text-muted-foreground">* Champ obligatoire</p>
+              {gameId ? (
+                <Dialog
+                  open={deleteDialogOpen}
+                  onOpenChange={setDeleteDialogOpen}
+                >
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={() => setDeleteDialogOpen(true)}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Supprimer
+                  </Button>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Confirmer la suppression</DialogTitle>
+                      <DialogDescription>
+                        Cette action supprimera definitivement la partie et ses
+                        donnees associees.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                      <DialogClose asChild>
+                        <Button type="button" variant="outline">
+                          Annuler
+                        </Button>
+                      </DialogClose>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        onClick={handleDelete}
+                        disabled={deleting}
+                      >
+                        {deleting ? "Suppression..." : "Supprimer"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              ) : null}
+            </div>
           </form>
         )}
       </CardContent>
