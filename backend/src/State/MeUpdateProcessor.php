@@ -99,7 +99,6 @@ class MeUpdateProcessor implements ProcessorInterface
     {
         if (!isset(self::$updatableProperties[$propertyName])) {
             $property = new \ReflectionProperty(User::class, $propertyName);
-            $property->setAccessible(true);
             self::$updatableProperties[$propertyName] = $property;
         }
 

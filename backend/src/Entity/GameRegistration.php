@@ -17,6 +17,7 @@ use App\State\GameRegistrationPresenceProcessor;
 use App\State\MyGameRegistrationsProvider;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Annotation\Groups;
+use Symfony\Component\Serializer\Annotation\SerializedName;
 
 #[ORM\Entity(repositoryClass: GameRegistrationRepository::class)]
 #[ORM\Table(name: 'game_registration', uniqueConstraints: [new ORM\UniqueConstraint(name: 'uniq_game_registration_game_user', columns: ['game_id', 'user_id'])])]
@@ -64,7 +65,7 @@ class GameRegistration
     private \DateTimeImmutable $createdAt;
 
     #[ORM\Column(type: 'boolean', options: ['default' => false])]
-    #[Groups(['game_registration:read', 'game_registration:write'])]
+    #[Groups(['game_registration:write'])]
     private bool $isPresent = false;
 
     public function __construct()
@@ -111,6 +112,14 @@ class GameRegistration
         return $this->isPresent;
     }
 
+    #[Groups(['game_registration:read'])]
+    #[SerializedName('isPresent')]
+    public function getIsPresent(): bool
+    {
+        return $this->isPresent;
+    }
+
+    #[Groups(['game_registration:read'])]
     public function getPresence(): bool
     {
         return $this->isPresent;

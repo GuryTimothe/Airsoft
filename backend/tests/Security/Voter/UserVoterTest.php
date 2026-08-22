@@ -157,12 +157,12 @@ final class UserVoterTest extends TestCase
         $this->assertSame(-1, $voter->vote($this->createToken($actor), null, [UserVoter::VIEW_ALL_USERS]));
     }
 
-    public function testOrganizerCannotViewAllUsers(): void
+    public function testOrganizerCanViewAllUsers(): void
     {
         $voter = new UserVoter();
         $actor = (new User())->setRole('ROLE_ORGANIZER');
 
-        $this->assertSame(-1, $voter->vote($this->createToken($actor), null, [UserVoter::VIEW_ALL_USERS]));
+        $this->assertSame(1, $voter->vote($this->createToken($actor), null, [UserVoter::VIEW_ALL_USERS]));
     }
 
     public function testAdminCanUpdateUser(): void

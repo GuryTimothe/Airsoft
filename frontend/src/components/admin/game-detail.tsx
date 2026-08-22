@@ -179,17 +179,14 @@ export function GameDetail({ gameId }: GameDetailProps) {
     );
 
     try {
-      const updated = await updateGameRegistrationPresence(
-        registrationId,
-        isPresent,
-      );
+      await updateGameRegistrationPresence(registrationId, isPresent);
 
       setRegistrations((current) =>
         current.map((registration) =>
           registration.id === registrationId
             ? {
                 ...registration,
-                isPresent: updated.isPresent,
+                isPresent,
               }
             : registration,
         ),
@@ -250,10 +247,6 @@ export function GameDetail({ gameId }: GameDetailProps) {
     });
 
     return [...filtered].sort((left, right) => {
-      if (left.isPresent !== right.isPresent) {
-        return left.isPresent ? -1 : 1;
-      }
-
       const leftLastname = left.userLastname ?? "";
       const rightLastname = right.userLastname ?? "";
       const lastNameComparison = leftLastname.localeCompare(
