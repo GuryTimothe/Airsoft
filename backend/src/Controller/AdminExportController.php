@@ -35,7 +35,7 @@ final class AdminExportController extends AbstractController
     #[Route('/games.csv', methods: ['GET'])]
     public function exportGames(Request $request): StreamedResponse
     {
-        $this->denyAccessUnlessGrantedAdminOrSuperAdmin();
+        $this->denyAccessUnlessGrantedAdminOrSuperAdminOrOrganizer();
 
         $dateFrom = $this->parseDate($request->query->get('dateFrom'), 'dateFrom');
         $dateTo   = $this->parseDate($request->query->get('dateTo'), 'dateTo');
@@ -187,6 +187,19 @@ final class AdminExportController extends AbstractController
     private function denyAccessUnlessGrantedAdminOrSuperAdmin(): void
     {
         if ($this->isGranted('ROLE_ADMIN') || $this->isGranted('ROLE_SUPER_ADMIN')) {
+            return;
+        }
+
+        $this->denyAccessUnlessGranted('ROLE_ADMIN');
+    }
+
+    private function denyAccessUnlessGrantedAdminOrSuperAdminOrOrganizer(): void
+    {
+        if (
+            $this->isGranted('ROLE_ADMIN')
+            || $this->isGranted('ROLE_SUPER_ADMIN')
+            || $this->isGranted('ROLE_ORGANIZER')
+        ) {
             return;
         }
 
@@ -405,6 +418,7 @@ final class AdminExportController extends AbstractController
                 throw new \RuntimeException('Impossible de preparer le flux CSV.');
             }
 
+            fwrite($handle, "\xEF\xBB\xBF");
             fputcsv($handle, $headers, ';', '"', '');
 
             foreach ($rows as $row) {

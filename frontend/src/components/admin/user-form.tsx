@@ -27,6 +27,7 @@ import {
   deleteUser,
   getCurrentUser,
   getUser,
+  ProfileValidationError,
   updateUser,
   type CreateUserPayload,
   type UpdateUserPayload,
@@ -38,15 +39,12 @@ import {
   parseEmergencyContact,
   serializeEmergencyContact,
 } from "@/lib/emergency-contact";
+import { isValidEmail, isValidPhoneNumber } from "@/lib/validators";
 
 interface UserFormProps {
   userId?: number;
   initialUser?: User;
   initialActorRole?: UserRole | null;
-}
-
-function RequiredMark() {
-  return <span className="ml-1 text-destructive">*</span>;
 }
 
 type UserFormValues = {
@@ -163,7 +161,7 @@ export function UserForm({
   const [actorRole, setActorRole] = useState<UserRole | null>(
     initialActorRole ?? null,
   );
-  const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -217,7 +215,7 @@ export function UserForm({
     return () => {
       active = false;
     };
-  }, []);
+  }, [initialActorRole]);
 
   useEffect(() => {
     if (!userId || initialUser) {
@@ -240,9 +238,9 @@ export function UserForm({
         setTargetRole(user.role);
       } catch (err) {
         if (active) {
-          setError(
+          setErrors([
             err instanceof Error ? err.message : "Une erreur est survenue",
-          );
+          ]);
         }
       } finally {
         if (active) {
@@ -256,7 +254,7 @@ export function UserForm({
     return () => {
       active = false;
     };
-  }, [userId]);
+  }, [userId, initialUser]);
 
   const isAdminActor = actorRole === "ROLE_ADMIN";
   const isAdminBlockedOnTarget =
@@ -270,39 +268,104 @@ export function UserForm({
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError(null);
+    setErrors([]);
 
     if (isAdminBlockedOnTarget) {
-      setError(
+      setErrors([
         "Un admin peut modifier ou supprimer uniquement les organisateurs et utilisateurs classiques.",
+      ]);
+      return;
+    }
+
+    if (!userId && isAdminActor && isElevatedRole(values.role)) {
+      setErrors(["Un admin ne peut pas creer un admin ou super admin."]);
+      return;
+    }
+
+    const emergencyContactFields = {
+      lastname: values.emergencyLastname,
+      firstname: values.emergencyFirstname,
+      email: values.emergencyEmail,
+      phone: values.emergencyPhone,
+    };
+    const emergencyContact = serializeEmergencyContact(emergencyContactFields);
+
+    const clientErrors: string[] = [];
+
+    if (!values.firstname.trim()) {
+      clientErrors.push("Prenom : ce champ ne doit pas etre vide.");
+    }
+
+    if (!values.lastname.trim()) {
+      clientErrors.push("Nom : ce champ ne doit pas etre vide.");
+    }
+
+    if (!values.email.trim()) {
+      clientErrors.push("Email : ce champ ne doit pas etre vide.");
+    } else if (!isValidEmail(values.email.trim())) {
+      clientErrors.push(
+        "Email : cette valeur n'est pas une adresse email valide.",
       );
+    }
+
+    if (!userId) {
+      if (!values.password.trim()) {
+        clientErrors.push("Mot de passe : ce champ ne doit pas etre vide.");
+      } else {
+        const passwordPolicyError = validatePasswordPolicy(values.password);
+        if (passwordPolicyError) {
+          clientErrors.push(`Mot de passe : ${passwordPolicyError}`);
+        }
+      }
+    } else if (values.password.trim()) {
+      const passwordPolicyError = validatePasswordPolicy(values.password);
+      if (passwordPolicyError) {
+        clientErrors.push(`Mot de passe : ${passwordPolicyError}`);
+      }
+    }
+
+    if (!values.dateOfBirth.trim()) {
+      clientErrors.push("Date de naissance : ce champ ne doit pas etre vide.");
+    } else if (Number.isNaN(new Date(values.dateOfBirth).getTime())) {
+      clientErrors.push("Date de naissance : cette date n'est pas valide.");
+    }
+
+    if (values.phone.trim() && !isValidPhoneNumber(values.phone.trim())) {
+      clientErrors.push("Telephone : le numero de telephone n'est pas valide.");
+    }
+
+    if (isMinor && !hasCompleteEmergencyContact(emergencyContactFields)) {
+      clientErrors.push(
+        "Contact d'urgence : doit contenir nom, prenom, email et telephone pour un mineur.",
+      );
+    }
+
+    if (
+      values.emergencyEmail.trim() &&
+      !isValidEmail(values.emergencyEmail.trim())
+    ) {
+      clientErrors.push(
+        "Email du contact : cette valeur n'est pas une adresse email valide.",
+      );
+    }
+
+    if (
+      values.emergencyPhone.trim() &&
+      !isValidPhoneNumber(values.emergencyPhone.trim())
+    ) {
+      clientErrors.push(
+        "Telephone du contact : le numero de telephone n'est pas valide.",
+      );
+    }
+
+    if (clientErrors.length > 0) {
+      setErrors(clientErrors);
       return;
     }
 
     setSubmitting(true);
 
     try {
-      const birthDate = new Date(values.dateOfBirth);
-      if (Number.isNaN(birthDate.getTime())) {
-        throw new Error("La date de naissance est invalide.");
-      }
-
-      const emergencyContactFields = {
-        lastname: values.emergencyLastname,
-        firstname: values.emergencyFirstname,
-        email: values.emergencyEmail,
-        phone: values.emergencyPhone,
-      };
-      const emergencyContact = serializeEmergencyContact(
-        emergencyContactFields,
-      );
-
-      if (isMinor && !hasCompleteEmergencyContact(emergencyContactFields)) {
-        throw new Error(
-          "Le contact d'urgence mineur doit contenir nom, prenom, email et telephone.",
-        );
-      }
-
       if (userId) {
         const payload: UpdateUserPayload = {
           lastname: values.lastname,
@@ -317,27 +380,12 @@ export function UserForm({
         };
 
         if (values.password.trim()) {
-          const passwordPolicyError = validatePasswordPolicy(values.password);
-          if (passwordPolicyError) {
-            throw new Error(passwordPolicyError);
-          }
-
           payload.password = values.password;
         }
 
         const updated = await updateUser(userId, payload);
         router.push(`/admin/users/${updated.id}`);
       } else {
-        if (isAdminActor && isElevatedRole(values.role)) {
-          setError("Un admin ne peut pas creer un admin ou super admin.");
-          return;
-        }
-
-        const passwordPolicyError = validatePasswordPolicy(values.password);
-        if (passwordPolicyError) {
-          throw new Error(passwordPolicyError);
-        }
-
         const payload: CreateUserPayload = {
           lastname: values.lastname,
           firstname: values.firstname,
@@ -357,7 +405,13 @@ export function UserForm({
 
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Une erreur est survenue");
+      if (err instanceof ProfileValidationError) {
+        setErrors(err.messages);
+      } else {
+        setErrors([
+          err instanceof Error ? err.message : "Une erreur est survenue",
+        ]);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -369,13 +423,13 @@ export function UserForm({
     }
 
     if (isAdminBlockedOnTarget) {
-      setError(
+      setErrors([
         "Un admin peut modifier ou supprimer uniquement les organisateurs et utilisateurs classiques.",
-      );
+      ]);
       return;
     }
 
-    setError(null);
+    setErrors([]);
     setDeleting(true);
 
     try {
@@ -384,11 +438,11 @@ export function UserForm({
       router.push("/admin/users");
       router.refresh();
     } catch (err) {
-      setError(
+      setErrors([
         err instanceof Error
           ? err.message
           : "Impossible de supprimer l'utilisateur",
-      );
+      ]);
     } finally {
       setDeleting(false);
     }
@@ -406,11 +460,22 @@ export function UserForm({
         {loading ? (
           <p className="text-sm text-muted-foreground">Chargement...</p>
         ) : (
-          <form className="space-y-6" onSubmit={handleSubmit}>
-            {error ? (
-              <p className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-                {error}
-              </p>
+          <form className="space-y-6" onSubmit={handleSubmit} noValidate>
+            {errors.length > 0 ? (
+              <div
+                role="alert"
+                aria-live="assertive"
+                className="rounded border border-destructive/70 bg-destructive/10 p-3 text-sm text-destructive"
+              >
+                <p className="font-semibold">
+                  Veuillez corriger les erreurs suivantes :
+                </p>
+                <ul className="mt-2 list-disc space-y-1 pl-5">
+                  {errors.map((errorMessage, index) => (
+                    <li key={index}>{errorMessage}</li>
+                  ))}
+                </ul>
+              </div>
             ) : null}
 
             {isAdminBlockedOnTarget ? (
@@ -422,41 +487,45 @@ export function UserForm({
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="firstname">
-                  Prenom
-                  <RequiredMark />
-                </Label>
+                <div className="flex items-center gap-1">
+                  <Label htmlFor="firstname">Prenom</Label>
+                  <span className="text-sm text-destructive" aria-hidden="true">
+                    *
+                  </span>
+                </div>
                 <Input
                   id="firstname"
                   value={values.firstname}
                   onChange={(event) =>
                     setValues({ ...values, firstname: event.target.value })
                   }
-                  required
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="lastname">
-                  Nom
-                  <RequiredMark />
-                </Label>
+                <div className="flex items-center gap-1">
+                  <Label htmlFor="lastname">Nom</Label>
+                  <span className="text-sm text-destructive" aria-hidden="true">
+                    *
+                  </span>
+                </div>
                 <Input
                   id="lastname"
                   value={values.lastname}
                   onChange={(event) =>
                     setValues({ ...values, lastname: event.target.value })
                   }
-                  required
                 />
               </div>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="email">
-                  Email
-                  <RequiredMark />
-                </Label>
+                <div className="flex items-center gap-1">
+                  <Label htmlFor="email">Email</Label>
+                  <span className="text-sm text-destructive" aria-hidden="true">
+                    *
+                  </span>
+                </div>
                 <Input
                   id="email"
                   type="email"
@@ -464,15 +533,19 @@ export function UserForm({
                   onChange={(event) =>
                     setValues({ ...values, email: event.target.value })
                   }
-                  required
                 />
               </div>
               {!userId ? (
                 <div className="space-y-2">
-                  <Label htmlFor="password">
-                    Mot de passe
-                    <RequiredMark />
-                  </Label>
+                  <div className="flex items-center gap-1">
+                    <Label htmlFor="password">Mot de passe</Label>
+                    <span
+                      className="text-sm text-destructive"
+                      aria-hidden="true"
+                    >
+                      *
+                    </span>
+                  </div>
                   <Input
                     id="password"
                     type="password"
@@ -480,7 +553,6 @@ export function UserForm({
                     onChange={(event) =>
                       setValues({ ...values, password: event.target.value })
                     }
-                    required
                   />
                 </div>
               ) : null}
@@ -488,10 +560,12 @@ export function UserForm({
 
             <div className="grid gap-4 md:grid-cols-3">
               <div className="space-y-2">
-                <Label htmlFor="dateOfBirth">
-                  Date de naissance
-                  <RequiredMark />
-                </Label>
+                <div className="flex items-center gap-1">
+                  <Label htmlFor="dateOfBirth">Date de naissance</Label>
+                  <span className="text-sm text-destructive" aria-hidden="true">
+                    *
+                  </span>
+                </div>
                 <Input
                   id="dateOfBirth"
                   type="date"
@@ -499,7 +573,6 @@ export function UserForm({
                   onChange={(event) =>
                     setValues({ ...values, dateOfBirth: event.target.value })
                   }
-                  required
                 />
               </div>
               <div className="space-y-2">
@@ -526,21 +599,28 @@ export function UserForm({
 
             <div className="space-y-3">
               <div>
-                <Label>
-                  Contact d'urgence
-                  {isMinor ? <RequiredMark /> : null}
-                </Label>
+                <Label>Contact d'urgence</Label>
                 <p className="text-xs text-muted-foreground">
                   Renseigner nom, prenom, email et telephone.
+                  {isMinor
+                    ? " Obligatoire pour un mineur."
+                    : " Optionnel pour un majeur."}
                 </p>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="emergencyLastname">
-                    Nom du contact
-                    {isMinor ? <RequiredMark /> : null}
-                  </Label>
+                  <div className="flex items-center gap-1">
+                    <Label htmlFor="emergencyLastname">Nom du contact</Label>
+                    {isMinor ? (
+                      <span
+                        className="text-sm text-destructive"
+                        aria-hidden="true"
+                      >
+                        *
+                      </span>
+                    ) : null}
+                  </div>
                   <Input
                     id="emergencyLastname"
                     value={values.emergencyLastname}
@@ -550,15 +630,23 @@ export function UserForm({
                         emergencyLastname: event.target.value,
                       })
                     }
-                    required={isMinor}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="emergencyFirstname">
-                    Prenom du contact
-                    {isMinor ? <RequiredMark /> : null}
-                  </Label>
+                  <div className="flex items-center gap-1">
+                    <Label htmlFor="emergencyFirstname">
+                      Prenom du contact
+                    </Label>
+                    {isMinor ? (
+                      <span
+                        className="text-sm text-destructive"
+                        aria-hidden="true"
+                      >
+                        *
+                      </span>
+                    ) : null}
+                  </div>
                   <Input
                     id="emergencyFirstname"
                     value={values.emergencyFirstname}
@@ -568,15 +656,21 @@ export function UserForm({
                         emergencyFirstname: event.target.value,
                       })
                     }
-                    required={isMinor}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="emergencyEmail">
-                    Email du contact
-                    {isMinor ? <RequiredMark /> : null}
-                  </Label>
+                  <div className="flex items-center gap-1">
+                    <Label htmlFor="emergencyEmail">Email du contact</Label>
+                    {isMinor ? (
+                      <span
+                        className="text-sm text-destructive"
+                        aria-hidden="true"
+                      >
+                        *
+                      </span>
+                    ) : null}
+                  </div>
                   <Input
                     id="emergencyEmail"
                     type="email"
@@ -587,15 +681,21 @@ export function UserForm({
                         emergencyEmail: event.target.value,
                       })
                     }
-                    required={isMinor}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="emergencyPhone">
-                    Telephone du contact
-                    {isMinor ? <RequiredMark /> : null}
-                  </Label>
+                  <div className="flex items-center gap-1">
+                    <Label htmlFor="emergencyPhone">Telephone du contact</Label>
+                    {isMinor ? (
+                      <span
+                        className="text-sm text-destructive"
+                        aria-hidden="true"
+                      >
+                        *
+                      </span>
+                    ) : null}
+                  </div>
                   <Input
                     id="emergencyPhone"
                     value={values.emergencyPhone}
@@ -605,7 +705,6 @@ export function UserForm({
                         emergencyPhone: event.target.value,
                       })
                     }
-                    required={isMinor}
                   />
                 </div>
               </div>
@@ -613,10 +712,12 @@ export function UserForm({
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="role">
-                  Role
-                  <RequiredMark />
-                </Label>
+                <div className="flex items-center gap-1">
+                  <Label htmlFor="role">Role</Label>
+                  <span className="text-sm text-destructive" aria-hidden="true">
+                    *
+                  </span>
+                </div>
                 <select
                   id="role"
                   value={values.role}
@@ -675,6 +776,8 @@ export function UserForm({
                 ) : null}
               </div>
             </div>
+
+            <p className="text-xs text-muted-foreground">* Champ obligatoire</p>
 
             <div className="flex flex-wrap gap-3">
               <Button
@@ -749,8 +852,6 @@ export function UserForm({
                 </Dialog>
               ) : null}
             </div>
-
-            <p className="text-xs text-muted-foreground">* Champ obligatoire</p>
           </form>
         )}
       </CardContent>

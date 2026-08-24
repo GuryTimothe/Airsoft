@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import {
   getAppSettings,
   updateAppSettings,
+  AppSettingsValidationError,
   type AppSetting,
 } from "@/lib/settings-api";
 
@@ -38,6 +39,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [formErrors, setFormErrors] = useState<string[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -72,6 +74,7 @@ export default function SettingsPage() {
     setSaving(true);
     setMessage(null);
     setError(null);
+    setFormErrors([]);
 
     const payload = {
       defaultAddress: values.defaultAddress,
@@ -85,11 +88,15 @@ export default function SettingsPage() {
       setValues(toFormValues(saved));
       setMessage("Parametres enregistres avec succes.");
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Impossible d'enregistrer les parametres.",
-      );
+      if (err instanceof AppSettingsValidationError) {
+        setFormErrors(err.messages);
+      } else {
+        setFormErrors([
+          err instanceof Error
+            ? err.message
+            : "Impossible d'enregistrer les parametres.",
+        ]);
+      }
     } finally {
       setSaving(false);
     }
@@ -120,9 +127,29 @@ export default function SettingsPage() {
           ) : null}
 
           {hasLoadedSettings ? (
-            <form className="space-y-4" onSubmit={handleSubmit}>
+            <form className="space-y-4" onSubmit={handleSubmit} noValidate>
+              {formErrors.length > 0 ? (
+                <div
+                  role="alert"
+                  aria-live="assertive"
+                  className="rounded border border-destructive/70 bg-destructive/10 p-3 text-sm text-destructive"
+                >
+                  <p className="font-semibold">
+                    Veuillez corriger les erreurs suivantes :
+                  </p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    {formErrors.map((formError, index) => (
+                      <li key={index}>{formError}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
               <div className="space-y-2">
-                <Label htmlFor="defaultPrice">PAF par defaut (€)</Label>
+                <Label htmlFor="defaultPrice">
+                  PAF par defaut (€)
+                  <span className="ml-1 text-destructive">*</span>
+                </Label>
                 <Input
                   id="defaultPrice"
                   type="number"
@@ -132,13 +159,13 @@ export default function SettingsPage() {
                   onChange={(event) =>
                     setValues({ ...values, defaultPrice: event.target.value })
                   }
-                  required
                 />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="defaultMaxPlaces">
                   Nombre de joueurs par defaut
+                  <span className="ml-1 text-destructive">*</span>
                 </Label>
                 <Input
                   id="defaultMaxPlaces"
@@ -151,21 +178,26 @@ export default function SettingsPage() {
                       defaultMaxPlaces: event.target.value,
                     })
                   }
-                  required
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="defaultAddress">Lieu par defaut</Label>
+                <Label htmlFor="defaultAddress">
+                  Lieu par defaut
+                  <span className="ml-1 text-destructive">*</span>
+                </Label>
                 <Input
                   id="defaultAddress"
                   value={values.defaultAddress}
                   onChange={(event) =>
                     setValues({ ...values, defaultAddress: event.target.value })
                   }
-                  required
                 />
               </div>
+
+              <p className="text-xs text-muted-foreground">
+                * Champ obligatoire
+              </p>
 
               <Button className="mt-4" type="submit" disabled={saving}>
                 {saving ? "Sauvegarde..." : "Sauvegarder"}

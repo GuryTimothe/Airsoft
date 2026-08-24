@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/card";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -179,17 +180,14 @@ export function GameDetail({ gameId }: GameDetailProps) {
     );
 
     try {
-      const updated = await updateGameRegistrationPresence(
-        registrationId,
-        isPresent,
-      );
+      await updateGameRegistrationPresence(registrationId, isPresent);
 
       setRegistrations((current) =>
         current.map((registration) =>
           registration.id === registrationId
             ? {
                 ...registration,
-                isPresent: updated.isPresent,
+                isPresent,
               }
             : registration,
         ),
@@ -250,10 +248,6 @@ export function GameDetail({ gameId }: GameDetailProps) {
     });
 
     return [...filtered].sort((left, right) => {
-      if (left.isPresent !== right.isPresent) {
-        return left.isPresent ? -1 : 1;
-      }
-
       const leftLastname = left.userLastname ?? "";
       const rightLastname = right.userLastname ?? "";
       const lastNameComparison = leftLastname.localeCompare(
@@ -327,9 +321,9 @@ export function GameDetail({ gameId }: GameDetailProps) {
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>
-                <Button variant="outline" onClick={() => undefined}>
-                  Annuler
-                </Button>
+                <DialogClose asChild>
+                  <Button variant="outline">Annuler</Button>
+                </DialogClose>
                 <Button
                   variant="destructive"
                   onClick={handleDelete}

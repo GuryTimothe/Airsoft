@@ -69,6 +69,10 @@ class MeUpdateProcessor implements ProcessorInterface
 
         $emergencyContactProperty = $this->getWritableProperty('emergencyContact');
         if (!$this->wasEmergencyContactPatched($source, $emergencyContactProperty)) {
+            if ($this->isMinor($target) && !($target->getEmergencyContact()?->isComplete() ?? false)) {
+                throw new \InvalidArgumentException('Le contact d\'urgence est obligatoire pour un mineur.');
+            }
+
             return;
         }
 
@@ -98,8 +102,7 @@ class MeUpdateProcessor implements ProcessorInterface
     private function getWritableProperty(string $propertyName): \ReflectionProperty
     {
         if (!isset(self::$updatableProperties[$propertyName])) {
-            $property = new \ReflectionProperty(User::class, $propertyName);
-            $property->setAccessible(true);
+            $property                                 = new \ReflectionProperty(User::class, $propertyName);
             self::$updatableProperties[$propertyName] = $property;
         }
 
@@ -124,6 +127,11 @@ class MeUpdateProcessor implements ProcessorInterface
 
     private function isMinor(User $user): bool
     {
+        $dateOfBirthProperty = $this->getWritableProperty('dateOfBirth');
+        if (!$dateOfBirthProperty->isInitialized($user)) {
+            return false;
+        }
+
         $today     = new \DateTimeImmutable('today');
         $birthDate = \DateTimeImmutable::createFromInterface($user->getDateOfBirth());
 
