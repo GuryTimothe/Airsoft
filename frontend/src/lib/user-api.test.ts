@@ -489,7 +489,7 @@ describe("user-api", () => {
     mockCsrf();
     fetchMock.mockResolvedValueOnce({
       ok: false,
-      text: async () => "Email already taken",
+      json: async () => ({ detail: "Email already taken" }),
     });
     await expect(
       createUser({
@@ -506,7 +506,7 @@ describe("user-api", () => {
     mockCsrf();
     fetchMock.mockResolvedValueOnce({
       ok: false,
-      text: async () => "Forbidden",
+      json: async () => ({ detail: "Forbidden" }),
     });
     await expect(updateUser(1, { role: "ROLE_ADMIN" })).rejects.toThrow(
       "Forbidden",
@@ -647,7 +647,7 @@ describe("user-api", () => {
     mockCsrf();
     fetchMock.mockResolvedValueOnce({
       ok: false,
-      text: async () => "Email already exists",
+      json: async () => ({ detail: "Email already exists" }),
     });
 
     await expect(

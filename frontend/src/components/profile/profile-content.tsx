@@ -25,11 +25,13 @@ import {
 import {
   deleteCurrentUser,
   getCurrentUser,
+  ProfileValidationError,
   updateMyEmail,
   updateMyPassword,
   updateMyProfile,
   type User,
 } from "@/lib/user-api";
+import { isValidEmail, isValidPhoneNumber } from "@/lib/validators";
 
 function displayOptionalValue(value?: string | null): string {
   if (typeof value !== "string") {
@@ -116,10 +118,10 @@ export function ProfileContent() {
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
   const [emergencyMessage, setEmergencyMessage] = useState<string | null>(null);
 
-  const [generalError, setGeneralError] = useState<string | null>(null);
-  const [emailError, setEmailError] = useState<string | null>(null);
-  const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [emergencyError, setEmergencyError] = useState<string | null>(null);
+  const [generalErrors, setGeneralErrors] = useState<string[]>([]);
+  const [emailErrors, setEmailErrors] = useState<string[]>([]);
+  const [passwordErrors, setPasswordErrors] = useState<string[]>([]);
+  const [emergencyErrors, setEmergencyErrors] = useState<string[]>([]);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const [isUpdatingGeneral, setIsUpdatingGeneral] = useState(false);
@@ -260,10 +262,53 @@ export function ProfileContent() {
     };
   }, [passwordMessage]);
 
+  function resetGeneralForm() {
+    if (!user) {
+      return;
+    }
+
+    setGeneralForm({
+      firstname: user.firstname,
+      lastname: user.lastname,
+      dateOfBirth: user.dateOfBirth.slice(0, 10),
+      pseudo: user.pseudo ?? "",
+      phone: user.phone ?? "",
+    });
+  }
+
   async function handleGeneralSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setGeneralMessage(null);
-    setGeneralError(null);
+    setGeneralErrors([]);
+
+    const clientErrors: string[] = [];
+
+    if (!generalForm.firstname.trim()) {
+      clientErrors.push("Prenom : ce champ ne doit pas etre vide.");
+    }
+
+    if (!generalForm.lastname.trim()) {
+      clientErrors.push("Nom : ce champ ne doit pas etre vide.");
+    }
+
+    if (!generalForm.dateOfBirth.trim()) {
+      clientErrors.push("Date de naissance : ce champ ne doit pas etre vide.");
+    } else if (Number.isNaN(new Date(generalForm.dateOfBirth).getTime())) {
+      clientErrors.push("Date de naissance : cette date n'est pas valide.");
+    }
+
+    if (
+      generalForm.phone.trim() &&
+      !isValidPhoneNumber(generalForm.phone.trim())
+    ) {
+      clientErrors.push("Telephone : le numero de telephone n'est pas valide.");
+    }
+
+    if (clientErrors.length > 0) {
+      setGeneralErrors(clientErrors);
+      return;
+    }
+
     setIsUpdatingGeneral(true);
 
     try {
@@ -286,19 +331,27 @@ export function ProfileContent() {
       setGeneralMessage("Profil mis a jour.");
       setIsGeneralModalOpen(false);
     } catch (error) {
-      setGeneralError(
-        error instanceof Error
-          ? error.message
-          : "Impossible de mettre a jour le profil.",
-      );
+      if (error instanceof ProfileValidationError) {
+        setGeneralErrors(error.messages);
+      } else {
+        setGeneralErrors([
+          error instanceof Error
+            ? error.message
+            : "Impossible de mettre a jour le profil.",
+        ]);
+      }
     } finally {
       setIsUpdatingGeneral(false);
     }
   }
 
-  function openEmergencyModal() {
-    setEmergencyError(null);
+  function resetEmergencyForm() {
     setEmergencyForm(parseEmergencyContact(user?.emergencyContact ?? null));
+  }
+
+  function openEmergencyModal() {
+    setEmergencyErrors([]);
+    resetEmergencyForm();
     setIsEmergencyModalOpen(true);
   }
 
@@ -307,34 +360,58 @@ export function ProfileContent() {
   ) {
     event.preventDefault();
     setEmergencyMessage(null);
-    setEmergencyError(null);
+    setEmergencyErrors([]);
+
+    const formData = new FormData(event.currentTarget);
+    const submittedEmergencyContact = {
+      lastname: String(formData.get("lastname") ?? "").trim(),
+      firstname: String(formData.get("firstname") ?? "").trim(),
+      email: String(formData.get("email") ?? "").trim(),
+      phone: String(formData.get("phone") ?? "").trim(),
+    };
+    const normalizedEmergencyContact = serializeEmergencyContact(
+      submittedEmergencyContact,
+    );
+
+    const clientErrors: string[] = [];
+
+    if (
+      normalizedEmergencyContact &&
+      !hasCompleteEmergencyContact(normalizedEmergencyContact)
+    ) {
+      clientErrors.push(
+        "Le contact d'urgence doit contenir nom, prenom, email et telephone.",
+      );
+    }
+
+    if (isMinorUser && !normalizedEmergencyContact) {
+      clientErrors.push("Le contact d'urgence est obligatoire pour un mineur.");
+    }
+
+    if (
+      submittedEmergencyContact.email &&
+      !isValidEmail(submittedEmergencyContact.email)
+    ) {
+      clientErrors.push(
+        "Email : cette valeur n'est pas une adresse email valide.",
+      );
+    }
+
+    if (
+      submittedEmergencyContact.phone &&
+      !isValidPhoneNumber(submittedEmergencyContact.phone)
+    ) {
+      clientErrors.push("Telephone : le numero de telephone n'est pas valide.");
+    }
+
+    if (clientErrors.length > 0) {
+      setEmergencyErrors(clientErrors);
+      return;
+    }
+
     setIsUpdatingEmergency(true);
 
     try {
-      const formData = new FormData(event.currentTarget);
-      const submittedEmergencyContact = {
-        lastname: String(formData.get("lastname") ?? "").trim(),
-        firstname: String(formData.get("firstname") ?? "").trim(),
-        email: String(formData.get("email") ?? "").trim(),
-        phone: String(formData.get("phone") ?? "").trim(),
-      };
-      const normalizedEmergencyContact = serializeEmergencyContact(
-        submittedEmergencyContact,
-      );
-
-      if (
-        normalizedEmergencyContact &&
-        !hasCompleteEmergencyContact(normalizedEmergencyContact)
-      ) {
-        throw new Error(
-          "Le contact d'urgence doit contenir nom, prenom, email et telephone.",
-        );
-      }
-
-      if (isMinorUser && !normalizedEmergencyContact) {
-        throw new Error("Le contact d'urgence est obligatoire pour un mineur.");
-      }
-
       const updatedUser = await updateMyProfile({
         firstname: generalForm.firstname,
         lastname: generalForm.lastname,
@@ -360,11 +437,15 @@ export function ProfileContent() {
       );
       setIsEmergencyModalOpen(false);
     } catch (error) {
-      setEmergencyError(
-        error instanceof Error
-          ? error.message
-          : "Impossible de mettre a jour le contact d'urgence.",
-      );
+      if (error instanceof ProfileValidationError) {
+        setEmergencyErrors(error.messages);
+      } else {
+        setEmergencyErrors([
+          error instanceof Error
+            ? error.message
+            : "Impossible de mettre a jour le contact d'urgence.",
+        ]);
+      }
     } finally {
       setIsUpdatingEmergency(false);
     }
@@ -372,10 +453,12 @@ export function ProfileContent() {
 
   async function handleDeleteEmergencyContact() {
     setEmergencyMessage(null);
-    setEmergencyError(null);
+    setEmergencyErrors([]);
 
     if (isMinorUser) {
-      setEmergencyError("Le contact d'urgence est obligatoire pour un mineur.");
+      setEmergencyErrors([
+        "Le contact d'urgence est obligatoire pour un mineur.",
+      ]);
       return;
     }
 
@@ -399,23 +482,51 @@ export function ProfileContent() {
       setEmergencyForm(parseEmergencyContact(updatedUser.emergencyContact));
       setEmergencyMessage("Contact d'urgence supprime.");
     } catch (error) {
-      setEmergencyError(
-        error instanceof Error
-          ? error.message
-          : "Impossible de supprimer le contact d'urgence.",
-      );
+      if (error instanceof ProfileValidationError) {
+        setEmergencyErrors(error.messages);
+      } else {
+        setEmergencyErrors([
+          error instanceof Error
+            ? error.message
+            : "Impossible de supprimer le contact d'urgence.",
+        ]);
+      }
     } finally {
       setIsUpdatingEmergency(false);
     }
   }
 
+  function resetEmailForm() {
+    if (!user) {
+      return;
+    }
+
+    setEmailForm({ email: user.email, currentPassword: "" });
+  }
+
   async function handleEmailSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setEmailMessage(null);
-    setEmailError(null);
+    setEmailErrors([]);
+
+    const clientErrors: string[] = [];
+
+    if (!emailForm.email.trim()) {
+      clientErrors.push("Email : ce champ ne doit pas etre vide.");
+    } else if (!isValidEmail(emailForm.email.trim())) {
+      clientErrors.push(
+        "Email : cette valeur n'est pas une adresse email valide.",
+      );
+    }
 
     if (!emailForm.currentPassword.trim()) {
-      setEmailError("Le mot de passe actuel est requis.");
+      clientErrors.push(
+        "Mot de passe actuel : ce champ ne doit pas etre vide.",
+      );
+    }
+
+    if (clientErrors.length > 0) {
+      setEmailErrors(clientErrors);
       return;
     }
 
@@ -434,43 +545,65 @@ export function ProfileContent() {
       setEmailMessage("Email mis a jour.");
       setIsEmailModalOpen(false);
     } catch (error) {
-      setEmailError(
-        error instanceof Error
-          ? error.message
-          : "Impossible de mettre a jour l'email.",
-      );
+      if (error instanceof ProfileValidationError) {
+        setEmailErrors(error.messages);
+      } else {
+        setEmailErrors([
+          error instanceof Error
+            ? error.message
+            : "Impossible de mettre a jour l'email.",
+        ]);
+      }
     } finally {
       setIsUpdatingEmail(false);
     }
   }
 
+  function resetPasswordForm() {
+    setPasswordForm({
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    });
+  }
+
   async function handlePasswordSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPasswordMessage(null);
-    setPasswordError(null);
+    setPasswordErrors([]);
+
+    const clientErrors: string[] = [];
 
     if (!passwordForm.currentPassword.trim()) {
-      setPasswordError("Le mot de passe actuel est requis.");
-      return;
+      clientErrors.push(
+        "Mot de passe actuel : ce champ ne doit pas etre vide.",
+      );
     }
 
     if (!passwordForm.newPassword.trim()) {
-      setPasswordError("Le nouveau mot de passe est requis.");
-      return;
-    }
-
-    const passwordPolicyError = validatePasswordPolicy(
-      passwordForm.newPassword,
-    );
-    if (passwordPolicyError) {
-      setPasswordError(passwordPolicyError);
-      return;
-    }
-
-    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      setPasswordError(
-        "La confirmation ne correspond pas au nouveau mot de passe.",
+      clientErrors.push(
+        "Nouveau mot de passe : ce champ ne doit pas etre vide.",
       );
+    } else {
+      const passwordPolicyError = validatePasswordPolicy(
+        passwordForm.newPassword,
+      );
+      if (passwordPolicyError) {
+        clientErrors.push(`Nouveau mot de passe : ${passwordPolicyError}`);
+      }
+    }
+
+    if (
+      passwordForm.newPassword.trim() &&
+      passwordForm.newPassword !== passwordForm.confirmPassword
+    ) {
+      clientErrors.push(
+        "Confirmation : la confirmation ne correspond pas au nouveau mot de passe.",
+      );
+    }
+
+    if (clientErrors.length > 0) {
+      setPasswordErrors(clientErrors);
       return;
     }
 
@@ -482,19 +615,19 @@ export function ProfileContent() {
         newPassword: passwordForm.newPassword,
       });
       setUser(result.user);
-      setPasswordForm({
-        currentPassword: "",
-        newPassword: "",
-        confirmPassword: "",
-      });
+      resetPasswordForm();
       setPasswordMessage("Mot de passe mis a jour.");
       setIsPasswordModalOpen(false);
     } catch (error) {
-      setPasswordError(
-        error instanceof Error
-          ? error.message
-          : "Impossible de mettre a jour le mot de passe.",
-      );
+      if (error instanceof ProfileValidationError) {
+        setPasswordErrors(error.messages);
+      } else {
+        setPasswordErrors([
+          error instanceof Error
+            ? error.message
+            : "Impossible de mettre a jour le mot de passe.",
+        ]);
+      }
     } finally {
       setIsUpdatingPassword(false);
     }
@@ -598,7 +731,8 @@ export function ProfileContent() {
           <Button
             type="button"
             onClick={() => {
-              setGeneralError(null);
+              resetGeneralForm();
+              setGeneralErrors([]);
               setIsGeneralModalOpen(true);
             }}
           >
@@ -608,8 +742,8 @@ export function ProfileContent() {
             type="button"
             variant="outline"
             onClick={() => {
-              setEmailError(null);
-              setEmailForm({ ...emailForm, currentPassword: "" });
+              resetEmailForm();
+              setEmailErrors([]);
               setIsEmailModalOpen(true);
             }}
           >
@@ -619,12 +753,8 @@ export function ProfileContent() {
             type="button"
             variant="outline"
             onClick={() => {
-              setPasswordError(null);
-              setPasswordForm({
-                currentPassword: "",
-                newPassword: "",
-                confirmPassword: "",
-              });
+              resetPasswordForm();
+              setPasswordErrors([]);
               setIsPasswordModalOpen(true);
             }}
           >
@@ -687,10 +817,21 @@ export function ProfileContent() {
           />
         ) : null}
 
-        {emergencyError ? (
-          <p className="mt-4 rounded-md border border-destructive/60 bg-destructive/10 p-3 text-sm text-destructive">
-            {emergencyError}
-          </p>
+        {emergencyErrors.length > 0 ? (
+          <div
+            role="alert"
+            aria-live="assertive"
+            className="mt-4 rounded border border-destructive/70 bg-destructive/10 p-3 text-sm text-destructive"
+          >
+            <p className="font-semibold">
+              Veuillez corriger les erreurs suivantes :
+            </p>
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              {emergencyErrors.map((emergencyErrorMessage, index) => (
+                <li key={index}>{emergencyErrorMessage}</li>
+              ))}
+            </ul>
+          </div>
         ) : null}
 
         {!hasEmergencyContact ? (
@@ -737,26 +878,60 @@ export function ProfileContent() {
 
       <Dialog
         open={isEmergencyModalOpen}
-        onOpenChange={setIsEmergencyModalOpen}
+        onOpenChange={(open) => {
+          setIsEmergencyModalOpen(open);
+          if (!open) {
+            setEmergencyErrors([]);
+            resetEmergencyForm();
+          }
+        }}
       >
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Contact d'urgence</DialogTitle>
             <DialogDescription>
               Renseignez une personne a contacter en cas de besoin.
+              {isMinorUser
+                ? " Obligatoire pour un mineur."
+                : " Optionnel pour un majeur."}
             </DialogDescription>
           </DialogHeader>
 
-          <form className="space-y-4" onSubmit={handleEmergencySubmit}>
-            {emergencyError ? (
-              <p className="rounded-md border border-destructive/60 bg-destructive/10 p-3 text-sm text-destructive">
-                {emergencyError}
-              </p>
+          <form
+            className="space-y-4"
+            onSubmit={handleEmergencySubmit}
+            noValidate
+          >
+            {emergencyErrors.length > 0 ? (
+              <div
+                role="alert"
+                aria-live="assertive"
+                className="rounded border border-destructive/70 bg-destructive/10 p-3 text-sm text-destructive"
+              >
+                <p className="font-semibold">
+                  Veuillez corriger les erreurs suivantes :
+                </p>
+                <ul className="mt-2 list-disc space-y-1 pl-5">
+                  {emergencyErrors.map((emergencyErrorMessage, index) => (
+                    <li key={index}>{emergencyErrorMessage}</li>
+                  ))}
+                </ul>
+              </div>
             ) : null}
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="emergency-lastname">Nom</Label>
+                <div className="flex items-center gap-1">
+                  <Label htmlFor="emergency-lastname">Nom</Label>
+                  {isMinorUser ? (
+                    <span
+                      className="text-sm text-destructive"
+                      aria-hidden="true"
+                    >
+                      *
+                    </span>
+                  ) : null}
+                </div>
                 <Input
                   id="emergency-lastname"
                   name="lastname"
@@ -771,7 +946,17 @@ export function ProfileContent() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="emergency-firstname">Prenom</Label>
+                <div className="flex items-center gap-1">
+                  <Label htmlFor="emergency-firstname">Prenom</Label>
+                  {isMinorUser ? (
+                    <span
+                      className="text-sm text-destructive"
+                      aria-hidden="true"
+                    >
+                      *
+                    </span>
+                  ) : null}
+                </div>
                 <Input
                   id="emergency-firstname"
                   name="firstname"
@@ -788,7 +973,17 @@ export function ProfileContent() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="emergency-email">Email</Label>
+                <div className="flex items-center gap-1">
+                  <Label htmlFor="emergency-email">Email</Label>
+                  {isMinorUser ? (
+                    <span
+                      className="text-sm text-destructive"
+                      aria-hidden="true"
+                    >
+                      *
+                    </span>
+                  ) : null}
+                </div>
                 <Input
                   id="emergency-email"
                   name="email"
@@ -804,7 +999,17 @@ export function ProfileContent() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="emergency-phone">Telephone</Label>
+                <div className="flex items-center gap-1">
+                  <Label htmlFor="emergency-phone">Telephone</Label>
+                  {isMinorUser ? (
+                    <span
+                      className="text-sm text-destructive"
+                      aria-hidden="true"
+                    >
+                      *
+                    </span>
+                  ) : null}
+                </div>
                 <Input
                   id="emergency-phone"
                   name="phone"
@@ -818,6 +1023,12 @@ export function ProfileContent() {
                 />
               </div>
             </div>
+
+            {isMinorUser ? (
+              <p className="text-xs text-muted-foreground">
+                * Champ obligatoire
+              </p>
+            ) : null}
 
             <DialogFooter>
               <DialogClose asChild>
@@ -891,7 +1102,15 @@ export function ProfileContent() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isGeneralModalOpen} onOpenChange={setIsGeneralModalOpen}>
+      <Dialog
+        open={isGeneralModalOpen}
+        onOpenChange={(open) => {
+          setIsGeneralModalOpen(open);
+          if (!open) {
+            resetGeneralForm();
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Modifier mes infos</DialogTitle>
@@ -900,16 +1119,32 @@ export function ProfileContent() {
             </DialogDescription>
           </DialogHeader>
 
-          <form className="space-y-4" onSubmit={handleGeneralSubmit}>
-            {generalError ? (
-              <p className="rounded-md border border-destructive/60 bg-destructive/10 p-3 text-sm text-destructive">
-                {generalError}
-              </p>
+          <form className="space-y-4" onSubmit={handleGeneralSubmit} noValidate>
+            {generalErrors.length > 0 ? (
+              <div
+                role="alert"
+                aria-live="assertive"
+                className="rounded border border-destructive/70 bg-destructive/10 p-3 text-sm text-destructive"
+              >
+                <p className="font-semibold">
+                  Veuillez corriger les erreurs suivantes :
+                </p>
+                <ul className="mt-2 list-disc space-y-1 pl-5">
+                  {generalErrors.map((generalErrorMessage, index) => (
+                    <li key={index}>{generalErrorMessage}</li>
+                  ))}
+                </ul>
+              </div>
             ) : null}
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="profile-firstname">Prenom</Label>
+                <div className="flex items-center gap-1">
+                  <Label htmlFor="profile-firstname">Prenom</Label>
+                  <span className="text-sm text-destructive" aria-hidden="true">
+                    *
+                  </span>
+                </div>
                 <Input
                   id="profile-firstname"
                   value={generalForm.firstname}
@@ -919,12 +1154,16 @@ export function ProfileContent() {
                       firstname: event.target.value,
                     })
                   }
-                  required
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="profile-lastname">Nom</Label>
+                <div className="flex items-center gap-1">
+                  <Label htmlFor="profile-lastname">Nom</Label>
+                  <span className="text-sm text-destructive" aria-hidden="true">
+                    *
+                  </span>
+                </div>
                 <Input
                   id="profile-lastname"
                   value={generalForm.lastname}
@@ -934,14 +1173,18 @@ export function ProfileContent() {
                       lastname: event.target.value,
                     })
                   }
-                  required
                 />
               </div>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="space-y-2">
-                <Label htmlFor="profile-dob">Date de naissance</Label>
+                <div className="flex items-center gap-1">
+                  <Label htmlFor="profile-dob">Date de naissance</Label>
+                  <span className="text-sm text-destructive" aria-hidden="true">
+                    *
+                  </span>
+                </div>
                 <Input
                   id="profile-dob"
                   type="date"
@@ -952,7 +1195,6 @@ export function ProfileContent() {
                       dateOfBirth: event.target.value,
                     })
                   }
-                  required
                 />
               </div>
 
@@ -985,6 +1227,8 @@ export function ProfileContent() {
               </div>
             </div>
 
+            <p className="text-xs text-muted-foreground">* Champ obligatoire</p>
+
             <DialogFooter>
               <DialogClose asChild>
                 <Button type="button" variant="outline">
@@ -999,7 +1243,15 @@ export function ProfileContent() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isEmailModalOpen} onOpenChange={setIsEmailModalOpen}>
+      <Dialog
+        open={isEmailModalOpen}
+        onOpenChange={(open) => {
+          setIsEmailModalOpen(open);
+          if (!open) {
+            resetEmailForm();
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Modifier mon email</DialogTitle>
@@ -1008,15 +1260,31 @@ export function ProfileContent() {
             </DialogDescription>
           </DialogHeader>
 
-          <form className="space-y-4" onSubmit={handleEmailSubmit}>
-            {emailError ? (
-              <p className="rounded-md border border-destructive/60 bg-destructive/10 p-3 text-sm text-destructive">
-                {emailError}
-              </p>
+          <form className="space-y-4" onSubmit={handleEmailSubmit} noValidate>
+            {emailErrors.length > 0 ? (
+              <div
+                role="alert"
+                aria-live="assertive"
+                className="rounded border border-destructive/70 bg-destructive/10 p-3 text-sm text-destructive"
+              >
+                <p className="font-semibold">
+                  Veuillez corriger les erreurs suivantes :
+                </p>
+                <ul className="mt-2 list-disc space-y-1 pl-5">
+                  {emailErrors.map((emailErrorMessage, index) => (
+                    <li key={index}>{emailErrorMessage}</li>
+                  ))}
+                </ul>
+              </div>
             ) : null}
 
             <div className="space-y-2">
-              <Label htmlFor="profile-email">Nouvel email</Label>
+              <div className="flex items-center gap-1">
+                <Label htmlFor="profile-email">Nouvel email</Label>
+                <span className="text-sm text-destructive" aria-hidden="true">
+                  *
+                </span>
+              </div>
               <Input
                 id="profile-email"
                 type="email"
@@ -1024,14 +1292,18 @@ export function ProfileContent() {
                 onChange={(event) =>
                   setEmailForm({ ...emailForm, email: event.target.value })
                 }
-                required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="profile-email-current-password">
-                Mot de passe actuel
-              </Label>
+              <div className="flex items-center gap-1">
+                <Label htmlFor="profile-email-current-password">
+                  Mot de passe actuel
+                </Label>
+                <span className="text-sm text-destructive" aria-hidden="true">
+                  *
+                </span>
+              </div>
               <Input
                 id="profile-email-current-password"
                 type="password"
@@ -1042,9 +1314,10 @@ export function ProfileContent() {
                     currentPassword: event.target.value,
                   })
                 }
-                required
               />
             </div>
+
+            <p className="text-xs text-muted-foreground">* Champ obligatoire</p>
 
             <DialogFooter>
               <DialogClose asChild>
@@ -1060,7 +1333,15 @@ export function ProfileContent() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isPasswordModalOpen} onOpenChange={setIsPasswordModalOpen}>
+      <Dialog
+        open={isPasswordModalOpen}
+        onOpenChange={(open) => {
+          setIsPasswordModalOpen(open);
+          if (!open) {
+            resetPasswordForm();
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Modifier mon mot de passe</DialogTitle>
@@ -1069,17 +1350,37 @@ export function ProfileContent() {
             </DialogDescription>
           </DialogHeader>
 
-          <form className="space-y-4" onSubmit={handlePasswordSubmit}>
-            {passwordError ? (
-              <p className="rounded-md border border-destructive/60 bg-destructive/10 p-3 text-sm text-destructive">
-                {passwordError}
-              </p>
+          <form
+            className="space-y-4"
+            onSubmit={handlePasswordSubmit}
+            noValidate
+          >
+            {passwordErrors.length > 0 ? (
+              <div
+                role="alert"
+                aria-live="assertive"
+                className="rounded border border-destructive/70 bg-destructive/10 p-3 text-sm text-destructive"
+              >
+                <p className="font-semibold">
+                  Veuillez corriger les erreurs suivantes :
+                </p>
+                <ul className="mt-2 list-disc space-y-1 pl-5">
+                  {passwordErrors.map((passwordErrorMessage, index) => (
+                    <li key={index}>{passwordErrorMessage}</li>
+                  ))}
+                </ul>
+              </div>
             ) : null}
 
             <div className="space-y-2">
-              <Label htmlFor="profile-password-current">
-                Mot de passe actuel
-              </Label>
+              <div className="flex items-center gap-1">
+                <Label htmlFor="profile-password-current">
+                  Mot de passe actuel
+                </Label>
+                <span className="text-sm text-destructive" aria-hidden="true">
+                  *
+                </span>
+              </div>
               <Input
                 id="profile-password-current"
                 type="password"
@@ -1090,12 +1391,18 @@ export function ProfileContent() {
                     currentPassword: event.target.value,
                   })
                 }
-                required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="profile-password-new">Nouveau mot de passe</Label>
+              <div className="flex items-center gap-1">
+                <Label htmlFor="profile-password-new">
+                  Nouveau mot de passe
+                </Label>
+                <span className="text-sm text-destructive" aria-hidden="true">
+                  *
+                </span>
+              </div>
               <Input
                 id="profile-password-new"
                 type="password"
@@ -1106,12 +1413,16 @@ export function ProfileContent() {
                     newPassword: event.target.value,
                   })
                 }
-                required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="profile-password-confirm">Confirmation</Label>
+              <div className="flex items-center gap-1">
+                <Label htmlFor="profile-password-confirm">Confirmation</Label>
+                <span className="text-sm text-destructive" aria-hidden="true">
+                  *
+                </span>
+              </div>
               <Input
                 id="profile-password-confirm"
                 type="password"
@@ -1122,9 +1433,10 @@ export function ProfileContent() {
                     confirmPassword: event.target.value,
                   })
                 }
-                required
               />
             </div>
+
+            <p className="text-xs text-muted-foreground">* Champ obligatoire</p>
 
             <DialogFooter>
               <DialogClose asChild>

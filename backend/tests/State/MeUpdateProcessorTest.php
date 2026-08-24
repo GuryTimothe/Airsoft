@@ -60,6 +60,68 @@ final class MeUpdateProcessorTest extends TestCase
         $this->assertSame('1990-01-01', $result->getDateOfBirth()->format('Y-m-d'));
     }
 
+    public function testBecomingMinorWithExistingCompleteEmergencyContactDoesNotThrow(): void
+    {
+        $incomingDateOfBirth = new \DateTimeImmutable(date('Y-m-d', strtotime('-15 years')));
+
+        $user = (new User())->setDateOfBirth($incomingDateOfBirth);
+
+        $existingEmergencyContact = (new \App\Entity\EmergencyContact())
+            ->setLastname('Martin')
+            ->setFirstname('Paul')
+            ->setEmail('paul@test.com')
+            ->setPhone('0612345678');
+
+        $previous = (new User())
+            ->setFirstname('Alice')
+            ->setLastname('Doe')
+            ->setDateOfBirth(new \DateTimeImmutable('1990-01-01'));
+
+        $ref = new \ReflectionProperty(User::class, 'emergencyContact');
+        $ref->setAccessible(true);
+        $ref->setValue($previous, $existingEmergencyContact);
+
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->expects($this->once())->method('flush');
+
+        $security = $this->createMock(Security::class);
+        $security->method('getUser')->willReturn($previous);
+
+        // No request pushed: simulates the "Modifier mes infos" form which never sends emergencyContact.
+        $processor = $this->createProcessor($entityManager, $security);
+
+        $result = $processor->process($user, new Patch(uriTemplate: '/me'), context: ['previous_data' => $previous]);
+
+        $this->assertSame($incomingDateOfBirth->format('Y-m-d'), $result->getDateOfBirth()->format('Y-m-d'));
+        $this->assertNotNull($result->getEmergencyContact());
+        $this->assertSame('Martin', $result->getEmergencyContact()->getLastname());
+    }
+
+    public function testBecomingMinorWithoutExistingEmergencyContactThrows(): void
+    {
+        $incomingDateOfBirth = new \DateTimeImmutable(date('Y-m-d', strtotime('-15 years')));
+
+        $user = (new User())->setDateOfBirth($incomingDateOfBirth);
+
+        $previous = (new User())
+            ->setFirstname('Alice')
+            ->setLastname('Doe')
+            ->setDateOfBirth(new \DateTimeImmutable('1990-01-01'));
+
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->expects($this->never())->method('flush');
+
+        $security = $this->createMock(Security::class);
+        $security->method('getUser')->willReturn($previous);
+
+        $processor = $this->createProcessor($entityManager, $security);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('obligatoire pour un mineur');
+
+        $processor->process($user, new Patch(uriTemplate: '/me'), context: ['previous_data' => $previous]);
+    }
+
     public function testGeneralUpdateDoesNotChangeEmail(): void
     {
         $user = new User();

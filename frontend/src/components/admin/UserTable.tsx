@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -72,10 +72,17 @@ export default function UserTable({
   const [privateFilter, setPrivateFilter] = useState<"all" | "yes" | "no">(
     "all",
   );
+  const [ageFilter, setAgeFilter] = useState<"all" | "minor" | "adult">("all");
+  const [searchInput, setSearchInput] = useState("");
+  const [searchBy, setSearchBy] = useState<"lastname" | "firstname">(
+    "lastname",
+  );
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [users, setUsers] = useState<User[]>(initialUsers);
   const [view, setView] = useState<CollectionView | undefined>(initialView);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageLoading, setPageLoading] = useState(false);
+  const isFirstRenderRef = useRef(true);
 
   useEffect(() => {
     let isDisposed = false;
@@ -106,12 +113,34 @@ export default function UserTable({
     return match ? Number(match[1]) : null;
   }
 
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedSearch(searchInput.trim());
+    }, 300);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [searchInput]);
+
   const lastPage = extractPage(view?.last) ?? (view ? currentPage : null);
+
+  const filters = useMemo(
+    () => ({
+      role: roleFilter !== "all" ? roleFilter : undefined,
+      canSeePrivate:
+        privateFilter === "all" ? undefined : privateFilter === "yes",
+      isMinor: ageFilter === "all" ? undefined : ageFilter === "minor",
+      search: debouncedSearch || undefined,
+      searchBy,
+    }),
+    [roleFilter, privateFilter, ageFilter, debouncedSearch, searchBy],
+  );
 
   async function goToPage(page: number) {
     setPageLoading(true);
     try {
-      const result = await getUsers(page);
+      const result = await getUsers(page, filters);
       setUsers(result.users);
       setView(result.view);
       setCurrentPage(page);
@@ -120,29 +149,52 @@ export default function UserTable({
     }
   }
 
-  const filteredUsers = useMemo(() => {
-    return [...users]
-      .filter((user) => {
-        if (roleFilter !== "all" && user.role !== roleFilter) {
-          return false;
-        }
+  // Server-side filtering: whenever a filter changes, refetch from page 1
+  // instead of filtering the already-paginated results on the client.
+  useEffect(() => {
+    if (isFirstRenderRef.current) {
+      isFirstRenderRef.current = false;
+      return;
+    }
 
-        if (privateFilter === "yes" && !user.canSeePrivate) {
-          return false;
-        }
+    void goToPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters]);
 
-        if (privateFilter === "no" && user.canSeePrivate) {
-          return false;
-        }
-
-        return true;
-      })
-      .sort((a, b) => a.lastname.localeCompare(b.lastname, "fr"));
-  }, [users, privateFilter, roleFilter]);
+  const sortedUsers = useMemo(() => {
+    return [...users].sort((a, b) =>
+      a.lastname.localeCompare(b.lastname, "fr"),
+    );
+  }, [users]);
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 md:grid-cols-2 lg:max-w-xl">
+      <div className="flex flex-wrap items-end gap-4">
+        <label className="space-y-2 text-sm">
+          <span>Rechercher</span>
+          <input
+            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+            type="text"
+            placeholder="Ex. Martin"
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+          />
+        </label>
+
+        <label className="space-y-2 text-sm">
+          <span>Rechercher par</span>
+          <select
+            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+            value={searchBy}
+            onChange={(event) =>
+              setSearchBy(event.target.value as "lastname" | "firstname")
+            }
+          >
+            <option value="lastname">Nom</option>
+            <option value="firstname">Prenom</option>
+          </select>
+        </label>
+
         <label className="space-y-2 text-sm">
           <span>Filtrer par role</span>
           <select
@@ -175,6 +227,43 @@ export default function UserTable({
             <option value="no">Refuse</option>
           </select>
         </label>
+
+        <label className="space-y-2 text-sm">
+          <span>Filtrer par age</span>
+          <select
+            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+            value={ageFilter}
+            onChange={(event) =>
+              setAgeFilter(event.target.value as "all" | "minor" | "adult")
+            }
+          >
+            <option value="all">Tous</option>
+            <option value="adult">Majeur</option>
+            <option value="minor">Mineur</option>
+          </select>
+        </label>
+
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={
+            roleFilter === "all" &&
+            privateFilter === "all" &&
+            ageFilter === "all" &&
+            searchInput === "" &&
+            searchBy === "lastname"
+          }
+          onClick={() => {
+            setRoleFilter("all");
+            setPrivateFilter("all");
+            setAgeFilter("all");
+            setSearchInput("");
+            setSearchBy("lastname");
+          }}
+        >
+          Reinitialiser les filtres
+        </Button>
       </div>
 
       <Table>
@@ -190,7 +279,7 @@ export default function UserTable({
         </TableHeader>
 
         <TableBody>
-          {filteredUsers.map((user) => {
+          {sortedUsers.map((user) => {
             const fullName = `${user.firstname} ${user.lastname}`.trim();
             const age = computeAge(user.dateOfBirth, referenceDateIso);
             const isMinor = age < 18;

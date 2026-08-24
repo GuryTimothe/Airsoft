@@ -8,6 +8,7 @@ use ApiPlatform\Validator\Exception\ValidationException;
 use App\Dto\MeEmailUpdateInput;
 use App\Dto\MeUpdateOutput;
 use App\Entity\User;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -80,7 +81,21 @@ class MeEmailUpdateProcessor implements ProcessorInterface
         }
 
         $targetUser->setEmail($data->email);
-        $this->entityManager->flush();
+
+        try {
+            $this->entityManager->flush();
+        } catch (UniqueConstraintViolationException) {
+            throw new ValidationException(new ConstraintViolationList([
+                new ConstraintViolation(
+                    'Un compte avec cet email existe deja.',
+                    null,
+                    [],
+                    null,
+                    'email',
+                    $data->email,
+                ),
+            ]));
+        }
 
         return new MeUpdateOutput($targetUser, $this->jwtManager->create($targetUser));
     }

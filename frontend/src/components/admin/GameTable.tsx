@@ -120,7 +120,7 @@ export default function GameTable({
       </CardHeader>
       <CardContent>
         <div className="mb-6 space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 lg:max-w-4xl lg:grid-cols-4">
+          <div className="flex flex-wrap items-end gap-4">
             <label className="space-y-2 text-sm">
               <span>Filtrer par visibilité</span>
               <select
@@ -174,12 +174,17 @@ export default function GameTable({
                 <option value="desc">Descendant</option>
               </select>
             </label>
-          </div>
 
-          <div>
             <Button
               type="button"
               variant="outline"
+              size="sm"
+              disabled={
+                visibility === "all" &&
+                dateFilter === "" &&
+                sortBy === "date" &&
+                sortDirection === "asc"
+              }
               onClick={() => {
                 setVisibility("all");
                 setDateFilter("");

@@ -1,9 +1,6 @@
 name: Deploy
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
   workflow_call:
 
@@ -16,7 +13,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: Deploy on VPS (SFTP)
+    name: Deploy on VPS
     runs-on: ubuntu-latest
     environment:
       name: production
@@ -67,7 +64,9 @@ jobs:
             --exclude-glob .git/ \
             --exclude-glob .github/ \
             --exclude-glob frontend/node_modules/ \
+            --exclude-glob frontend/.next/ \
             --exclude-glob backend/vendor/ \
+            --exclude-glob .env.prod \
             ./ "$DEPLOY_PATH/"
           bye
           EOF
@@ -87,7 +86,9 @@ jobs:
             --exclude-glob .git/ \
             --exclude-glob .github/ \
             --exclude-glob frontend/node_modules/ \
+            --exclude-glob frontend/.next/ \
             --exclude-glob backend/vendor/ \
+            --exclude-glob .env.prod \
             ./ "$DEPLOY_PATH/"
           bye
           EOF
