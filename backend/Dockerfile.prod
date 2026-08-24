@@ -8,7 +8,7 @@ RUN apk add --no-cache \
     tini \
     unzip \
     $PHPIZE_DEPS \
-    && docker-php-ext-install intl pdo_pgsql opcache \
+    && docker-php-ext-install intl pdo_pgsql \
     && apk del $PHPIZE_DEPS
 
 RUN echo "opcache.enable=1" >> /usr/local/etc/php/conf.d/opcache.ini \
