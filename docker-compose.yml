@@ -27,6 +27,8 @@ services:
 
   backend:
     container_name: airsoft-backend
+    volumes:
+      - backend_jwt:/app/config/jwt
     depends_on:
       database:
         condition: service_healthy
@@ -72,5 +74,6 @@ volumes:
   database_pgdata:
   backend_vendor:
   backend_var:
+  backend_jwt:
   frontend_node_modules:
   frontend_next:

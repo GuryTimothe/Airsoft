@@ -4,8 +4,17 @@ import { Plus } from "lucide-react";
 import UserTable from "@/components/admin/UserTable";
 import { UsersExportControls } from "@/components/admin/UsersExportControls";
 import { getUsers, type CollectionView, type User } from "@/lib/user-api";
+import { AUTH_TOKEN_KEY, getRolesFromToken } from "@/lib/auth";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
 export default async function UsersPage() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(AUTH_TOKEN_KEY)?.value ?? null;
+  if (getRolesFromToken(token).includes("ROLE_ORGANIZER")) {
+    redirect("/admin");
+  }
+
   let users: User[] = [];
   let initialView: CollectionView | undefined;
   let errorMessage: string | null = null;

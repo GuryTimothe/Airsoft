@@ -66,9 +66,35 @@ final class AdminExportControllerTest extends WebTestCase
         self::assertResponseHeaderSame('content-type', 'text/csv; charset=UTF-8');
 
         $content = (string) $client->getResponse()->getContent();
+        self::assertStringStartsWith("\xEF\xBB\xBF", $content);
         self::assertStringContainsString('Included export game', $content);
         self::assertStringNotContainsString('Excluded export game', $content);
         self::assertStringContainsString((string) $includedGame->getId(), $content);
+    }
+
+    public function testOrganizerCanExportGames(): void
+    {
+        $client    = static::createClient();
+        $container = static::getContainer();
+
+        $entityManager  = $container->get(EntityManagerInterface::class);
+        $passwordHasher = $container->get(UserPasswordHasherInterface::class);
+
+        $this->skipIfDatabaseUnavailable($entityManager);
+
+        [$organizer, $organizerPassword] = $this->createUser($entityManager, $passwordHasher, 'ROLE_ORGANIZER', '1990-01-01');
+        $game                            = $this->createGame($entityManager, 'Organizer export game', '2026-07-20 10:00:00');
+
+        $token = $this->loginAndGetToken($client, $organizer->getEmail(), $organizerPassword);
+
+        $client->request('GET', '/api/exports/games.csv', server: [
+            'HTTP_AUTHORIZATION' => 'Bearer '.$token,
+        ]);
+
+        self::assertResponseIsSuccessful();
+        self::assertResponseHeaderSame('content-type', 'text/csv; charset=UTF-8');
+        self::assertStringContainsString('Organizer export game', (string) $client->getResponse()->getContent());
+        self::assertStringContainsString((string) $game->getId(), (string) $client->getResponse()->getContent());
     }
 
     public function testAdminCanExportUsersFilteredByAgeGroupAndRole(): void

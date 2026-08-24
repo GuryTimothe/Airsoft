@@ -2,6 +2,8 @@
 
 namespace App\Entity;
 
+use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
+use ApiPlatform\Metadata\ApiFilter;
 use ApiPlatform\Metadata\ApiProperty;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Delete;
@@ -13,6 +15,8 @@ use App\Dto\MeEmailUpdateInput;
 use App\Dto\MePasswordUpdateInput;
 use App\Dto\MeUpdateOutput;
 use App\Dto\RegisterInput;
+use App\Filter\IsMinorFilter;
+use App\Filter\UserNameSearchFilter;
 use App\Repository\UserRepository;
 use App\State\MeDeleteProcessor;
 use App\State\MeEmailUpdateProcessor;
@@ -108,6 +112,9 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
         new Delete(security: "is_granted('DELETE_USER', object)"),
     ]
 )]
+#[ApiFilter(SearchFilter::class, properties: ['role' => 'exact', 'canSeePrivate' => 'exact'])]
+#[ApiFilter(IsMinorFilter::class)]
+#[ApiFilter(UserNameSearchFilter::class)]
 class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
     #[ORM\Id]
@@ -436,7 +443,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->updatedAt = new \DateTimeImmutable();
     }
 
-    #[Assert\Callback(groups: ['Default', 'user:create', 'user:admin:update', 'user:self:general'])]
+    #[Assert\Callback(groups: ['Default', 'user:create', 'user:admin:update'])]
     public function validateEmergencyContactForMinor(
         ExecutionContextInterface $context,
     ): void {

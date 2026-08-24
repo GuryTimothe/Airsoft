@@ -8,7 +8,7 @@ RUN apk add --no-cache \
     tini \
     unzip \
     $PHPIZE_DEPS \
-    && docker-php-ext-install intl pdo_pgsql opcache \
+    && docker-php-ext-install intl pdo_pgsql \
     && apk del $PHPIZE_DEPS
 
 RUN echo "opcache.enable=1" >> /usr/local/etc/php/conf.d/opcache.ini \
@@ -33,7 +33,7 @@ COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh \
     && chown app-user:app-group /app/docker-entrypoint.sh
 
-RUN mkdir -p var/cache var/log \
+RUN mkdir -p var/cache var/log config/jwt \
     && chown -R app-user:app-group /app
 
 USER app-user

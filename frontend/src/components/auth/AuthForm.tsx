@@ -40,7 +40,7 @@ export default function AuthForm({ mode = "login" }: Props) {
     reset,
     setValue,
     control,
-  } = useForm<FormData>({ resolver, mode: "onTouched" });
+  } = useForm<FormData>({ resolver, mode: "onSubmit" });
 
   // Type-safe error access based on mode
   const getError = (field: string): string | undefined => {
@@ -222,12 +222,17 @@ export default function AuthForm({ mode = "login" }: Props) {
         {mode === "register" && (
           <>
             <div>
-              <label
-                htmlFor="lastname"
-                className="block text-sm text-muted-foreground"
-              >
-                Nom
-              </label>
+              <div className="flex items-center gap-1">
+                <label
+                  htmlFor="lastname"
+                  className="block text-sm text-muted-foreground"
+                >
+                  Nom
+                </label>
+                <span className="text-sm text-destructive" aria-hidden="true">
+                  *
+                </span>
+              </div>
               <input
                 id="lastname"
                 {...register("lastname")}
@@ -251,12 +256,17 @@ export default function AuthForm({ mode = "login" }: Props) {
             </div>
 
             <div>
-              <label
-                htmlFor="firstname"
-                className="block text-sm text-muted-foreground"
-              >
-                Prénom
-              </label>
+              <div className="flex items-center gap-1">
+                <label
+                  htmlFor="firstname"
+                  className="block text-sm text-muted-foreground"
+                >
+                  Prénom
+                </label>
+                <span className="text-sm text-destructive" aria-hidden="true">
+                  *
+                </span>
+              </div>
               <input
                 id="firstname"
                 {...register("firstname")}
@@ -282,12 +292,17 @@ export default function AuthForm({ mode = "login" }: Props) {
         )}
 
         <div>
-          <label
-            htmlFor="email"
-            className="block text-sm text-muted-foreground"
-          >
-            Email
-          </label>
+          <div className="flex items-center gap-1">
+            <label
+              htmlFor="email"
+              className="block text-sm text-muted-foreground"
+            >
+              Email
+            </label>
+            <span className="text-sm text-destructive" aria-hidden="true">
+              *
+            </span>
+          </div>
           <input
             id="email"
             {...register("email")}
@@ -310,12 +325,17 @@ export default function AuthForm({ mode = "login" }: Props) {
         </div>
 
         <div>
-          <label
-            htmlFor="password"
-            className="block text-sm text-muted-foreground"
-          >
-            Mot de passe
-          </label>
+          <div className="flex items-center gap-1">
+            <label
+              htmlFor="password"
+              className="block text-sm text-muted-foreground"
+            >
+              Mot de passe
+            </label>
+            <span className="text-sm text-destructive" aria-hidden="true">
+              *
+            </span>
+          </div>
           <input
             id="password"
             {...register("password")}
@@ -344,12 +364,17 @@ export default function AuthForm({ mode = "login" }: Props) {
         {mode === "register" && (
           <>
             <div>
-              <label
-                htmlFor="confirm"
-                className="block text-sm text-muted-foreground"
-              >
-                Confirmer
-              </label>
+              <div className="flex items-center gap-1">
+                <label
+                  htmlFor="confirm"
+                  className="block text-sm text-muted-foreground"
+                >
+                  Confirmer
+                </label>
+                <span className="text-sm text-destructive" aria-hidden="true">
+                  *
+                </span>
+              </div>
               <input
                 id="confirm"
                 {...register("confirm")}
@@ -374,12 +399,17 @@ export default function AuthForm({ mode = "login" }: Props) {
             </div>
 
             <div>
-              <label
-                htmlFor="dateOfBirth"
-                className="block text-sm text-muted-foreground"
-              >
-                Date de naissance
-              </label>
+              <div className="flex items-center gap-1">
+                <label
+                  htmlFor="dateOfBirth"
+                  className="block text-sm text-muted-foreground"
+                >
+                  Date de naissance
+                </label>
+                <span className="text-sm text-destructive" aria-hidden="true">
+                  *
+                </span>
+              </div>
               <input
                 id="dateOfBirth"
                 {...register("dateOfBirth")}
@@ -470,12 +500,22 @@ export default function AuthForm({ mode = "login" }: Props) {
               </div>
 
               <div>
-                <label
-                  htmlFor="guardianLastname"
-                  className="block text-sm text-muted-foreground"
-                >
-                  Nom du responsable
-                </label>
+                <div className="flex items-center gap-1">
+                  <label
+                    htmlFor="guardianLastname"
+                    className="block text-sm text-muted-foreground"
+                  >
+                    Nom du responsable
+                  </label>
+                  {isMinorRegistration ? (
+                    <span
+                      className="text-sm text-destructive"
+                      aria-hidden="true"
+                    >
+                      *
+                    </span>
+                  ) : null}
+                </div>
                 <input
                   id="guardianLastname"
                   {...register("guardianLastname")}
@@ -500,12 +540,22 @@ export default function AuthForm({ mode = "login" }: Props) {
               </div>
 
               <div>
-                <label
-                  htmlFor="guardianFirstname"
-                  className="block text-sm text-muted-foreground"
-                >
-                  Prénom du responsable
-                </label>
+                <div className="flex items-center gap-1">
+                  <label
+                    htmlFor="guardianFirstname"
+                    className="block text-sm text-muted-foreground"
+                  >
+                    Prénom du responsable
+                  </label>
+                  {isMinorRegistration ? (
+                    <span
+                      className="text-sm text-destructive"
+                      aria-hidden="true"
+                    >
+                      *
+                    </span>
+                  ) : null}
+                </div>
                 <input
                   id="guardianFirstname"
                   {...register("guardianFirstname")}
@@ -530,12 +580,22 @@ export default function AuthForm({ mode = "login" }: Props) {
               </div>
 
               <div>
-                <label
-                  htmlFor="guardianEmail"
-                  className="block text-sm text-muted-foreground"
-                >
-                  Email du responsable
-                </label>
+                <div className="flex items-center gap-1">
+                  <label
+                    htmlFor="guardianEmail"
+                    className="block text-sm text-muted-foreground"
+                  >
+                    Email du responsable
+                  </label>
+                  {isMinorRegistration ? (
+                    <span
+                      className="text-sm text-destructive"
+                      aria-hidden="true"
+                    >
+                      *
+                    </span>
+                  ) : null}
+                </div>
                 <input
                   id="guardianEmail"
                   {...register("guardianEmail")}
@@ -561,12 +621,22 @@ export default function AuthForm({ mode = "login" }: Props) {
               </div>
 
               <div>
-                <label
-                  htmlFor="guardianPhone"
-                  className="block text-sm text-muted-foreground"
-                >
-                  Téléphone du responsable
-                </label>
+                <div className="flex items-center gap-1">
+                  <label
+                    htmlFor="guardianPhone"
+                    className="block text-sm text-muted-foreground"
+                  >
+                    Téléphone du responsable
+                  </label>
+                  {isMinorRegistration ? (
+                    <span
+                      className="text-sm text-destructive"
+                      aria-hidden="true"
+                    >
+                      *
+                    </span>
+                  ) : null}
+                </div>
                 <input
                   id="guardianPhone"
                   {...register("guardianPhone")}
@@ -593,6 +663,8 @@ export default function AuthForm({ mode = "login" }: Props) {
             </div>
           </>
         )}
+
+        <p className="text-xs text-muted-foreground">* Champ obligatoire</p>
 
         {status && (
           <div

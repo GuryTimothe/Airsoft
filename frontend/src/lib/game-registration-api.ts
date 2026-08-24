@@ -109,6 +109,17 @@ function toBoolean(value: unknown): boolean {
   return false;
 }
 
+function readPresence(data: Record<string, unknown>): boolean {
+  const presenceFields = [
+    data.isPresent,
+    data.is_present,
+    data.present,
+    data.presence,
+  ];
+
+  return presenceFields.some((value) => toBoolean(value));
+}
+
 function normalizeGameRegistration(data: unknown): GameRegistration {
   const d = data as Record<string, unknown>;
   const userObject =
@@ -152,9 +163,7 @@ function normalizeGameRegistration(data: unknown): GameRegistration {
       toNonNegativeIntOrNull(d.userAge) ??
       toNonNegativeIntOrNull(d.user_age) ??
       toNonNegativeIntOrNull(userObject?.age),
-    isPresent: toBoolean(
-      d.isPresent ?? d.is_present ?? d.present ?? d.presence ?? false,
-    ),
+    isPresent: readPresence(d),
     createdAt: String(d.createdAt ?? ""),
   };
 }
@@ -355,7 +364,7 @@ export async function updateGameRegistrationPresence(
       method: "PATCH",
       credentials: "include",
       headers,
-      body: JSON.stringify({ present: isPresent, isPresent }),
+      body: JSON.stringify({ isPresent }),
     },
   );
 

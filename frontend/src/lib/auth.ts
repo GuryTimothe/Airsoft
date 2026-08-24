@@ -92,6 +92,8 @@ export function getAuthToken(): string | null {
 }
 
 export function setAuthToken(_token: string): void {
+  void _token;
+
   if (typeof window === "undefined") {
     return;
   }
@@ -282,11 +284,10 @@ export async function login(payload: LoginInput): Promise<string> {
     body: JSON.stringify(payload),
   });
 
-  let data: unknown = null;
   try {
-    data = await response.json();
+    await response.json();
   } catch {
-    data = null;
+    // Ignore non-JSON login responses; the auth cookie is set by the backend.
   }
 
   if (!response.ok) {

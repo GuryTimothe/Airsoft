@@ -37,11 +37,13 @@ final class UserVoter extends Voter
         $roles = $user->getRoles();
 
         return match ($attribute) {
-            self::VIEW_ALL_USERS => \in_array('ROLE_ADMIN', $roles, true) || \in_array('ROLE_SUPER_ADMIN', $roles, true),
-            self::DELETE_USER    => $this->canDeleteUser($user, $subject),
-            self::CREATE_USER    => $this->canCreateUser($user, $subject),
-            self::UPDATE_USER    => $this->canUpdateUser($user),
-            default              => false,
+            self::VIEW_ALL_USERS => \in_array('ROLE_ADMIN', $roles, true)
+                || \in_array('ROLE_SUPER_ADMIN', $roles, true)
+                || \in_array('ROLE_ORGANIZER', $roles, true),
+            self::DELETE_USER => $this->canDeleteUser($user, $subject),
+            self::CREATE_USER => $this->canCreateUser($user, $subject),
+            self::UPDATE_USER => $this->canUpdateUser($user),
+            default           => false,
         };
     }
 

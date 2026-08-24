@@ -39,12 +39,8 @@ jobs:
     secrets:
       RELEASE_GITHUB_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN }}
 
-  # deploy-dev:
-  #   if: github.ref == 'refs/heads/dev' && github.event_name == 'push'
-  #   needs: [frontend, backend, scanner]
-  #   uses: ./.github/workflows/deploy.yml
-
-  # deploy-prod:
-  #   if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-  #   needs: [frontend, backend, scanner, release]
-  #   uses: ./.github/workflows/deploy.yml
+  deploy-prod:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [frontend, backend, scanner, lighthouse, pa11y, release]
+    uses: ./.github/workflows/deploy.yml
+    secrets: inherit

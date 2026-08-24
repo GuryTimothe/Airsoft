@@ -1,5 +1,6 @@
 import { getAuthHeaders, withCsrfHeaders } from "@/lib/auth";
 import { getApiBaseUrl } from "@/lib/api-base-url";
+import { translateViolationMessage } from "@/lib/api-violations";
 import {
   parseEmergencyContact,
   type EmergencyContactFields,
@@ -87,6 +88,16 @@ export interface CreateUserPayload {
   role?: UserRole;
   canSeePrivate?: boolean;
   adminNotes?: string | null;
+}
+
+export class ProfileValidationError extends Error {
+  readonly messages: string[];
+
+  constructor(messages: string[]) {
+    super(messages[0] ?? "Une erreur est survenue.");
+    this.name = "ProfileValidationError";
+    this.messages = messages;
+  }
 }
 
 const API_BASE_URL = getApiBaseUrl();
@@ -222,6 +233,66 @@ async function parseApiErrorMessage(
   return fallbackMessage;
 }
 
+const PROFILE_FIELD_LABELS: Record<string, string> = {
+  firstname: "Prenom",
+  lastname: "Nom",
+  dateOfBirth: "Date de naissance",
+  pseudo: "Pseudo",
+  phone: "Telephone",
+  email: "Email",
+  currentPassword: "Mot de passe actuel",
+  newPassword: "Nouveau mot de passe",
+  password: "Mot de passe",
+  emergencyContact: "Contact d'urgence",
+  role: "Role",
+};
+
+async function parseProfileErrorMessages(
+  response: Response,
+  fallbackMessage = "Une erreur est survenue.",
+): Promise<string[]> {
+  let data: unknown = null;
+
+  try {
+    data = await response.json();
+  } catch {
+    return [fallbackMessage];
+  }
+
+  if (typeof data !== "object" || data === null) {
+    return [fallbackMessage];
+  }
+
+  const violations = (data as { violations?: unknown }).violations;
+  if (Array.isArray(violations) && violations.length > 0) {
+    return violations.map((violation) => {
+      const v = violation as { propertyPath?: unknown; message?: unknown };
+      const field =
+        typeof v.propertyPath === "string"
+          ? (PROFILE_FIELD_LABELS[v.propertyPath] ?? v.propertyPath)
+          : null;
+      const message =
+        typeof v.message === "string"
+          ? translateViolationMessage(v.message)
+          : "Valeur invalide.";
+
+      return field ? `${field} : ${message}` : message;
+    });
+  }
+
+  const detail = (data as { detail?: unknown }).detail;
+  if (typeof detail === "string" && detail.trim()) {
+    return [translateViolationMessage(detail)];
+  }
+
+  const message = (data as { message?: unknown }).message;
+  if (typeof message === "string" && message.trim()) {
+    return [translateViolationMessage(message)];
+  }
+
+  return [fallbackMessage];
+}
+
 function normalizeSelfUserUpdateResult(data: unknown): SelfUserUpdateResult {
   const result = data as {
     user?: unknown;
@@ -234,12 +305,46 @@ function normalizeSelfUserUpdateResult(data: unknown): SelfUserUpdateResult {
   };
 }
 
-export async function getUsers(page?: number): Promise<UsersResult> {
+export interface GetUsersFilters {
+  role?: UserRole;
+  canSeePrivate?: boolean;
+  isMinor?: boolean;
+  search?: string;
+  searchBy?: "lastname" | "firstname";
+}
+
+export async function getUsers(
+  page?: number,
+  filters?: GetUsersFilters,
+): Promise<UsersResult> {
   const headers = await getAuthHeaders();
-  const url =
-    page && page > 1
-      ? buildUrl(`/api/users?page=${page}`)
-      : buildUrl("/api/users");
+  const params = new URLSearchParams();
+
+  if (page && page > 1) {
+    params.set("page", String(page));
+  }
+
+  if (filters?.role) {
+    params.set("role", filters.role);
+  }
+
+  if (filters?.canSeePrivate !== undefined) {
+    params.set("canSeePrivate", String(filters.canSeePrivate));
+  }
+
+  if (filters?.isMinor !== undefined) {
+    params.set("isMinor", String(filters.isMinor));
+  }
+
+  if (filters?.search?.trim()) {
+    params.set("search", filters.search.trim());
+    if (filters.searchBy) {
+      params.set("searchBy", filters.searchBy);
+    }
+  }
+
+  const query = params.toString();
+  const url = buildUrl(query ? `/api/users?${query}` : "/api/users");
   const response = await fetch(url, {
     cache: "no-store",
     credentials: "include",
@@ -306,8 +411,7 @@ export async function updateUser(
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(errorText || "Impossible de mettre a jour l'utilisateur");
+    throw new ProfileValidationError(await parseProfileErrorMessages(response));
   }
 
   return normalizeUser(await response.json());
@@ -328,7 +432,7 @@ export async function updateMyProfile(
   });
 
   if (!response.ok) {
-    throw new Error(await parseApiErrorMessage(response));
+    throw new ProfileValidationError(await parseProfileErrorMessages(response));
   }
 
   return normalizeUser(await response.json());
@@ -349,7 +453,7 @@ export async function updateMyEmail(
   });
 
   if (!response.ok) {
-    throw new Error(await parseApiErrorMessage(response));
+    throw new ProfileValidationError(await parseProfileErrorMessages(response));
   }
 
   return normalizeSelfUserUpdateResult(await response.json());
@@ -370,7 +474,7 @@ export async function updateMyPassword(
   });
 
   if (!response.ok) {
-    throw new Error(await parseApiErrorMessage(response));
+    throw new ProfileValidationError(await parseProfileErrorMessages(response));
   }
 
   return normalizeSelfUserUpdateResult(await response.json());
@@ -431,8 +535,7 @@ export async function createUser(payload: CreateUserPayload): Promise<User> {
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(errorText || "Impossible de creer l'utilisateur");
+    throw new ProfileValidationError(await parseProfileErrorMessages(response));
   }
 
   return normalizeUser(await response.json());
