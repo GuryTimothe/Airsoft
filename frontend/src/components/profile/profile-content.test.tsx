@@ -10,6 +10,7 @@ import { ProfileContent } from "./profile-content";
 import {
   deleteCurrentUser,
   getCurrentUser,
+  updateMyPassword,
   updateMyProfile,
 } from "@/lib/user-api";
 import { clearAuthToken } from "@/lib/auth";
@@ -41,6 +42,9 @@ const mockedGetCurrentUser = getCurrentUser as jest.MockedFunction<
 >;
 const mockedUpdateMyProfile = updateMyProfile as jest.MockedFunction<
   typeof updateMyProfile
+>;
+const mockedUpdateMyPassword = updateMyPassword as jest.MockedFunction<
+  typeof updateMyPassword
 >;
 const mockedDeleteCurrentUser = deleteCurrentUser as jest.MockedFunction<
   typeof deleteCurrentUser
@@ -141,6 +145,53 @@ describe("ProfileContent", () => {
     expect(
       within(passwordDialog).getByLabelText("Confirmation"),
     ).toBeInTheDocument();
+    expect(
+      within(passwordDialog).getByRole("link", {
+        name: "Mot de passe oublié ?",
+      }),
+    ).toHaveAttribute("href", "/auth/forget-password?email=alex%40example.com");
+  });
+
+  it("logs out and redirects to login after changing the password", async () => {
+    const user = userEvent.setup();
+    mockedUpdateMyPassword.mockResolvedValueOnce({
+      user: baseUser,
+      token: "",
+    });
+
+    render(<ProfileContent />);
+
+    await screen.findByRole("heading", { name: "Mon profil" });
+    await user.click(
+      screen.getByRole("button", { name: "Modifier mot de passe" }),
+    );
+    const passwordDialog = await screen.findByRole("dialog", {
+      name: "Modifier mon mot de passe",
+    });
+    fireEvent.change(
+      within(passwordDialog).getByLabelText("Mot de passe actuel"),
+      { target: { value: "CurrentPassword123!" } },
+    );
+    fireEvent.change(
+      within(passwordDialog).getByLabelText("Nouveau mot de passe"),
+      { target: { value: "NewPassword123!" } },
+    );
+    fireEvent.change(within(passwordDialog).getByLabelText("Confirmation"), {
+      target: { value: "NewPassword123!" },
+    });
+    fireEvent.click(
+      within(passwordDialog).getByRole("button", { name: "Enregistrer" }),
+    );
+
+    await waitFor(() => {
+      expect(mockedUpdateMyPassword).toHaveBeenCalledWith({
+        currentPassword: "CurrentPassword123!",
+        newPassword: "NewPassword123!",
+      });
+      expect(mockedClearAuthToken).toHaveBeenCalledTimes(1);
+      expect(replace).toHaveBeenCalledWith("/auth/login");
+      expect(refresh).toHaveBeenCalledTimes(1);
+    });
   });
 
   it("deletes emergency contact for adult user", async () => {

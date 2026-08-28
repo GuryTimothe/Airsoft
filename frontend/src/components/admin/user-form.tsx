@@ -162,6 +162,8 @@ export function UserForm({
     initialActorRole ?? null,
   );
   const [errors, setErrors] = useState<string[]>([]);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [invitationDialogOpen, setInvitationDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -269,6 +271,7 @@ export function UserForm({
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setErrors([]);
+    setSuccessMessage(null);
 
     if (isAdminBlockedOnTarget) {
       setErrors([
@@ -384,7 +387,10 @@ export function UserForm({
         }
 
         const updated = await updateUser(userId, payload);
-        router.push(`/admin/users/${updated.id}`);
+        const emailChangeRequested = updated.email !== values.email;
+        router.push(
+          `/admin/users/${updated.id}${emailChangeRequested ? "?emailChangeRequested=1" : ""}`,
+        );
       } else {
         const payload: CreateUserPayload = {
           lastname: values.lastname,
@@ -399,11 +405,14 @@ export function UserForm({
           canSeePrivate: isPrivateAccessLocked ? true : values.canSeePrivate,
         };
 
-        const created = await createUser(payload);
-        router.push(`/admin/users/${created.id}`);
+        const message = await createUser(payload);
+        setSuccessMessage(message);
+        setInvitationDialogOpen(true);
       }
 
-      router.refresh();
+      if (userId) {
+        router.refresh();
+      }
     } catch (err) {
       if (err instanceof ProfileValidationError) {
         setErrors(err.messages);
@@ -477,7 +486,6 @@ export function UserForm({
                 </ul>
               </div>
             ) : null}
-
             {isAdminBlockedOnTarget ? (
               <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
                 Un admin peut modifier ou supprimer uniquement les organisateurs
@@ -855,6 +863,31 @@ export function UserForm({
           </form>
         )}
       </CardContent>
+
+      <Dialog
+        open={invitationDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            router.push("/admin/users");
+          }
+          setInvitationDialogOpen(open);
+        }}
+      >
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>E-mail de confirmation envoyé</DialogTitle>
+            <DialogDescription>
+              {successMessage ??
+                "Un e-mail de confirmation a été envoyé à l’utilisateur. Le compte sera créé après validation de son adresse e-mail."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" onClick={() => router.push("/admin/users")}>
+              Retour aux utilisateurs
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

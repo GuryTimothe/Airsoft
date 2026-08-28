@@ -20,6 +20,7 @@ security:
       pattern: ^/api/login
       stateless: true
       provider: app_user_provider
+      user_checker: App\Security\EmailVerifiedUserChecker
 
       login_throttling:
         max_attempts: 3
@@ -39,6 +40,16 @@ security:
 
     public_logout:
       pattern: ^/api/logout
+      stateless: true
+      security: false
+
+    public_password_reset:
+      pattern: ^/api/password-reset
+      stateless: true
+      security: false
+
+    public_email_verification:
+      pattern: ^/api/email-verification
       stateless: true
       security: false
 
@@ -66,6 +77,8 @@ security:
     - { path: ^/api/login, roles: IS_AUTHENTICATED_ANONYMOUSLY }
     - { path: ^/api/register, roles: IS_AUTHENTICATED_ANONYMOUSLY }
     - { path: ^/api/logout, roles: IS_AUTHENTICATED_ANONYMOUSLY }
+    - { path: ^/api/password-reset, roles: PUBLIC_ACCESS }
+    - { path: ^/api/email-verification, roles: PUBLIC_ACCESS }
     - { path: ^/api/games$, roles: PUBLIC_ACCESS, methods: [GET] }
     - { path: ^/api/games/\d+$, roles: PUBLIC_ACCESS, methods: [GET] }
     - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }

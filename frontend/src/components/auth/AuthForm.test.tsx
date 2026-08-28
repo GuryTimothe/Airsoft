@@ -60,6 +60,13 @@ describe("AuthForm", () => {
       "0600000000",
     );
     await user.click(screen.getByRole("button", { name: "Créer un compte" }));
+    expect(registerUser).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("dialog", { name: "Valider votre adresse e-mail" }),
+    ).toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", { name: "Recevoir le lien de validation" }),
+    );
 
     await waitFor(() => {
       expect(registerUser).toHaveBeenCalledWith({
@@ -78,6 +85,24 @@ describe("AuthForm", () => {
         phone: undefined,
       });
     });
+  });
+
+  it("does not create an account when registration is cancelled", async () => {
+    const user = userEvent.setup();
+
+    render(<AuthForm mode="register" />);
+
+    await user.type(screen.getByLabelText("Nom"), "Martin");
+    await user.type(screen.getByLabelText("Prénom"), "Alex");
+    await user.type(screen.getByLabelText("Email"), "alex@example.com");
+    await user.type(screen.getByLabelText("Mot de passe"), "Password1234!");
+    await user.type(screen.getByLabelText("Confirmer"), "Password1234!");
+    await user.type(screen.getByLabelText("Date de naissance"), "1992-01-01");
+    await user.click(screen.getByRole("button", { name: "Créer un compte" }));
+    await user.click(screen.getByRole("button", { name: "Annuler" }));
+
+    expect(registerUser).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("prefills email in login mode from query string", async () => {

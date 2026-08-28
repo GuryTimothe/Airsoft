@@ -6,6 +6,7 @@ use ApiPlatform\Metadata\Post;
 use ApiPlatform\Validator\Exception\ValidationException;
 use App\Dto\RegisterInput;
 use App\Entity\User;
+use App\Repository\UserRepository;
 use App\State\RegisterProcessor;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
@@ -21,13 +22,13 @@ final class RegisterProcessorTest extends TestCase
     private function buildInput(array $overrides = []): RegisterInput
     {
         $input              = new RegisterInput();
-        $input->firstname   = $overrides['firstname'] ?? 'Jean';
-        $input->lastname    = $overrides['lastname'] ?? 'Dupont';
-        $input->email       = $overrides['email'] ?? 'jean@example.com';
-        $input->password    = $overrides['password'] ?? 'Password123';
+        $input->firstname   = $overrides['firstname']   ?? 'Jean';
+        $input->lastname    = $overrides['lastname']    ?? 'Dupont';
+        $input->email       = $overrides['email']       ?? 'jean@example.com';
+        $input->password    = $overrides['password']    ?? 'Password123';
         $input->dateOfBirth = $overrides['dateOfBirth'] ?? new \DateTimeImmutable('1990-01-15');
-        $input->pseudo      = $overrides['pseudo'] ?? null;
-        $input->phone       = $overrides['phone'] ?? null;
+        $input->pseudo      = $overrides['pseudo']      ?? null;
+        $input->phone       = $overrides['phone']       ?? null;
 
         return $input;
     }
@@ -37,6 +38,7 @@ final class RegisterProcessorTest extends TestCase
         bool $hasViolations = false,
         ?EntityManagerInterface $entityManager = null,
         ?UserPasswordHasherInterface $passwordHasher = null,
+        ?UserRepository $userRepository = null,
     ): RegisterProcessor {
         $em = $entityManager ?? $this->createMock(EntityManagerInterface::class);
 
@@ -58,7 +60,7 @@ final class RegisterProcessorTest extends TestCase
         $denormalizer = $this->createMock(DenormalizerInterface::class);
         $denormalizer->method('denormalize')->willReturn($returnedInput);
 
-        return new RegisterProcessor($em, $hasher, $validator, $denormalizer);
+        return new RegisterProcessor($em, $hasher, $validator, $denormalizer, $userRepository);
     }
 
     public function testThrowsRuntimeExceptionWhenNoRequestInContext(): void
@@ -122,15 +124,37 @@ final class RegisterProcessorTest extends TestCase
         $this->assertSame('hashed_password', $result->getPassword());
     }
 
+    public function testReplacesExistingUnverifiedUserWithSameEmail(): void
+    {
+        $existingUser = (new User())
+            ->setEmail('jean@example.com')
+            ->setEmailVerified(false);
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->expects($this->once())->method('remove')->with($existingUser);
+        $entityManager->expects($this->exactly(2))->method('flush');
+        $entityManager->expects($this->once())->method('persist');
+        $repository = $this->createMock(UserRepository::class);
+        $repository->expects($this->once())->method('findOneBy')->with(['email' => 'jean@example.com'])->willReturn($existingUser);
+
+        $processor = $this->createProcessor(
+            $this->buildInput(),
+            entityManager: $entityManager,
+            userRepository: $repository,
+        );
+
+        $request = Request::create('/api/register', 'POST', [], [], [], [], '{}');
+        $processor->process(new \stdClass(), new Post(), context: ['request' => $request]);
+    }
+
     public function testCreatesUserWithOptionalFields(): void
     {
         $entityManager = $this->createMock(EntityManagerInterface::class);
         $entityManager->expects($this->once())->method('persist');
         $entityManager->expects($this->once())->method('flush');
 
-        $input          = $this->buildInput();
-        $input->pseudo  = 'SniperFox';
-        $input->phone   = '0612345678';
+        $input         = $this->buildInput();
+        $input->pseudo = 'SniperFox';
+        $input->phone  = '0612345678';
 
         $processor = $this->createProcessor(
             $input,

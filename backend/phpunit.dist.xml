@@ -26,6 +26,10 @@
         <server name="LOGIN_CSRF_TOKEN_TTL" value="600" force="true" />
         <server name="REDIS_URL" value="redis://127.0.0.1:6379" force="true" />
         <server name="SHELL_VERBOSITY" value="-1" />
+
+        <!-- ###+ symfony/mailer ### -->
+        <env name="MAILER_DSN" value="null://null"/>
+        <!-- ###- symfony/mailer ### -->
     </php>
 
     <testsuites>

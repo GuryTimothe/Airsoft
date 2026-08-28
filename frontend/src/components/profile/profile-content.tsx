@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
@@ -542,7 +543,9 @@ export function ProfileContent() {
         email: result.user.email,
         currentPassword: "",
       });
-      setEmailMessage("Email mis a jour.");
+      setEmailMessage(
+        "Un e-mail de confirmation a été envoyé à votre nouvelle adresse. Votre adresse actuelle reste utilisée jusqu'à sa validation.",
+      );
       setIsEmailModalOpen(false);
     } catch (error) {
       if (error instanceof ProfileValidationError) {
@@ -610,14 +613,15 @@ export function ProfileContent() {
     setIsUpdatingPassword(true);
 
     try {
-      const result = await updateMyPassword({
+      await updateMyPassword({
         currentPassword: passwordForm.currentPassword,
         newPassword: passwordForm.newPassword,
       });
-      setUser(result.user);
+      clearAuthToken();
       resetPasswordForm();
-      setPasswordMessage("Mot de passe mis a jour.");
       setIsPasswordModalOpen(false);
+      router.replace("/auth/login");
+      router.refresh();
     } catch (error) {
       if (error instanceof ProfileValidationError) {
         setPasswordErrors(error.messages);
@@ -1435,6 +1439,13 @@ export function ProfileContent() {
                 }
               />
             </div>
+
+            <Link
+              href={`/auth/forget-password?email=${encodeURIComponent(user?.email ?? "")}`}
+              className="block text-sm text-primary"
+            >
+              Mot de passe oublié ?
+            </Link>
 
             <p className="text-xs text-muted-foreground">* Champ obligatoire</p>
 
