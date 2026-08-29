@@ -299,6 +299,34 @@ export async function login(payload: LoginInput): Promise<string> {
   return "";
 }
 
+export class RegisterValidationError extends Error {
+  field?: string;
+
+  constructor(message: string, field?: string) {
+    super(message);
+    this.name = "RegisterValidationError";
+    this.field = field;
+  }
+}
+
+export async function isEmailAvailable(email: string): Promise<boolean> {
+  const response = await fetch(
+    buildUrl(`/api/register/check-email?email=${encodeURIComponent(email)}`),
+    { method: "GET" },
+  );
+
+  if (!response.ok) {
+    // Fail open: let the actual registration call surface the real error.
+    return true;
+  }
+
+  const data = (await response.json().catch(() => null)) as {
+    available?: unknown;
+  } | null;
+
+  return data?.available !== false;
+}
+
 export async function registerUser(payload: RegisterPayload): Promise<void> {
   const response = await fetch(buildUrl("/api/register"), {
     method: "POST",
@@ -316,6 +344,27 @@ export async function registerUser(payload: RegisterPayload): Promise<void> {
   }
 
   if (!response.ok) {
+    const violations =
+      typeof data === "object" && data !== null
+        ? (data as { violations?: unknown }).violations
+        : null;
+
+    if (Array.isArray(violations) && violations.length > 0) {
+      const firstViolation = violations[0] as {
+        propertyPath?: unknown;
+        message?: unknown;
+      };
+
+      if (typeof firstViolation.message === "string") {
+        throw new RegisterValidationError(
+          firstViolation.message,
+          typeof firstViolation.propertyPath === "string"
+            ? firstViolation.propertyPath
+            : undefined,
+        );
+      }
+    }
+
     const errorMessage =
       typeof data === "object" &&
       data !== null &&

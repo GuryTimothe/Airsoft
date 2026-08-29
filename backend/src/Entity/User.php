@@ -149,18 +149,46 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column(length: 255)]
     #[Assert\NotBlank]
-    #[Assert\Length(
-        min: 12,
-        minMessage: 'Le mot de passe doit contenir au moins 12 caractères.',
-        groups: ['user:create']
-    )]
-    #[Assert\Regex(
-        pattern: '/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\w\s]).+$/',
-        message: 'Le mot de passe doit contenir une majuscule, une minuscule, un chiffre et un symbole.',
-        groups: ['user:create']
-    )]
     #[Groups(['user:write'])]
     private string $password;
+
+    #[Assert\Callback(groups: ['user:create'])]
+    public function validatePasswordPolicy(ExecutionContextInterface $context): void
+    {
+        if ('' === trim($this->password)) {
+            return;
+        }
+
+        if (\strlen($this->password) < 12) {
+            $context->buildViolation('Le mot de passe doit contenir au moins 12 caractères.')
+                ->atPath('password')
+                ->addViolation();
+        }
+
+        if (!preg_match('/[a-z]/', $this->password)) {
+            $context->buildViolation('Le mot de passe doit contenir au moins une minuscule.')
+                ->atPath('password')
+                ->addViolation();
+        }
+
+        if (!preg_match('/[A-Z]/', $this->password)) {
+            $context->buildViolation('Le mot de passe doit contenir au moins une majuscule.')
+                ->atPath('password')
+                ->addViolation();
+        }
+
+        if (!preg_match('/\d/', $this->password)) {
+            $context->buildViolation('Le mot de passe doit contenir au moins un chiffre.')
+                ->atPath('password')
+                ->addViolation();
+        }
+
+        if (!preg_match('/[^\w\s]/', $this->password)) {
+            $context->buildViolation('Le mot de passe doit contenir au moins un symbole.')
+                ->atPath('password')
+                ->addViolation();
+        }
+    }
 
     #[ORM\Column(type: 'date')]
     #[Assert\NotNull(groups: ['user:create', 'user:admin:update', 'user:self:general'])]

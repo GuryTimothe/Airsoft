@@ -191,7 +191,7 @@ export default function UserTable({
             }
           >
             <option value="lastname">Nom</option>
-            <option value="firstname">Prenom</option>
+            <option value="firstname">Prénom</option>
           </select>
         </label>
 

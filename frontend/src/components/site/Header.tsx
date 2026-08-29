@@ -89,16 +89,16 @@ export function Header({
     <header className="sticky top-0 z-50 bg-primary text-primary-foreground">
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
         <div className="flex items-center gap-2">
-          <Image
-            src="/images/logo.png"
-            alt="Logo"
-            className="ml-4 h-20 w-15"
-            width={60}
-            height={80}
-            sizes="60px"
-          />
-          <Link href="/" className="text-2xl font-black">
-            Muret Airsoft
+          <Link href="/" className="flex items-center gap-2">
+            <Image
+              src="/images/logo.png"
+              alt="Logo"
+              className="ml-4 h-20 w-15"
+              width={60}
+              height={80}
+              sizes="60px"
+            />
+            <span className="text-2xl font-black">Muret Airsoft</span>
           </Link>
         </div>
         <div className="hidden items-center gap-3 md:flex">
@@ -138,31 +138,10 @@ export function Header({
       ) : null}
 
       {mobileMenuOpen ? (
-        <div className="border-t border-border bg-background md:hidden">
+        <div className="border-t border-border bg-[#CCB99F] md:hidden">
           <div className="space-y-4 px-6 py-4">
-            <Link
-              href="#"
-              className="block text-md font-medium transition-colors hover:text-primary"
-            >
-              Parties
-            </Link>
-
-            <Link
-              href="#"
-              className="block text-md font-medium transition-colors hover:text-primary"
-            >
-              À propos
-            </Link>
-
-            <Link
-              href="#"
-              className="block text-md font-medium transition-colors hover:text-primary"
-            >
-              Contact
-            </Link>
-
-            <div className="flex gap-2 pt-2">
-              <Link href={authHref} className="flex-1">
+            <div className="flex flex-col gap-2">
+              <Link href={authHref} className="w-full">
                 <Button variant="default" className="w-full text-sm">
                   {authLabel}
                 </Button>
@@ -170,7 +149,7 @@ export function Header({
               {isAuthenticated ? (
                 <Button
                   variant="default"
-                  className="flex-1 text-sm"
+                  className="w-full text-sm"
                   onClick={handleLogout}
                 >
                   Se deconnecter

@@ -104,7 +104,7 @@ class MeEmailUpdateProcessor implements ProcessorInterface
         $existingUser = $this->userRepository->findOneBy(['email' => $newEmail]);
         if ($existingUser instanceof User && $existingUser !== $targetUser) {
             throw new ValidationException(new ConstraintViolationList([
-                new ConstraintViolation('Un compte avec cet email existe deja.', null, [], null, 'email', $data->email),
+                new ConstraintViolation('Un compte avec cet email existe déjà.', null, [], null, 'email', $data->email),
             ]));
         }
 
@@ -124,7 +124,7 @@ class MeEmailUpdateProcessor implements ProcessorInterface
         } catch (UniqueConstraintViolationException) {
             throw new ValidationException(new ConstraintViolationList([
                 new ConstraintViolation(
-                    'Un compte avec cet email existe deja.',
+                    'Un compte avec cet email existe déjà.',
                     null,
                     [],
                     null,

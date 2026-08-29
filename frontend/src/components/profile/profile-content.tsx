@@ -32,7 +32,12 @@ import {
   updateMyProfile,
   type User,
 } from "@/lib/user-api";
-import { isValidEmail, isValidPhoneNumber } from "@/lib/validators";
+import { validatePasswordPolicy } from "@/lib/password-policy";
+import {
+  isValidEmail,
+  isValidName,
+  isValidPhoneNumber,
+} from "@/lib/validators";
 
 function displayOptionalValue(value?: string | null): string {
   if (typeof value !== "string") {
@@ -62,30 +67,6 @@ function isMinorDate(dateOfBirth: string): boolean {
   }
 
   return age < 18;
-}
-
-function validatePasswordPolicy(password: string): string | null {
-  if (password.length < 12) {
-    return "Le nouveau mot de passe doit contenir au moins 12 caractères.";
-  }
-
-  if (!/[a-z]/.test(password)) {
-    return "Le nouveau mot de passe doit contenir une minuscule.";
-  }
-
-  if (!/[A-Z]/.test(password)) {
-    return "Le nouveau mot de passe doit contenir une majuscule.";
-  }
-
-  if (!/\d/.test(password)) {
-    return "Le nouveau mot de passe doit contenir un chiffre.";
-  }
-
-  if (!/[^\w\s]/.test(password)) {
-    return "Le nouveau mot de passe doit contenir un symbole.";
-  }
-
-  return null;
 }
 
 type DismissibleMessageProps = {
@@ -285,11 +266,19 @@ export function ProfileContent() {
     const clientErrors: string[] = [];
 
     if (!generalForm.firstname.trim()) {
-      clientErrors.push("Prenom : ce champ ne doit pas etre vide.");
+      clientErrors.push("Prénom : ce champ ne doit pas etre vide.");
+    } else if (!isValidName(generalForm.firstname)) {
+      clientErrors.push(
+        "Prénom : ce champ ne peut contenir que des lettres, espaces et tirets.",
+      );
     }
 
     if (!generalForm.lastname.trim()) {
       clientErrors.push("Nom : ce champ ne doit pas etre vide.");
+    } else if (!isValidName(generalForm.lastname)) {
+      clientErrors.push(
+        "Nom : ce champ ne peut contenir que des lettres, espaces et tirets.",
+      );
     }
 
     if (!generalForm.dateOfBirth.trim()) {
@@ -302,7 +291,7 @@ export function ProfileContent() {
       generalForm.phone.trim() &&
       !isValidPhoneNumber(generalForm.phone.trim())
     ) {
-      clientErrors.push("Telephone : le numero de telephone n'est pas valide.");
+      clientErrors.push("Téléphone : le numero de téléphone n'est pas valide.");
     }
 
     if (clientErrors.length > 0) {
@@ -381,7 +370,7 @@ export function ProfileContent() {
       !hasCompleteEmergencyContact(normalizedEmergencyContact)
     ) {
       clientErrors.push(
-        "Le contact d'urgence doit contenir nom, prenom, email et telephone.",
+        "Le contact d'urgence doit contenir nom, prénom, email et téléphone.",
       );
     }
 
@@ -399,10 +388,28 @@ export function ProfileContent() {
     }
 
     if (
+      submittedEmergencyContact.lastname &&
+      !isValidName(submittedEmergencyContact.lastname)
+    ) {
+      clientErrors.push(
+        "Nom : ce champ ne peut contenir que des lettres, espaces et tirets.",
+      );
+    }
+
+    if (
+      submittedEmergencyContact.firstname &&
+      !isValidName(submittedEmergencyContact.firstname)
+    ) {
+      clientErrors.push(
+        "Prénom : ce champ ne peut contenir que des lettres, espaces et tirets.",
+      );
+    }
+
+    if (
       submittedEmergencyContact.phone &&
       !isValidPhoneNumber(submittedEmergencyContact.phone)
     ) {
-      clientErrors.push("Telephone : le numero de telephone n'est pas valide.");
+      clientErrors.push("Téléphone : le numero de téléphone n'est pas valide.");
     }
 
     if (clientErrors.length > 0) {
@@ -588,11 +595,15 @@ export function ProfileContent() {
         "Nouveau mot de passe : ce champ ne doit pas etre vide.",
       );
     } else {
-      const passwordPolicyError = validatePasswordPolicy(
+      const passwordPolicyErrors = validatePasswordPolicy(
         passwordForm.newPassword,
       );
-      if (passwordPolicyError) {
-        clientErrors.push(`Nouveau mot de passe : ${passwordPolicyError}`);
+      if (passwordPolicyErrors.length > 0) {
+        clientErrors.push(
+          ...passwordPolicyErrors.map(
+            (message) => `Nouveau mot de passe : ${message}`,
+          ),
+        );
       }
     }
 
@@ -727,11 +738,11 @@ export function ProfileContent() {
       <section className="rounded-lg border border-border bg-card p-6">
         <h2 className="text-xl font-semibold">Modifier mon profil</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Choisissez l'action a effectuer. Chaque bouton ouvre une fenetre de
+          Choisissez l'action a effectuer. Chaque bouton ouvre une fenêtre de
           modification.
         </p>
 
-        <div className="mt-5 flex flex-wrap gap-3">
+        <div className="mt-5 flex flex-col gap-3 sm:flex-row">
           <Button
             type="button"
             onClick={() => {
@@ -739,6 +750,7 @@ export function ProfileContent() {
               setGeneralErrors([]);
               setIsGeneralModalOpen(true);
             }}
+            className="w-full sm:w-auto"
           >
             Modifier infos
           </Button>
@@ -750,6 +762,7 @@ export function ProfileContent() {
               setEmailErrors([]);
               setIsEmailModalOpen(true);
             }}
+            className="w-full sm:w-auto"
           >
             Modifier email
           </Button>
@@ -761,6 +774,7 @@ export function ProfileContent() {
               setPasswordErrors([]);
               setIsPasswordModalOpen(true);
             }}
+            className="w-full sm:w-auto"
           >
             Modifier mot de passe
           </Button>
@@ -787,16 +801,20 @@ export function ProfileContent() {
       </section>
 
       <section className="rounded-lg border border-border bg-card p-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
+        <div className="flex flex-col gap-4 sm:gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex-1">
             <h2 className="text-xl font-semibold">Contact d'urgence</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Personne a contacter en cas de besoin.
+              Personne à contacter en cas de besoin.
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Button type="button" onClick={openEmergencyModal}>
+          <div className="flex flex-col gap-2 sm:gap-2 sm:flex-row sm:items-center sm:whitespace-nowrap">
+            <Button
+              type="button"
+              onClick={openEmergencyModal}
+              className="w-full sm:w-auto"
+            >
               {hasEmergencyContact
                 ? "Modifier le contact d'urgence"
                 : "Ajouter un contact d'urgence"}
@@ -808,6 +826,7 @@ export function ProfileContent() {
               disabled={
                 isMinorUser || !hasEmergencyContact || isUpdatingEmergency
               }
+              className="w-full sm:w-auto"
             >
               Supprimer le contact d'urgence
             </Button>
@@ -855,7 +874,7 @@ export function ProfileContent() {
           </div>
           <div>
             <dt className="text-xs uppercase tracking-wide text-muted-foreground">
-              Prenom
+              Prénom
             </dt>
             <dd className="text-base font-medium">
               {hasEmergencyContact ? emergencyContact.firstname : "Aucun"}
@@ -871,7 +890,7 @@ export function ProfileContent() {
           </div>
           <div>
             <dt className="text-xs uppercase tracking-wide text-muted-foreground">
-              Telephone
+              Téléphone
             </dt>
             <dd className="text-base font-medium">
               {hasEmergencyContact ? emergencyContact.phone : "Aucun"}
@@ -951,7 +970,7 @@ export function ProfileContent() {
 
               <div className="space-y-2">
                 <div className="flex items-center gap-1">
-                  <Label htmlFor="emergency-firstname">Prenom</Label>
+                  <Label htmlFor="emergency-firstname">Prénom</Label>
                   {isMinorUser ? (
                     <span
                       className="text-sm text-destructive"
@@ -1004,7 +1023,7 @@ export function ProfileContent() {
 
               <div className="space-y-2">
                 <div className="flex items-center gap-1">
-                  <Label htmlFor="emergency-phone">Telephone</Label>
+                  <Label htmlFor="emergency-phone">Téléphone</Label>
                   {isMinorUser ? (
                     <span
                       className="text-sm text-destructive"
@@ -1017,6 +1036,7 @@ export function ProfileContent() {
                 <Input
                   id="emergency-phone"
                   name="phone"
+                  placeholder="0600000000"
                   value={emergencyForm.phone}
                   onChange={(event) =>
                     setEmergencyForm({
@@ -1144,7 +1164,7 @@ export function ProfileContent() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <div className="flex items-center gap-1">
-                  <Label htmlFor="profile-firstname">Prenom</Label>
+                  <Label htmlFor="profile-firstname">Prénom</Label>
                   <span className="text-sm text-destructive" aria-hidden="true">
                     *
                   </span>
@@ -1217,9 +1237,10 @@ export function ProfileContent() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="profile-phone">Telephone</Label>
+                <Label htmlFor="profile-phone">Téléphone</Label>
                 <Input
                   id="profile-phone"
+                  placeholder="0600000000"
                   value={generalForm.phone}
                   onChange={(event) =>
                     setGeneralForm({

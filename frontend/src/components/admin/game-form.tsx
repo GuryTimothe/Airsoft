@@ -149,33 +149,33 @@ export function GameForm({ gameId, initialGame }: GameFormProps) {
     const clientErrors: string[] = [];
 
     if (!values.title.trim()) {
-      clientErrors.push("Titre : ce champ ne doit pas etre vide.");
+      clientErrors.push("Titre : ce champ ne doit pas être vide.");
     }
 
     if (!values.address.trim()) {
-      clientErrors.push("Adresse : ce champ ne doit pas etre vide.");
+      clientErrors.push("Adresse : ce champ ne doit pas être vide.");
     }
 
     if (!values.startDateTime.trim()) {
-      clientErrors.push("Date et heure : ce champ ne doit pas etre vide.");
+      clientErrors.push("Date et heure : ce champ ne doit pas être vide.");
     } else if (Number.isNaN(new Date(values.startDateTime).getTime())) {
       clientErrors.push("Date et heure : cette date n'est pas valide.");
     }
 
     if (!values.price.trim()) {
-      clientErrors.push("PAF : ce champ ne doit pas etre vide.");
+      clientErrors.push("PAF : ce champ ne doit pas être vide.");
     } else if (Number.isNaN(Number(values.price)) || Number(values.price) < 0) {
-      clientErrors.push("PAF : cette valeur doit etre un nombre positif.");
+      clientErrors.push("PAF : cette valeur doit être un nombre positif.");
     }
 
     if (!values.maxPlaces.trim()) {
-      clientErrors.push("Places max : ce champ ne doit pas etre vide.");
+      clientErrors.push("Places max : ce champ ne doit pas être vide.");
     } else if (
       Number.isNaN(Number(values.maxPlaces)) ||
       Number(values.maxPlaces) < 1
     ) {
       clientErrors.push(
-        "Places max : cette valeur doit etre un nombre superieur ou egal a 1.",
+        "Places max : cette valeur doit être un nombre supérieur ou égal à 1.",
       );
     }
 

@@ -146,6 +146,35 @@ final class RegisterProcessorTest extends TestCase
         $processor->process(new \stdClass(), new Post(), context: ['request' => $request]);
     }
 
+    public function testThrowsValidationExceptionWhenEmailBelongsToVerifiedAccount(): void
+    {
+        $existingUser = (new User())
+            ->setEmail('jean@example.com')
+            ->setEmailVerified(true);
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->expects($this->never())->method('remove');
+        $repository = $this->createMock(UserRepository::class);
+        $repository->method('findOneBy')->with(['email' => 'jean@example.com'])->willReturn($existingUser);
+
+        $processor = $this->createProcessor(
+            $this->buildInput(),
+            entityManager: $entityManager,
+            userRepository: $repository,
+        );
+
+        $request = Request::create('/api/register', 'POST', [], [], [], [], '{}');
+
+        try {
+            $processor->process(new \stdClass(), new Post(), context: ['request' => $request]);
+            $this->fail('Expected a ValidationException to be thrown.');
+        } catch (ValidationException $exception) {
+            $violations = $exception->getConstraintViolationList();
+            $this->assertCount(1, $violations);
+            $this->assertSame('email', $violations->get(0)->getPropertyPath());
+            $this->assertSame('Un compte avec cet email existe déjà.', $violations->get(0)->getMessage());
+        }
+    }
+
     public function testCreatesUserWithOptionalFields(): void
     {
         $entityManager = $this->createMock(EntityManagerInterface::class);
