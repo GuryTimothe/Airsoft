@@ -45,6 +45,8 @@ final class LoginCsrfRequestSubscriber implements EventSubscriberInterface
             str_starts_with($path, '/api/csrf')
             || '/api/register' === $path
             || '/api/logout'   === $path
+            || str_starts_with($path, '/api/password-reset')
+            || str_starts_with($path, '/api/email-verification')
         ) {
             return;
         }

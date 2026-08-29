@@ -11,6 +11,7 @@ use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
+use App\Dto\AdminUserInvitationOutput;
 use App\Dto\MeEmailUpdateInput;
 use App\Dto\MePasswordUpdateInput;
 use App\Dto\MeUpdateOutput;
@@ -93,6 +94,9 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
             processor: UserCreateProcessor::class,
             denormalizationContext: ['groups' => ['user:write', 'user:create']],
             validationContext: ['groups' => ['user:create']],
+            normalizationContext: ['groups' => ['admin:user:invitation:read']],
+            output: AdminUserInvitationOutput::class,
+            status: 202,
         ),
         new Post(
             uriTemplate: '/register',
@@ -138,6 +142,10 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Assert\Email(groups: ['user:create', 'user:admin:update', 'user:self:email'])]
     #[Groups(['user:read', 'user:write', 'user:self:email:write', 'user:me:read'])]
     private string $email;
+
+    #[ORM\Column(options: ['default' => true])]
+    #[Groups(['user:read', 'user:me:read'])]
+    private bool $emailVerified = true;
 
     #[ORM\Column(length: 255)]
     #[Assert\NotBlank]
@@ -249,6 +257,18 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setEmail(string $email): self
     {
         $this->email = $email;
+
+        return $this;
+    }
+
+    public function isEmailVerified(): bool
+    {
+        return $this->emailVerified;
+    }
+
+    public function setEmailVerified(bool $emailVerified): self
+    {
+        $this->emailVerified = $emailVerified;
 
         return $this;
     }

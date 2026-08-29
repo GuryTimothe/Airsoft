@@ -218,22 +218,16 @@ describe("user-api", () => {
     });
   });
 
-  it("creates a user", async () => {
+  it("creates a pending user invitation", async () => {
     mockCsrf();
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        id: 3,
-        lastname: "Roux",
-        firstname: "Nina",
-        email: "nina@example.com",
-        dateOfBirth: "1995-04-20",
-        role: "ROLE_USER",
-        canSeePrivate: false,
+        message: "Un e-mail de confirmation a été envoyé à l’utilisateur.",
       }),
     });
 
-    const user = await createUser({
+    const message = await createUser({
       lastname: "Roux",
       firstname: "Nina",
       email: "nina@example.com",
@@ -247,7 +241,9 @@ describe("user-api", () => {
       expect.stringContaining("/api/users"),
       expect.objectContaining({ method: "POST" }),
     );
-    expect(user.id).toBe(3);
+    expect(message).toBe(
+      "Un e-mail de confirmation a été envoyé à l’utilisateur.",
+    );
   });
 
   it("sends canSeePrivate when creating a user", async () => {
@@ -255,13 +251,7 @@ describe("user-api", () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        id: 13,
-        lastname: "Lemoine",
-        firstname: "Nora",
-        email: "nora@example.com",
-        dateOfBirth: "1996-03-08",
-        role: "ROLE_ORGANIZER",
-        canSeePrivate: true,
+        message: "Invitation envoyée.",
       }),
     });
 

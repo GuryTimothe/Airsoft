@@ -56,6 +56,10 @@ final class JwtCookieResponseSubscriber implements EventSubscriberInterface
         $jwt     = \is_array($payload) ? ($payload['token'] ?? null) : null;
 
         if (!\is_string($jwt) || '' === trim($jwt)) {
+            if ('/api/me/password' === $request->getPathInfo()) {
+                $this->jwtCookieManager->addClearingCookie($response, $request->isSecure());
+            }
+
             return;
         }
 

@@ -10,7 +10,6 @@ use App\Entity\User;
 use App\Security\Jwt\JwtRevocationStore;
 use App\State\MePasswordUpdateProcessor;
 use Doctrine\ORM\EntityManagerInterface;
-use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -32,16 +31,13 @@ final class MePasswordUpdateProcessorTest extends TestCase
         $passwordHasher->expects($this->never())->method('isPasswordValid');
         $passwordHasher->expects($this->never())->method('hashPassword');
 
-        $jwtManager = $this->createMock(JWTTokenManagerInterface::class);
-        $jwtManager->expects($this->never())->method('create');
-
         $security = $this->createMock(Security::class);
         $security->method('getUser')->willReturn($actor);
 
         $jwtRevocationStore = $this->createMock(JwtRevocationStore::class);
         $jwtRevocationStore->expects($this->never())->method('rotateUserTokenNonce');
 
-        $processor = new MePasswordUpdateProcessor($entityManager, $passwordHasher, $jwtManager, $security, $jwtRevocationStore);
+        $processor = new MePasswordUpdateProcessor($entityManager, $passwordHasher, $security, $jwtRevocationStore);
 
         $this->expectException(ValidationException::class);
         $processor->process($payload, new Patch(uriTemplate: '/me/password'), context: [
@@ -69,16 +65,13 @@ final class MePasswordUpdateProcessorTest extends TestCase
             ->willReturn(false);
         $passwordHasher->expects($this->never())->method('hashPassword');
 
-        $jwtManager = $this->createMock(JWTTokenManagerInterface::class);
-        $jwtManager->expects($this->never())->method('create');
-
         $security = $this->createMock(Security::class);
         $security->method('getUser')->willReturn($actor);
 
         $jwtRevocationStore = $this->createMock(JwtRevocationStore::class);
         $jwtRevocationStore->expects($this->never())->method('rotateUserTokenNonce');
 
-        $processor = new MePasswordUpdateProcessor($entityManager, $passwordHasher, $jwtManager, $security, $jwtRevocationStore);
+        $processor = new MePasswordUpdateProcessor($entityManager, $passwordHasher, $security, $jwtRevocationStore);
 
         $this->expectException(ValidationException::class);
         $processor->process($payload, new Patch(uriTemplate: '/me/password'), context: [
@@ -86,7 +79,7 @@ final class MePasswordUpdateProcessorTest extends TestCase
         ]);
     }
 
-    public function testPasswordUpdateReturnsNewTokenWhenCurrentPasswordIsValid(): void
+    public function testPasswordUpdateInvalidatesExistingTokenWhenCurrentPasswordIsValid(): void
     {
         $payload                  = new MePasswordUpdateInput();
         $payload->currentPassword = 'good-password';
@@ -110,13 +103,6 @@ final class MePasswordUpdateProcessorTest extends TestCase
             ->with($actor, 'new-password-123')
             ->willReturn('new-hashed-password');
 
-        $jwtManager = $this->createMock(JWTTokenManagerInterface::class);
-        $jwtManager
-            ->expects($this->once())
-            ->method('create')
-            ->with($actor)
-            ->willReturn('new.jwt.token');
-
         $security = $this->createMock(Security::class);
         $security->method('getUser')->willReturn($actor);
 
@@ -127,7 +113,7 @@ final class MePasswordUpdateProcessorTest extends TestCase
             ->with($actor)
             ->willReturn('rotated-nonce');
 
-        $processor = new MePasswordUpdateProcessor($entityManager, $passwordHasher, $jwtManager, $security, $jwtRevocationStore);
+        $processor = new MePasswordUpdateProcessor($entityManager, $passwordHasher, $security, $jwtRevocationStore);
 
         $result = $processor->process($payload, new Patch(uriTemplate: '/me/password'), context: [
             'previous_data' => $actor,
@@ -136,7 +122,7 @@ final class MePasswordUpdateProcessorTest extends TestCase
         $this->assertInstanceOf(MeUpdateOutput::class, $result);
         $this->assertSame($actor, $result->user);
         $this->assertSame('new-hashed-password', $result->user->getPassword());
-        $this->assertSame('new.jwt.token', $result->token);
+        $this->assertSame('', $result->token);
     }
 
     public function testPasswordUpdateFailsWhenNewPasswordIsEmpty(): void
@@ -155,12 +141,11 @@ final class MePasswordUpdateProcessorTest extends TestCase
         $passwordHasher->method('isPasswordValid')->willReturn(true);
         $passwordHasher->expects($this->never())->method('hashPassword');
 
-        $jwtManager        = $this->createMock(JWTTokenManagerInterface::class);
         $security          = $this->createMock(Security::class);
         $security->method('getUser')->willReturn($actor);
         $jwtRevocationStore = $this->createMock(JwtRevocationStore::class);
 
-        $processor = new MePasswordUpdateProcessor($entityManager, $passwordHasher, $jwtManager, $security, $jwtRevocationStore);
+        $processor = new MePasswordUpdateProcessor($entityManager, $passwordHasher, $security, $jwtRevocationStore);
 
         $this->expectException(ValidationException::class);
         $processor->process($payload, new Patch(uriTemplate: '/me/password'), context: [
@@ -184,16 +169,13 @@ final class MePasswordUpdateProcessorTest extends TestCase
         $passwordHasher->method('isPasswordValid')->willReturn(true);
         $passwordHasher->method('hashPassword')->willReturn('hashed');
 
-        $jwtManager = $this->createMock(JWTTokenManagerInterface::class);
-        $jwtManager->method('create')->willReturn('token');
-
         $security = $this->createMock(Security::class);
         $security->method('getUser')->willReturn($actor);
 
         $jwtRevocationStore = $this->createMock(JwtRevocationStore::class);
         $jwtRevocationStore->method('rotateUserTokenNonce')->willReturn('nonce');
 
-        $processor = new MePasswordUpdateProcessor($entityManager, $passwordHasher, $jwtManager, $security, $jwtRevocationStore);
+        $processor = new MePasswordUpdateProcessor($entityManager, $passwordHasher, $security, $jwtRevocationStore);
 
         $result = $processor->process($payload, new Patch(uriTemplate: '/me/password'), context: []);
 
@@ -206,13 +188,12 @@ final class MePasswordUpdateProcessorTest extends TestCase
 
         $entityManager      = $this->createMock(EntityManagerInterface::class);
         $passwordHasher     = $this->createMock(UserPasswordHasherInterface::class);
-        $jwtManager         = $this->createMock(JWTTokenManagerInterface::class);
         $jwtRevocationStore = $this->createMock(JwtRevocationStore::class);
 
         $security = $this->createMock(Security::class);
         $security->method('getUser')->willReturn(null);
 
-        $processor = new MePasswordUpdateProcessor($entityManager, $passwordHasher, $jwtManager, $security, $jwtRevocationStore);
+        $processor = new MePasswordUpdateProcessor($entityManager, $passwordHasher, $security, $jwtRevocationStore);
 
         $this->expectException(\InvalidArgumentException::class);
         $processor->process($payload, new Patch(uriTemplate: '/me/password'), context: []);
@@ -224,11 +205,10 @@ final class MePasswordUpdateProcessorTest extends TestCase
 
         $entityManager      = $this->createMock(EntityManagerInterface::class);
         $passwordHasher     = $this->createMock(UserPasswordHasherInterface::class);
-        $jwtManager         = $this->createMock(JWTTokenManagerInterface::class);
         $jwtRevocationStore = $this->createMock(JwtRevocationStore::class);
         $security           = $this->createMock(Security::class);
 
-        $processor = new MePasswordUpdateProcessor($entityManager, $passwordHasher, $jwtManager, $security, $jwtRevocationStore);
+        $processor = new MePasswordUpdateProcessor($entityManager, $passwordHasher, $security, $jwtRevocationStore);
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Previous user state is invalid.');

@@ -36,6 +36,7 @@ import {
 
 interface UserDetailProps {
   userId: number;
+  emailChangeRequested?: boolean;
 }
 
 function roleLabel(role: User["role"]): string {
@@ -69,7 +70,10 @@ function computeAge(dateOfBirth: string): number | null {
   return age;
 }
 
-export function UserDetail({ userId }: UserDetailProps) {
+export function UserDetail({
+  userId,
+  emailChangeRequested = false,
+}: UserDetailProps) {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [emergencyContact, setEmergencyContact] =
@@ -78,6 +82,8 @@ export function UserDetail({ userId }: UserDetailProps) {
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [emailChangeDialogOpen, setEmailChangeDialogOpen] =
+    useState(emailChangeRequested);
   const [isAdminOnlyActor, setIsAdminOnlyActor] = useState(false);
 
   useEffect(() => {
@@ -176,6 +182,30 @@ export function UserDetail({ userId }: UserDetailProps) {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
+          <Dialog
+            open={emailChangeDialogOpen}
+            onOpenChange={setEmailChangeDialogOpen}
+          >
+            <DialogContent showCloseButton={false}>
+              <DialogHeader>
+                <DialogTitle>
+                  Demande de nouvelle adresse e-mail envoyée
+                </DialogTitle>
+                <DialogDescription>
+                  Un e-mail de confirmation a été envoyé à l’utilisateur. La
+                  nouvelle adresse e-mail sera effective après sa validation.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  onClick={() => setEmailChangeDialogOpen(false)}
+                >
+                  Fermer
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           <h1 className="text-2xl font-semibold tracking-tight">
             {user.firstname} {user.lastname}
           </h1>

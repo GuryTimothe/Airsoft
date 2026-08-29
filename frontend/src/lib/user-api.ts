@@ -522,7 +522,7 @@ export async function getCurrentUser(): Promise<User> {
   return normalizeUser(await response.json());
 }
 
-export async function createUser(payload: CreateUserPayload): Promise<User> {
+export async function createUser(payload: CreateUserPayload): Promise<string> {
   let headers = await getAuthHeaders({
     "Content-Type": "application/ld+json",
   });
@@ -538,7 +538,11 @@ export async function createUser(payload: CreateUserPayload): Promise<User> {
     throw new ProfileValidationError(await parseProfileErrorMessages(response));
   }
 
-  return normalizeUser(await response.json());
+  const data = (await response.json()) as { message?: unknown };
+
+  return typeof data.message === "string"
+    ? data.message
+    : "Un e-mail de confirmation a été envoyé à l’utilisateur.";
 }
 
 export async function deleteCurrentUser(): Promise<void> {
