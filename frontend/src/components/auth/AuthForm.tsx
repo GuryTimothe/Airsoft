@@ -5,6 +5,14 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { login, registerUser } from "@/lib/auth";
 import { serializeEmergencyContact } from "@/lib/emergency-contact";
 import { getCurrentUser } from "@/lib/user-api";
@@ -28,6 +36,12 @@ export default function AuthForm({ mode = "login" }: Props) {
     type: "success" | "error";
     message: string;
   } | null>(null);
+  const [pendingRegistration, setPendingRegistration] = useState<{
+    registration: RegisterInput;
+    emergencyContact?: string;
+  } | null>(null);
+  const [isConfirmingRegistration, setIsConfirmingRegistration] =
+    useState(false);
 
   const resolver = zodResolver(mode === "login" ? loginSchema : registerSchema);
 
@@ -132,10 +146,34 @@ export default function AuthForm({ mode = "login" }: Props) {
 
     setStatus({
       type: "success",
-      message: "Compte créé. Connectez-vous pour continuer.",
+      message:
+        "Un lien de validation a été envoyé. Validez votre adresse e-mail pour pouvoir vous connecter.",
     });
     reset();
-    router.push(`/auth/login?email=${encodeURIComponent(reg.email)}`);
+  }
+
+  async function confirmRegistration() {
+    if (!pendingRegistration) {
+      return;
+    }
+
+    setIsConfirmingRegistration(true);
+    setStatus(null);
+    try {
+      await submitRegister(
+        pendingRegistration.registration,
+        pendingRegistration.emergencyContact,
+      );
+      setPendingRegistration(null);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Impossible de créer le compte.";
+      setStatus({ type: "error", message });
+    } finally {
+      setIsConfirmingRegistration(false);
+    }
   }
 
   async function onSubmit(data: Record<string, unknown>) {
@@ -150,18 +188,12 @@ export default function AuthForm({ mode = "login" }: Props) {
         phone: reg.guardianPhone?.trim() ?? "",
       });
 
-      try {
-        await submitRegister(
-          reg,
-          emergencyContact ? JSON.stringify(emergencyContact) : undefined,
-        );
-      } catch (error) {
-        const message =
-          error instanceof Error
-            ? error.message
-            : "Impossible de créer le compte.";
-        setStatus({ type: "error", message });
-      }
+      setPendingRegistration({
+        registration: reg,
+        emergencyContact: emergencyContact
+          ? JSON.stringify(emergencyContact)
+          : undefined,
+      });
       return;
     }
 
@@ -682,6 +714,48 @@ export default function AuthForm({ mode = "login" }: Props) {
           </Button>
         </div>
       </form>
+
+      <Dialog
+        open={null !== pendingRegistration}
+        onOpenChange={(open) => {
+          if (!open && !isConfirmingRegistration) {
+            setPendingRegistration(null);
+            reset();
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Valider votre adresse e-mail</DialogTitle>
+            <DialogDescription>
+              Un lien de validation sera envoyé à l’adresse indiquée. Vous
+              devrez cliquer sur ce lien avant de pouvoir vous connecter.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isConfirmingRegistration}
+              onClick={() => {
+                setPendingRegistration(null);
+                reset();
+              }}
+            >
+              Annuler
+            </Button>
+            <Button
+              type="button"
+              disabled={isConfirmingRegistration}
+              onClick={confirmRegistration}
+            >
+              {isConfirmingRegistration
+                ? "Envoi..."
+                : "Recevoir le lien de validation"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

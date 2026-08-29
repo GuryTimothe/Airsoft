@@ -79,7 +79,8 @@ final class LoginCsrfRequestSubscriberTest extends TestCase
         $this->assertNull($event->getResponse());
     }
 
-    public function testSkipsExemptRoutes(): void
+    #[\PHPUnit\Framework\Attributes\DataProvider('exemptRoutes')]
+    public function testSkipsExemptRoutes(string $path): void
     {
         $redis = $this->createMock(RedisJwtClient::class);
         $redis->expects($this->never())->method('exists');
@@ -87,12 +88,22 @@ final class LoginCsrfRequestSubscriberTest extends TestCase
         $subscriber = new LoginCsrfRequestSubscriber(new LoginCsrfManager(120, 'redis://unused', $redis));
         $event      = new RequestEvent(
             $this->createMock(HttpKernelInterface::class),
-            Request::create('/api/register', 'POST'),
+            Request::create($path, 'POST'),
             HttpKernelInterface::MAIN_REQUEST,
         );
 
         $subscriber->onKernelRequest($event);
 
         $this->assertNull($event->getResponse());
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function exemptRoutes(): iterable
+    {
+        yield 'registration' => ['/api/register'];
+        yield 'password reset request' => ['/api/password-reset/request'];
+        yield 'password reset confirmation' => ['/api/password-reset/confirm'];
     }
 }

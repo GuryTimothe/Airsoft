@@ -21,6 +21,12 @@ export default function LoginPage() {
           <AuthForm mode="login" />
         </Suspense>
 
+        <div className="mt-4 text-sm">
+          <Link href="/auth/forget-password" className="text-primary">
+            Mot de passe oublié ?
+          </Link>
+        </div>
+
         <div className="mt-6 text-sm text-muted-foreground">
           Pas de compte ?{" "}
           <Link href="/auth/register" className="text-primary">
