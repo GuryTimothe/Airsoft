@@ -152,11 +152,11 @@ describe("ProfileContent", () => {
     ).toHaveAttribute("href", "/auth/forget-password?email=alex%40example.com");
   });
 
-  it("logs out and redirects to login after changing the password", async () => {
+  it("keeps the user signed in after changing the password", async () => {
     const user = userEvent.setup();
     mockedUpdateMyPassword.mockResolvedValueOnce({
       user: baseUser,
-      token: "",
+      token: "renewed.jwt.token",
     });
 
     render(<ProfileContent />);
@@ -188,9 +188,10 @@ describe("ProfileContent", () => {
         currentPassword: "CurrentPassword123!",
         newPassword: "NewPassword123!",
       });
-      expect(mockedClearAuthToken).toHaveBeenCalledTimes(1);
-      expect(replace).toHaveBeenCalledWith("/auth/login");
-      expect(refresh).toHaveBeenCalledTimes(1);
+      expect(mockedClearAuthToken).not.toHaveBeenCalled();
+      expect(replace).not.toHaveBeenCalled();
+      expect(refresh).not.toHaveBeenCalled();
+      expect(screen.getByText("Mot de passe mis a jour.")).toBeInTheDocument();
     });
   });
 
