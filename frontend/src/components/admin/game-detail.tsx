@@ -479,7 +479,7 @@ export function GameDetail({ gameId }: GameDetailProps) {
                 <thead>
                   <tr className="border-b text-left">
                     <th className="px-3 py-2 font-medium">Nom</th>
-                    <th className="px-3 py-2 font-medium">Prenom</th>
+                    <th className="px-3 py-2 font-medium">Prénom</th>
                     <th className="px-3 py-2 font-medium">Adresse mail</th>
                     <th className="px-3 py-2 font-medium">Age</th>
                     <th className="px-3 py-2 font-medium">Present</th>

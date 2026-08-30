@@ -35,11 +35,15 @@ import {
   type UserRole,
 } from "@/lib/user-api";
 import {
-  hasCompleteEmergencyContact,
   parseEmergencyContact,
   serializeEmergencyContact,
 } from "@/lib/emergency-contact";
-import { isValidEmail, isValidPhoneNumber } from "@/lib/validators";
+import { validatePasswordPolicy } from "@/lib/password-policy";
+import {
+  isValidEmail,
+  isValidName,
+  isValidPhoneNumber,
+} from "@/lib/validators";
 
 interface UserFormProps {
   userId?: number;
@@ -99,30 +103,6 @@ function isPrivateAccessForcedRole(role: UserRole): boolean {
   );
 }
 
-function validatePasswordPolicy(password: string): string | null {
-  if (password.length < 12) {
-    return "Le mot de passe doit contenir au moins 12 caractères.";
-  }
-
-  if (!/[a-z]/.test(password)) {
-    return "Le mot de passe doit contenir une minuscule.";
-  }
-
-  if (!/[A-Z]/.test(password)) {
-    return "Le mot de passe doit contenir une majuscule.";
-  }
-
-  if (!/\d/.test(password)) {
-    return "Le mot de passe doit contenir un chiffre.";
-  }
-
-  if (!/[^\w\s]/.test(password)) {
-    return "Le mot de passe doit contenir un symbole.";
-  }
-
-  return null;
-}
-
 function toFormValues(user?: User): UserFormValues {
   if (!user) {
     return emptyValues;
@@ -162,6 +142,8 @@ export function UserForm({
     initialActorRole ?? null,
   );
   const [errors, setErrors] = useState<string[]>([]);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [invitationDialogOpen, setInvitationDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -269,6 +251,7 @@ export function UserForm({
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setErrors([]);
+    setSuccessMessage(null);
 
     if (isAdminBlockedOnTarget) {
       setErrors([
@@ -278,7 +261,7 @@ export function UserForm({
     }
 
     if (!userId && isAdminActor && isElevatedRole(values.role)) {
-      setErrors(["Un admin ne peut pas creer un admin ou super admin."]);
+      setErrors(["Un admin ne peut pas créer un admin ou super admin."]);
       return;
     }
 
@@ -293,15 +276,23 @@ export function UserForm({
     const clientErrors: string[] = [];
 
     if (!values.firstname.trim()) {
-      clientErrors.push("Prenom : ce champ ne doit pas etre vide.");
+      clientErrors.push("Prénom : ce champ ne doit pas être vide.");
+    } else if (!isValidName(values.firstname)) {
+      clientErrors.push(
+        "Prénom : ce champ ne peut contenir que des lettres, espaces et tirets.",
+      );
     }
 
     if (!values.lastname.trim()) {
-      clientErrors.push("Nom : ce champ ne doit pas etre vide.");
+      clientErrors.push("Nom : ce champ ne doit pas être vide.");
+    } else if (!isValidName(values.lastname)) {
+      clientErrors.push(
+        "Nom : ce champ ne peut contenir que des lettres, espaces et tirets.",
+      );
     }
 
     if (!values.email.trim()) {
-      clientErrors.push("Email : ce champ ne doit pas etre vide.");
+      clientErrors.push("Email : ce champ ne doit pas être vide.");
     } else if (!isValidEmail(values.email.trim())) {
       clientErrors.push(
         "Email : cette valeur n'est pas une adresse email valide.",
@@ -310,51 +301,91 @@ export function UserForm({
 
     if (!userId) {
       if (!values.password.trim()) {
-        clientErrors.push("Mot de passe : ce champ ne doit pas etre vide.");
+        clientErrors.push("Mot de passe : ce champ ne doit pas être vide.");
       } else {
-        const passwordPolicyError = validatePasswordPolicy(values.password);
-        if (passwordPolicyError) {
-          clientErrors.push(`Mot de passe : ${passwordPolicyError}`);
+        const passwordPolicyErrors = validatePasswordPolicy(values.password);
+        if (passwordPolicyErrors.length > 0) {
+          clientErrors.push(
+            ...passwordPolicyErrors.map(
+              (message) => `Mot de passe : ${message}`,
+            ),
+          );
         }
       }
     } else if (values.password.trim()) {
-      const passwordPolicyError = validatePasswordPolicy(values.password);
-      if (passwordPolicyError) {
-        clientErrors.push(`Mot de passe : ${passwordPolicyError}`);
+      const passwordPolicyErrors = validatePasswordPolicy(values.password);
+      if (passwordPolicyErrors.length > 0) {
+        clientErrors.push(
+          ...passwordPolicyErrors.map((message) => `Mot de passe : ${message}`),
+        );
       }
     }
 
     if (!values.dateOfBirth.trim()) {
-      clientErrors.push("Date de naissance : ce champ ne doit pas etre vide.");
+      clientErrors.push("Date de naissance : ce champ ne doit pas être vide.");
     } else if (Number.isNaN(new Date(values.dateOfBirth).getTime())) {
       clientErrors.push("Date de naissance : cette date n'est pas valide.");
     }
 
     if (values.phone.trim() && !isValidPhoneNumber(values.phone.trim())) {
-      clientErrors.push("Telephone : le numero de telephone n'est pas valide.");
+      clientErrors.push("Téléphone : le numéro de téléphone n'est pas valide.");
     }
 
-    if (isMinor && !hasCompleteEmergencyContact(emergencyContactFields)) {
+    const emergencyFields = {
+      lastname: values.emergencyLastname.trim(),
+      firstname: values.emergencyFirstname.trim(),
+      email: values.emergencyEmail.trim(),
+      phone: values.emergencyPhone.trim(),
+    };
+    const hasAnyEmergencyField = Object.values(emergencyFields).some(
+      (field) => field !== "",
+    );
+    const allEmergencyFieldsFilled = Object.values(emergencyFields).every(
+      (field) => field !== "",
+    );
+
+    // Emergency contact is mandatory for minors, and all-or-nothing for adults
+    if ((isMinor || hasAnyEmergencyField) && !allEmergencyFieldsFilled) {
+      if (!emergencyFields.lastname) {
+        clientErrors.push("Nom du contact : ce champ ne doit pas être vide.");
+      }
+      if (!emergencyFields.firstname) {
+        clientErrors.push(
+          "Prénom du contact : ce champ ne doit pas être vide.",
+        );
+      }
+      if (!emergencyFields.email) {
+        clientErrors.push("Email du contact : ce champ ne doit pas être vide.");
+      }
+      if (!emergencyFields.phone) {
+        clientErrors.push(
+          "Téléphone du contact : ce champ ne doit pas être vide.",
+        );
+      }
+    }
+
+    // Any filled field must respect the same format rules, even if others are still missing
+    if (emergencyFields.lastname && !isValidName(emergencyFields.lastname)) {
       clientErrors.push(
-        "Contact d'urgence : doit contenir nom, prenom, email et telephone pour un mineur.",
+        "Nom du contact : ce champ ne peut contenir que des lettres, espaces et tirets.",
       );
     }
 
-    if (
-      values.emergencyEmail.trim() &&
-      !isValidEmail(values.emergencyEmail.trim())
-    ) {
+    if (emergencyFields.firstname && !isValidName(emergencyFields.firstname)) {
+      clientErrors.push(
+        "Prénom du contact : ce champ ne peut contenir que des lettres, espaces et tirets.",
+      );
+    }
+
+    if (emergencyFields.email && !isValidEmail(emergencyFields.email)) {
       clientErrors.push(
         "Email du contact : cette valeur n'est pas une adresse email valide.",
       );
     }
 
-    if (
-      values.emergencyPhone.trim() &&
-      !isValidPhoneNumber(values.emergencyPhone.trim())
-    ) {
+    if (emergencyFields.phone && !isValidPhoneNumber(emergencyFields.phone)) {
       clientErrors.push(
-        "Telephone du contact : le numero de telephone n'est pas valide.",
+        "Téléphone du contact : le numero de téléphone n'est pas valide.",
       );
     }
 
@@ -384,7 +415,10 @@ export function UserForm({
         }
 
         const updated = await updateUser(userId, payload);
-        router.push(`/admin/users/${updated.id}`);
+        const emailChangeRequested = updated.email !== values.email;
+        router.push(
+          `/admin/users/${updated.id}${emailChangeRequested ? "?emailChangeRequested=1" : ""}`,
+        );
       } else {
         const payload: CreateUserPayload = {
           lastname: values.lastname,
@@ -399,11 +433,14 @@ export function UserForm({
           canSeePrivate: isPrivateAccessLocked ? true : values.canSeePrivate,
         };
 
-        const created = await createUser(payload);
-        router.push(`/admin/users/${created.id}`);
+        const message = await createUser(payload);
+        setSuccessMessage(message);
+        setInvitationDialogOpen(true);
       }
 
-      router.refresh();
+      if (userId) {
+        router.refresh();
+      }
     } catch (err) {
       if (err instanceof ProfileValidationError) {
         setErrors(err.messages);
@@ -477,7 +514,6 @@ export function UserForm({
                 </ul>
               </div>
             ) : null}
-
             {isAdminBlockedOnTarget ? (
               <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
                 Un admin peut modifier ou supprimer uniquement les organisateurs
@@ -488,7 +524,7 @@ export function UserForm({
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <div className="flex items-center gap-1">
-                  <Label htmlFor="firstname">Prenom</Label>
+                  <Label htmlFor="firstname">Prénom</Label>
                   <span className="text-sm text-destructive" aria-hidden="true">
                     *
                   </span>
@@ -528,6 +564,7 @@ export function UserForm({
                 </div>
                 <Input
                   id="email"
+                  placeholder="exemple@exemple.com"
                   type="email"
                   value={values.email}
                   onChange={(event) =>
@@ -586,9 +623,10 @@ export function UserForm({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="phone">Telephone</Label>
+                <Label htmlFor="phone">Téléphone</Label>
                 <Input
                   id="phone"
+                  placeholder="0600000000"
                   value={values.phone}
                   onChange={(event) =>
                     setValues({ ...values, phone: event.target.value })
@@ -601,7 +639,7 @@ export function UserForm({
               <div>
                 <Label>Contact d'urgence</Label>
                 <p className="text-xs text-muted-foreground">
-                  Renseigner nom, prenom, email et telephone.
+                  Renseigner nom, prénom, email et téléphone.
                   {isMinor
                     ? " Obligatoire pour un mineur."
                     : " Optionnel pour un majeur."}
@@ -636,7 +674,7 @@ export function UserForm({
                 <div className="space-y-2">
                   <div className="flex items-center gap-1">
                     <Label htmlFor="emergencyFirstname">
-                      Prenom du contact
+                      Prénom du contact
                     </Label>
                     {isMinor ? (
                       <span
@@ -673,6 +711,7 @@ export function UserForm({
                   </div>
                   <Input
                     id="emergencyEmail"
+                    placeholder="exemple@exemple.com"
                     type="email"
                     value={values.emergencyEmail}
                     onChange={(event) =>
@@ -686,7 +725,7 @@ export function UserForm({
 
                 <div className="space-y-2">
                   <div className="flex items-center gap-1">
-                    <Label htmlFor="emergencyPhone">Telephone du contact</Label>
+                    <Label htmlFor="emergencyPhone">Téléphone du contact</Label>
                     {isMinor ? (
                       <span
                         className="text-sm text-destructive"
@@ -698,6 +737,7 @@ export function UserForm({
                   </div>
                   <Input
                     id="emergencyPhone"
+                    placeholder="0600000000"
                     value={values.emergencyPhone}
                     onChange={(event) =>
                       setValues({
@@ -855,6 +895,31 @@ export function UserForm({
           </form>
         )}
       </CardContent>
+
+      <Dialog
+        open={invitationDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            router.push("/admin/users");
+          }
+          setInvitationDialogOpen(open);
+        }}
+      >
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>E-mail de confirmation envoyé</DialogTitle>
+            <DialogDescription>
+              {successMessage ??
+                "Un e-mail de confirmation a été envoyé à l’utilisateur. Le compte sera créé après validation de son adresse e-mail."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" onClick={() => router.push("/admin/users")}>
+              Retour aux utilisateurs
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

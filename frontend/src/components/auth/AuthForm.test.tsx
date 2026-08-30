@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import AuthForm from "./AuthForm";
-import { login, registerUser } from "@/lib/auth";
+import { isEmailAvailable, login, registerUser } from "@/lib/auth";
 import { getCurrentUser } from "@/lib/user-api";
 
 const push = jest.fn();
@@ -24,6 +24,7 @@ jest.mock("@/lib/auth", () => {
     ...actual,
     login: jest.fn(),
     registerUser: jest.fn(),
+    isEmailAvailable: jest.fn().mockResolvedValue(true),
   };
 });
 
@@ -60,6 +61,13 @@ describe("AuthForm", () => {
       "0600000000",
     );
     await user.click(screen.getByRole("button", { name: "Créer un compte" }));
+    expect(registerUser).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("dialog", { name: "Valider votre adresse e-mail" }),
+    ).toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", { name: "Recevoir le lien de validation" }),
+    );
 
     await waitFor(() => {
       expect(registerUser).toHaveBeenCalledWith({
@@ -78,6 +86,50 @@ describe("AuthForm", () => {
         phone: undefined,
       });
     });
+  });
+
+  it("blocks registration before showing the confirmation dialog when the email is already taken", async () => {
+    const user = userEvent.setup();
+    (isEmailAvailable as jest.Mock).mockResolvedValueOnce(false);
+
+    render(<AuthForm mode="register" />);
+
+    await user.type(screen.getByLabelText("Nom"), "Martin");
+    await user.type(screen.getByLabelText("Prénom"), "Alex");
+    await user.type(screen.getByLabelText("Email"), "test@test.test");
+    await user.type(screen.getByLabelText("Mot de passe"), "Password1234!");
+    await user.type(screen.getByLabelText("Confirmer"), "Password1234!");
+    await user.type(screen.getByLabelText("Date de naissance"), "1992-01-01");
+    await user.click(screen.getByRole("button", { name: "Créer un compte" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getAllByText("Un compte avec cet email existe déjà.").length,
+      ).toBeGreaterThan(0);
+    });
+
+    expect(
+      screen.queryByRole("dialog", { name: "Valider votre adresse e-mail" }),
+    ).not.toBeInTheDocument();
+    expect(registerUser).not.toHaveBeenCalled();
+  });
+
+  it("does not create an account when registration is cancelled", async () => {
+    const user = userEvent.setup();
+
+    render(<AuthForm mode="register" />);
+
+    await user.type(screen.getByLabelText("Nom"), "Martin");
+    await user.type(screen.getByLabelText("Prénom"), "Alex");
+    await user.type(screen.getByLabelText("Email"), "alex@example.com");
+    await user.type(screen.getByLabelText("Mot de passe"), "Password1234!");
+    await user.type(screen.getByLabelText("Confirmer"), "Password1234!");
+    await user.type(screen.getByLabelText("Date de naissance"), "1992-01-01");
+    await user.click(screen.getByRole("button", { name: "Créer un compte" }));
+    await user.click(screen.getByRole("button", { name: "Annuler" }));
+
+    expect(registerUser).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("prefills email in login mode from query string", async () => {

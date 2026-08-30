@@ -65,7 +65,7 @@ describe("ProfilePage", () => {
     expect(screen.getByText("Alex")).toBeInTheDocument();
     expect(screen.getByText("Martin")).toBeInTheDocument();
     expect(screen.getByText("alex@example.com")).toBeInTheDocument();
-    expect(screen.getByText("Téléphone")).toBeInTheDocument();
+    expect(screen.getAllByText("Téléphone")).toHaveLength(2);
     expect(screen.getByText("Contact d'urgence")).toBeInTheDocument();
     expect(
       screen.getByText("Aucun contact d'urgence enregistré."),
@@ -213,13 +213,13 @@ describe("ProfilePage", () => {
     fireEvent.change(dialogScope.getByLabelText("Nom"), {
       target: { value: "Durand" },
     });
-    fireEvent.change(dialogScope.getByLabelText("Prenom"), {
+    fireEvent.change(dialogScope.getByLabelText("Prénom"), {
       target: { value: "Paul" },
     });
     fireEvent.change(dialogScope.getByLabelText("Email"), {
       target: { value: "paul@example.com" },
     });
-    fireEvent.change(dialogScope.getByLabelText("Telephone"), {
+    fireEvent.change(dialogScope.getByLabelText("Téléphone"), {
       target: { value: "0600000000" },
     });
     fireEvent.click(dialogScope.getByRole("button", { name: "Enregistrer" }));
@@ -316,13 +316,13 @@ describe("ProfilePage", () => {
     fireEvent.change(dialogScope.getByLabelText("Nom"), {
       target: { value: "" },
     });
-    fireEvent.change(dialogScope.getByLabelText("Prenom"), {
+    fireEvent.change(dialogScope.getByLabelText("Prénom"), {
       target: { value: "" },
     });
     fireEvent.change(dialogScope.getByLabelText("Email"), {
       target: { value: "" },
     });
-    fireEvent.change(dialogScope.getByLabelText("Telephone"), {
+    fireEvent.change(dialogScope.getByLabelText("Téléphone"), {
       target: { value: "" },
     });
     fireEvent.click(dialogScope.getByRole("button", { name: "Enregistrer" }));

@@ -7,11 +7,17 @@ use ApiPlatform\State\ProcessorInterface;
 use ApiPlatform\Validator\Exception\ValidationException;
 use App\Dto\MeEmailUpdateInput;
 use App\Dto\MeUpdateOutput;
+use App\Entity\EmailVerificationToken;
 use App\Entity\User;
+use App\Repository\UserRepository;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\Mailer\MailerInterface;
+use Symfony\Component\Mime\Email;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Validator\ConstraintViolation;
 use Symfony\Component\Validator\ConstraintViolationList;
@@ -26,6 +32,14 @@ class MeEmailUpdateProcessor implements ProcessorInterface
         private UserPasswordHasherInterface $passwordHasher,
         private JWTTokenManagerInterface $jwtManager,
         private Security $security,
+        private UserRepository $userRepository,
+        private MailerInterface $mailer,
+        #[Autowire('%env(MAILER_FROM)%')]
+        private string $mailerFrom,
+        #[Autowire('%env(FRONTEND_URL)%')]
+        private string $frontendUrl,
+        #[Autowire(service: 'monolog.logger.security')]
+        private LoggerInterface $logger,
     ) {
     }
 
@@ -80,14 +94,37 @@ class MeEmailUpdateProcessor implements ProcessorInterface
             ]));
         }
 
-        $targetUser->setEmail($data->email);
+        $newEmail = trim($data->email);
+        if ($targetUser->getEmail() === $newEmail) {
+            throw new ValidationException(new ConstraintViolationList([
+                new ConstraintViolation('La nouvelle adresse e-mail doit être différente.', null, [], null, 'email', $data->email),
+            ]));
+        }
+
+        $existingUser = $this->userRepository->findOneBy(['email' => $newEmail]);
+        if ($existingUser instanceof User && $existingUser !== $targetUser) {
+            throw new ValidationException(new ConstraintViolationList([
+                new ConstraintViolation('Un compte avec cet email existe déjà.', null, [], null, 'email', $data->email),
+            ]));
+        }
 
         try {
+            $this->entityManager->createQuery('DELETE FROM App\\Entity\\EmailVerificationToken token WHERE token.user = :user AND token.pendingEmail IS NOT NULL')
+                ->setParameter('user', $targetUser)
+                ->execute();
+
+            $plainToken = bin2hex(random_bytes(32));
+            $this->entityManager->persist(new EmailVerificationToken(
+                $targetUser,
+                hash('sha256', $plainToken),
+                new \DateTimeImmutable('+24 hours'),
+                $newEmail,
+            ));
             $this->entityManager->flush();
         } catch (UniqueConstraintViolationException) {
             throw new ValidationException(new ConstraintViolationList([
                 new ConstraintViolation(
-                    'Un compte avec cet email existe deja.',
+                    'Un compte avec cet email existe déjà.',
                     null,
                     [],
                     null,
@@ -95,6 +132,23 @@ class MeEmailUpdateProcessor implements ProcessorInterface
                     $data->email,
                 ),
             ]));
+        }
+
+        $url = sprintf('%s/auth/validation-email?token=%s', rtrim($this->frontendUrl, '/'), rawurlencode($plainToken));
+        try {
+            $this->mailer->send(
+                (new Email())
+                    ->from($this->mailerFrom)
+                    ->to($newEmail)
+                    ->subject('Validez votre nouvelle adresse e-mail')
+                    ->text(sprintf("Bonjour %s,\n\nPour confirmer votre nouvelle adresse e-mail, ouvrez ce lien :\n%s\n\nCe lien expire dans 24 heures.", $targetUser->getFirstname(), $url))
+                    ->html(sprintf('<p>Bonjour %s,</p><p>Pour confirmer votre nouvelle adresse e-mail, <a href="%s">validez votre adresse e-mail</a>.</p><p>Ce lien expire dans 24 heures.</p>', htmlspecialchars($targetUser->getFirstname(), ENT_QUOTES), htmlspecialchars($url, ENT_QUOTES))),
+            );
+        } catch (\Throwable $exception) {
+            $this->logger->error('Email change verification delivery failed.', [
+                'event_id'  => 'SEC.AUTH.EMAIL_CHANGE_VERIFICATION_FAILED',
+                'exception' => $exception,
+            ]);
         }
 
         return new MeUpdateOutput($targetUser, $this->jwtManager->create($targetUser));

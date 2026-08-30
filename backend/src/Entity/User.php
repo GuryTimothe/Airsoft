@@ -11,6 +11,7 @@ use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
+use App\Dto\AdminUserInvitationOutput;
 use App\Dto\MeEmailUpdateInput;
 use App\Dto\MePasswordUpdateInput;
 use App\Dto\MeUpdateOutput;
@@ -93,6 +94,9 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
             processor: UserCreateProcessor::class,
             denormalizationContext: ['groups' => ['user:write', 'user:create']],
             validationContext: ['groups' => ['user:create']],
+            normalizationContext: ['groups' => ['admin:user:invitation:read']],
+            output: AdminUserInvitationOutput::class,
+            status: 202,
         ),
         new Post(
             uriTemplate: '/register',
@@ -139,20 +143,52 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['user:read', 'user:write', 'user:self:email:write', 'user:me:read'])]
     private string $email;
 
+    #[ORM\Column(options: ['default' => true])]
+    #[Groups(['user:read', 'user:me:read'])]
+    private bool $emailVerified = true;
+
     #[ORM\Column(length: 255)]
     #[Assert\NotBlank]
-    #[Assert\Length(
-        min: 12,
-        minMessage: 'Le mot de passe doit contenir au moins 12 caractères.',
-        groups: ['user:create']
-    )]
-    #[Assert\Regex(
-        pattern: '/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\w\s]).+$/',
-        message: 'Le mot de passe doit contenir une majuscule, une minuscule, un chiffre et un symbole.',
-        groups: ['user:create']
-    )]
     #[Groups(['user:write'])]
     private string $password;
+
+    #[Assert\Callback(groups: ['user:create'])]
+    public function validatePasswordPolicy(ExecutionContextInterface $context): void
+    {
+        if ('' === trim($this->password)) {
+            return;
+        }
+
+        if (\strlen($this->password) < 12) {
+            $context->buildViolation('Le mot de passe doit contenir au moins 12 caractères.')
+                ->atPath('password')
+                ->addViolation();
+        }
+
+        if (!preg_match('/[a-z]/', $this->password)) {
+            $context->buildViolation('Le mot de passe doit contenir au moins une minuscule.')
+                ->atPath('password')
+                ->addViolation();
+        }
+
+        if (!preg_match('/[A-Z]/', $this->password)) {
+            $context->buildViolation('Le mot de passe doit contenir au moins une majuscule.')
+                ->atPath('password')
+                ->addViolation();
+        }
+
+        if (!preg_match('/\d/', $this->password)) {
+            $context->buildViolation('Le mot de passe doit contenir au moins un chiffre.')
+                ->atPath('password')
+                ->addViolation();
+        }
+
+        if (!preg_match('/[^\w\s]/', $this->password)) {
+            $context->buildViolation('Le mot de passe doit contenir au moins un symbole.')
+                ->atPath('password')
+                ->addViolation();
+        }
+    }
 
     #[ORM\Column(type: 'date')]
     #[Assert\NotNull(groups: ['user:create', 'user:admin:update', 'user:self:general'])]
@@ -249,6 +285,18 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setEmail(string $email): self
     {
         $this->email = $email;
+
+        return $this;
+    }
+
+    public function isEmailVerified(): bool
+    {
+        return $this->emailVerified;
+    }
+
+    public function setEmailVerified(bool $emailVerified): self
+    {
+        $this->emailVerified = $emailVerified;
 
         return $this;
     }

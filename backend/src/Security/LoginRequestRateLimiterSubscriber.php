@@ -32,11 +32,22 @@ final class LoginRequestRateLimiterSubscriber implements EventSubscriberInterfac
         }
 
         $request = $event->getRequest();
+        $path    = $request->getPathInfo();
+
+        if ('/api/register/check-email' === $path && $request->isMethod('GET')) {
+            $this->consumeOrReject(
+                event: $event,
+                limiter: $this->registerRequestLimiter,
+                message: 'Too many requests. Please try again in 5 minutes.'
+            );
+
+            return;
+        }
+
         if (!$request->isMethod('POST')) {
             return;
         }
 
-        $path = $request->getPathInfo();
         if ('/api/login' === $path) {
             $this->consumeOrReject(
                 event: $event,

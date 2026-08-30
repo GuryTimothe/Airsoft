@@ -6,14 +6,22 @@ use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
 use ApiPlatform\Validator\Exception\ValidationException;
 use App\Dto\RegisterInput;
+use App\Entity\EmailVerificationToken;
 use App\Entity\EmergencyContact;
 use App\Entity\User;
+use App\Repository\UserRepository;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
+use Symfony\Component\Mailer\MailerInterface;
+use Symfony\Component\Mime\Email;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Serializer\Normalizer\DenormalizerInterface;
+use Symfony\Component\Validator\ConstraintViolation;
+use Symfony\Component\Validator\ConstraintViolationList;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 /**
@@ -26,8 +34,18 @@ class RegisterProcessor implements ProcessorInterface
         private UserPasswordHasherInterface $passwordHasher,
         private ValidatorInterface $validator,
         private DenormalizerInterface $denormalizer,
+        private ?UserRepository $userRepository = null,
+        private ?MailerInterface $mailer = null,
+        #[Autowire('%env(MAILER_FROM)%')]
+        private string $mailerFrom = '',
+        #[Autowire('%env(FRONTEND_URL)%')]
+        private string $frontendUrl = '',
+        ?LoggerInterface $logger = null,
     ) {
+        $this->logger = $logger;
     }
+
+    private ?LoggerInterface $logger;
 
     public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): mixed
     {
@@ -46,6 +64,7 @@ class RegisterProcessor implements ProcessorInterface
 
         $user = new User();
         $user->setEmail($input->email);
+        $user->setEmailVerified(false);
         $user->setLastname($input->lastname);
         $user->setFirstname($input->firstname);
         $user->setRole('ROLE_USER');
@@ -71,13 +90,66 @@ class RegisterProcessor implements ProcessorInterface
         $user->setPassword($hashedPassword);
 
         try {
+            $this->replaceUnverifiedAccount($user->getEmail());
             $this->entityManager->persist($user);
+            $plainToken = null;
+            if (null !== $this->mailer) {
+                $plainToken = bin2hex(random_bytes(32));
+                $this->entityManager->persist(new EmailVerificationToken(
+                    $user,
+                    hash('sha256', $plainToken),
+                    new \DateTimeImmutable('+24 hours'),
+                ));
+            }
             $this->entityManager->flush();
+
+            if (null !== $plainToken) {
+                $url = sprintf('%s/auth/validation-email?token=%s', rtrim($this->frontendUrl, '/'), rawurlencode($plainToken));
+                try {
+                    $this->mailer->send(
+                        (new Email())
+                            ->from($this->mailerFrom)
+                            ->to($user->getEmail())
+                            ->subject('Validez votre adresse e-mail')
+                            ->text(sprintf("Bonjour %s,\n\nValidez votre adresse e-mail en ouvrant ce lien :\n%s\n\nCe lien expire dans 24 heures.", $user->getFirstname(), $url))
+                            ->html(sprintf('<p>Bonjour %s,</p><p><a href="%s">Valider mon adresse e-mail</a></p><p>Ce lien expire dans 24 heures.</p>', htmlspecialchars($user->getFirstname(), ENT_QUOTES), htmlspecialchars($url, ENT_QUOTES))),
+                    );
+                } catch (\Throwable $exception) {
+                    $this->logger?->error('Registration verification email delivery failed.', [
+                        'event_id'  => 'SEC.AUTH.EMAIL_VERIFICATION_FAILED',
+                        'exception' => $exception,
+                    ]);
+                }
+            }
         } catch (UniqueConstraintViolationException) {
             throw new ConflictHttpException('Identifiants invalides.');
         }
 
         return $user;
+    }
+
+    private function replaceUnverifiedAccount(string $email): void
+    {
+        $existingUser = $this->userRepository?->findOneBy(['email' => $email]);
+        if (!$existingUser instanceof User) {
+            return;
+        }
+
+        if ($existingUser->isEmailVerified()) {
+            throw new ValidationException(new ConstraintViolationList([
+                new ConstraintViolation(
+                    'Un compte avec cet email existe déjà.',
+                    null,
+                    [],
+                    null,
+                    'email',
+                    $email,
+                ),
+            ]));
+        }
+
+        $this->entityManager->remove($existingUser);
+        $this->entityManager->flush();
     }
 
     /**

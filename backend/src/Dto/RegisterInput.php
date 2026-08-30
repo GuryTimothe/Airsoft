@@ -30,12 +30,45 @@ class RegisterInput
     #[ApiProperty]
     #[Groups(['user:write'])]
     #[Assert\NotBlank(message: 'Le mot de passe est requis.')]
-    #[Assert\Length(min: 12, max: 255, minMessage: 'Le mot de passe doit contenir au moins 12 caractères.')]
-    #[Assert\Regex(
-        pattern: '/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\w\s]).+$/',
-        message: 'Le mot de passe doit contenir une majuscule, une minuscule, un chiffre et un symbole.'
-    )]
     public ?string $password = null;
+
+    #[Assert\Callback]
+    public function validatePasswordPolicy(ExecutionContextInterface $context): void
+    {
+        if (!\is_string($this->password) || '' === trim($this->password)) {
+            return;
+        }
+
+        if (\strlen($this->password) < 12) {
+            $context->buildViolation('Le mot de passe doit contenir au moins 12 caractères.')
+                ->atPath('password')
+                ->addViolation();
+        }
+
+        if (!preg_match('/[a-z]/', $this->password)) {
+            $context->buildViolation('Le mot de passe doit contenir au moins une minuscule.')
+                ->atPath('password')
+                ->addViolation();
+        }
+
+        if (!preg_match('/[A-Z]/', $this->password)) {
+            $context->buildViolation('Le mot de passe doit contenir au moins une majuscule.')
+                ->atPath('password')
+                ->addViolation();
+        }
+
+        if (!preg_match('/\d/', $this->password)) {
+            $context->buildViolation('Le mot de passe doit contenir au moins un chiffre.')
+                ->atPath('password')
+                ->addViolation();
+        }
+
+        if (!preg_match('/[^\w\s]/', $this->password)) {
+            $context->buildViolation('Le mot de passe doit contenir au moins un symbole.')
+                ->atPath('password')
+                ->addViolation();
+        }
+    }
 
     #[ApiProperty]
     #[Groups(['user:write'])]

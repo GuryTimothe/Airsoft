@@ -299,6 +299,34 @@ export async function login(payload: LoginInput): Promise<string> {
   return "";
 }
 
+export class RegisterValidationError extends Error {
+  field?: string;
+
+  constructor(message: string, field?: string) {
+    super(message);
+    this.name = "RegisterValidationError";
+    this.field = field;
+  }
+}
+
+export async function isEmailAvailable(email: string): Promise<boolean> {
+  const response = await fetch(
+    buildUrl(`/api/register/check-email?email=${encodeURIComponent(email)}`),
+    { method: "GET" },
+  );
+
+  if (!response.ok) {
+    // Fail open: let the actual registration call surface the real error.
+    return true;
+  }
+
+  const data = (await response.json().catch(() => null)) as {
+    available?: unknown;
+  } | null;
+
+  return data?.available !== false;
+}
+
 export async function registerUser(payload: RegisterPayload): Promise<void> {
   const response = await fetch(buildUrl("/api/register"), {
     method: "POST",
@@ -316,6 +344,27 @@ export async function registerUser(payload: RegisterPayload): Promise<void> {
   }
 
   if (!response.ok) {
+    const violations =
+      typeof data === "object" && data !== null
+        ? (data as { violations?: unknown }).violations
+        : null;
+
+    if (Array.isArray(violations) && violations.length > 0) {
+      const firstViolation = violations[0] as {
+        propertyPath?: unknown;
+        message?: unknown;
+      };
+
+      if (typeof firstViolation.message === "string") {
+        throw new RegisterValidationError(
+          firstViolation.message,
+          typeof firstViolation.propertyPath === "string"
+            ? firstViolation.propertyPath
+            : undefined,
+        );
+      }
+    }
+
     const errorMessage =
       typeof data === "object" &&
       data !== null &&
@@ -325,4 +374,97 @@ export async function registerUser(payload: RegisterPayload): Promise<void> {
 
     throw new Error(errorMessage);
   }
+}
+
+export async function requestPasswordReset(
+  email: string,
+  renewSession = false,
+): Promise<string> {
+  let headers: HeadersInit = { "Content-Type": "application/json" };
+  if (renewSession) {
+    headers = await withCsrfHeaders(headers);
+  }
+
+  const response = await fetch(
+    buildUrl(
+      renewSession
+        ? "/api/me/password-reset/request"
+        : "/api/password-reset/request",
+    ),
+    {
+      method: "POST",
+      credentials: "include",
+      headers,
+      body: JSON.stringify({ email }),
+    },
+  );
+
+  const data = (await response.json().catch(() => null)) as {
+    message?: unknown;
+    token?: unknown;
+  } | null;
+
+  if (!response.ok) {
+    throw new Error("Impossible d'envoyer la demande de réinitialisation.");
+  }
+
+  return typeof data?.message === "string"
+    ? data.message
+    : "Si un compte correspond a cette adresse, un e-mail de réinitialisation vient d'être envoyé.";
+}
+
+export async function resetPassword(
+  token: string,
+  password: string,
+): Promise<boolean> {
+  const response = await fetch(buildUrl("/api/password-reset/confirm"), {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, password }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseApiErrorMessage(response));
+  }
+
+  const data = (await response.json().catch(() => null)) as {
+    token?: unknown;
+  } | null;
+  const sessionRenewed = typeof data?.token === "string" && data.token !== "";
+  if (sessionRenewed) {
+    setAuthToken("");
+  }
+
+  return sessionRenewed;
+}
+
+export async function confirmEmailVerification(token: string): Promise<string> {
+  const response = await fetch(buildUrl("/api/email-verification/confirm"), {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token }),
+  });
+
+  const data = (await response.json().catch(() => null)) as {
+    message?: unknown;
+    token?: unknown;
+  } | null;
+
+  if (!response.ok) {
+    throw new Error(
+      typeof data?.message === "string"
+        ? data.message
+        : "Impossible de valider cette adresse e-mail.",
+    );
+  }
+
+  if (typeof data?.token === "string" && data.token) {
+    setAuthToken("");
+  }
+
+  return typeof data?.message === "string"
+    ? data.message
+    : "Votre adresse e-mail est validée.";
 }

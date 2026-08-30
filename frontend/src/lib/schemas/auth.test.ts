@@ -1,4 +1,5 @@
 import { describe, it, expect } from "@jest/globals";
+import { getPasswordPolicyErrors } from "@/lib/password-policy";
 import { loginSchema, registerSchema, guardianSchema } from "./auth";
 
 describe("loginSchema", () => {
@@ -77,6 +78,21 @@ describe("registerSchema", () => {
     expect(result.success).toBe(false);
   });
 
+  it("returns all password policy violations at once", () => {
+    const messages = getPasswordPolicyErrors("aaaaaaaaaaaa");
+
+    expect(messages).toEqual(
+      expect.arrayContaining([
+        "Le mot de passe doit contenir au moins une majuscule.",
+        "Le mot de passe doit contenir au moins un chiffre.",
+        "Le mot de passe doit contenir au moins un symbole.",
+      ]),
+    );
+    expect(messages).not.toContain(
+      "Le mot de passe doit contenir au moins une minuscule.",
+    );
+  });
+
   it("rejects short firstname", () => {
     const result = registerSchema.safeParse({ ...validAdult, firstname: "A" });
     expect(result.success).toBe(false);
@@ -126,6 +142,34 @@ describe("registerSchema", () => {
     });
     expect(result.success).toBe(true);
   });
+
+  it("rejects malformed phone number", () => {
+    const result = registerSchema.safeParse({
+      ...validAdult,
+      phone: "0070000000",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const paths = result.error.issues.map((i) => i.path.join("."));
+      expect(paths).toContain("phone");
+    }
+  });
+
+  it("rejects minor with malformed guardian phone", () => {
+    const result = registerSchema.safeParse({
+      ...validAdult,
+      dateOfBirth: "2015-06-01",
+      guardianLastname: "Martin",
+      guardianFirstname: "Paul",
+      guardianEmail: "paul@example.com",
+      guardianPhone: "007",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const paths = result.error.issues.map((i) => i.path.join("."));
+      expect(paths).toContain("guardianPhone");
+    }
+  });
 });
 
 describe("guardianSchema", () => {
@@ -133,7 +177,7 @@ describe("guardianSchema", () => {
     guardianLastname: "Martin",
     guardianFirstname: "Paul",
     guardianEmail: "paul@example.com",
-    guardianPhone: "0612",
+    guardianPhone: "0612345678",
     guardianConsent: true,
   };
 
@@ -164,6 +208,14 @@ describe("guardianSchema", () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it("rejects malformed guardian phone", () => {
+    const result = guardianSchema.safeParse({
+      ...validGuardian,
+      guardianPhone: "007",
+    });
+    expect(result.success).toBe(false);
+  });
 });
 
 describe("Age calculation edge cases", () => {
@@ -188,7 +240,7 @@ describe("Age calculation edge cases", () => {
       guardianLastname: "Parent",
       guardianFirstname: "John",
       guardianEmail: "parent@example.com",
-      guardianPhone: "0612",
+      guardianPhone: "0612345678",
     });
     expect(result.success).toBe(true);
   });
@@ -235,5 +287,103 @@ describe("Age calculation edge cases", () => {
       dateOfBirth: adultsAgo.toISOString().split("T")[0],
     });
     expect(result.success).toBe(true);
+  });
+
+  it("rejects adult with partial guardian info (all-or-nothing)", () => {
+    const today = new Date();
+    const adultsAgo = new Date(
+      today.getFullYear() - 25,
+      today.getMonth(),
+      today.getDate(),
+    );
+    const result = registerSchema.safeParse({
+      ...baseAdult,
+      dateOfBirth: adultsAgo.toISOString().split("T")[0],
+      guardianLastname: "Parent",
+      guardianFirstname: "",
+      guardianEmail: "",
+      guardianPhone: "",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const paths = result.error.issues.map((i) => i.path.join("."));
+      expect(paths).toContain("guardianFirstname");
+      expect(paths).toContain("guardianEmail");
+      expect(paths).toContain("guardianPhone");
+    }
+  });
+
+  it("accepts adult with complete valid guardian info", () => {
+    const today = new Date();
+    const adultsAgo = new Date(
+      today.getFullYear() - 25,
+      today.getMonth(),
+      today.getDate(),
+    );
+    const result = registerSchema.safeParse({
+      ...baseAdult,
+      dateOfBirth: adultsAgo.toISOString().split("T")[0],
+      guardianLastname: "Parent",
+      guardianFirstname: "John",
+      guardianEmail: "parent@example.com",
+      guardianPhone: "0612345678",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects adult with guardian info but invalid format", () => {
+    const today = new Date();
+    const adultsAgo = new Date(
+      today.getFullYear() - 25,
+      today.getMonth(),
+      today.getDate(),
+    );
+    const result = registerSchema.safeParse({
+      ...baseAdult,
+      dateOfBirth: adultsAgo.toISOString().split("T")[0],
+      guardianLastname: "123", // Invalid (numbers)
+      guardianFirstname: "John",
+      guardianEmail: "invalid-email", // Invalid email
+      guardianPhone: "007", // Invalid phone
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const paths = result.error.issues.map((i) => i.path.join("."));
+      expect(paths.some((p) => p.includes("guardianLastname"))).toBe(true);
+      expect(paths.some((p) => p.includes("guardianEmail"))).toBe(true);
+      expect(paths.some((p) => p.includes("guardianPhone"))).toBe(true);
+    }
+  });
+
+  it("reports format error on a single filled guardian field even when the others are still empty", () => {
+    const today = new Date();
+    const adultsAgo = new Date(
+      today.getFullYear() - 25,
+      today.getMonth(),
+      today.getDate(),
+    );
+    const result = registerSchema.safeParse({
+      ...baseAdult,
+      dateOfBirth: adultsAgo.toISOString().split("T")[0],
+      guardianLastname: "",
+      guardianFirstname: "",
+      guardianEmail: "",
+      guardianPhone: "007", // Invalid phone, only field filled
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const phoneIssues = result.error.issues.filter(
+        (i) => i.path.join(".") === "guardianPhone",
+      );
+      expect(
+        phoneIssues.some(
+          (i) => i.message === "Numéro de téléphone du responsable invalide.",
+        ),
+      ).toBe(true);
+      const paths = result.error.issues.map((i) => i.path.join("."));
+      expect(paths).toContain("guardianLastname");
+      expect(paths).toContain("guardianFirstname");
+      expect(paths).toContain("guardianEmail");
+    }
   });
 });
