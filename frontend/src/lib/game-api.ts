@@ -1,4 +1,4 @@
-import { getAuthHeaders, withCsrfHeaders } from "@/lib/auth";
+import { clearAuthToken, getAuthHeaders, withCsrfHeaders } from "@/lib/auth";
 import { getApiBaseUrl } from "@/lib/api-base-url";
 import { translateViolationMessage } from "@/lib/api-violations";
 
@@ -167,8 +167,12 @@ export async function getGamesPage(page?: number): Promise<GamesResult> {
 
   // If auth cookie/header is stale, retry the public games endpoint without auth.
   if (response.status === 401) {
+    if (typeof window !== "undefined") {
+      clearAuthToken();
+    }
     response = await fetch(url, {
       cache: "no-store",
+      credentials: "omit",
     });
   }
 
@@ -221,11 +225,21 @@ export async function getGames(): Promise<Game[]> {
 
 export async function getGame(id: number): Promise<Game> {
   const headers = await getAuthHeaders();
-  const response = await fetch(buildUrl(`/api/games/${id}`), {
+  let response = await fetch(buildUrl(`/api/games/${id}`), {
     cache: "no-store",
     credentials: "include",
     headers,
   });
+
+  if (response.status === 401) {
+    if (typeof window !== "undefined") {
+      clearAuthToken();
+    }
+    response = await fetch(buildUrl(`/api/games/${id}`), {
+      cache: "no-store",
+      credentials: "omit",
+    });
+  }
 
   if (!response.ok) {
     throw new Error("Impossible de charger la partie");
