@@ -234,17 +234,17 @@ async function parseApiErrorMessage(
 }
 
 const PROFILE_FIELD_LABELS: Record<string, string> = {
-  firstname: "Prenom",
+  firstname: "Prénom",
   lastname: "Nom",
   dateOfBirth: "Date de naissance",
   pseudo: "Pseudo",
-  phone: "Telephone",
+  phone: "Téléphone",
   email: "Email",
   currentPassword: "Mot de passe actuel",
   newPassword: "Nouveau mot de passe",
   password: "Mot de passe",
   emergencyContact: "Contact d'urgence",
-  role: "Role",
+  role: "Rôle",
 };
 
 async function parseProfileErrorMessages(

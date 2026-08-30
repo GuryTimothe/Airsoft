@@ -6,18 +6,15 @@ import { useSearchParams } from "next/navigation";
 import { confirmEmailVerification } from "@/lib/auth";
 import { getCurrentUser } from "@/lib/user-api";
 
+const ADMIN_ROLES = ["ROLE_ADMIN", "ROLE_SUPER_ADMIN", "ROLE_ORGANIZER"];
+
 function EmailVerificationContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-
-  useEffect(() => {
-    getCurrentUser()
-      .then(() => setIsAuthenticated(true))
-      .catch(() => setIsAuthenticated(false));
-  }, []);
+  const [profileHref, setProfileHref] = useState("/profil");
 
   useEffect(() => {
     if (!token) {
@@ -25,8 +22,14 @@ function EmailVerificationContent() {
     }
 
     confirmEmailVerification(token)
-      .then((verificationMessage) => {
+      .then(async (verificationMessage) => {
         setMessage(verificationMessage);
+
+        const currentUser = await getCurrentUser().catch(() => null);
+        setIsAuthenticated(currentUser !== null);
+        if (currentUser && ADMIN_ROLES.includes(currentUser.role)) {
+          setProfileHref("/admin/profil");
+        }
       })
       .catch((verificationError: unknown) => {
         setError(
@@ -63,7 +66,7 @@ function EmailVerificationContent() {
               {message}
             </p>
             <Link
-              href={isAuthenticated ? "/profil" : "/auth/login"}
+              href={isAuthenticated ? profileHref : "/auth/login"}
               className="text-sm text-primary"
             >
               {isAuthenticated ? "Retour au profil" : "Se connecter"}

@@ -29,9 +29,9 @@ export default function CGU() {
       <section className="space-y-3">
         <h2 className="text-xl font-semibold">Compte utilisateur</h2>
         <p>
-          Lors de l’inscription (email ou Google OAuth), l’utilisateur s’engage
-          à fournir des informations exactes. Il est responsable de la
-          confidentialité de son compte.
+          Lors de l’inscription, l’utilisateur s’engage à fournir des
+          informations exactes. Il est responsable de la confidentialité de son
+          compte.
         </p>
       </section>
 

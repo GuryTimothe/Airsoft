@@ -5,19 +5,15 @@ import { FormEvent, Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { resetPassword } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/user-api";
+import { validatePasswordPolicy } from "@/lib/password-policy";
 
-function passwordError(password: string): string | null {
-  if (password.length < 12)
-    return "Le mot de passe doit contenir au moins 12 caractères.";
-  if (!/[a-z]/.test(password))
-    return "Le mot de passe doit contenir une minuscule.";
-  if (!/[A-Z]/.test(password))
-    return "Le mot de passe doit contenir une majuscule.";
-  if (!/\d/.test(password)) return "Le mot de passe doit contenir un chiffre.";
-  if (!/[^\w\s]/.test(password))
-    return "Le mot de passe doit contenir un symbole.";
+const ADMIN_ROLES = ["ROLE_ADMIN", "ROLE_SUPER_ADMIN", "ROLE_ORGANIZER"];
 
-  return null;
+function passwordErrors(password: string): string[] {
+  return validatePasswordPolicy(password).map(
+    (message) => `Nouveau mot de passe : ${message}`,
+  );
 }
 
 function ResetPasswordForm() {
@@ -27,6 +23,7 @@ function ResetPasswordForm() {
   const [errors, setErrors] = useState<string[]>([]);
   const [isComplete, setIsComplete] = useState(false);
   const [sessionRenewed, setSessionRenewed] = useState(false);
+  const [profileHref, setProfileHref] = useState("/profil");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -34,7 +31,6 @@ function ResetPasswordForm() {
     setErrors([]);
 
     const token = searchParams.get("token") ?? "";
-    const validationError = passwordError(password);
     const validationErrors: string[] = [];
 
     if (!token) {
@@ -42,9 +38,7 @@ function ResetPasswordForm() {
         "Lien : ce lien de réinitialisation est invalide ou incomplet.",
       );
     }
-    if (validationError) {
-      validationErrors.push(`Nouveau mot de passe : ${validationError}`);
-    }
+    validationErrors.push(...passwordErrors(password));
     if (password !== confirmation) {
       validationErrors.push(
         "Confirmation : la confirmation ne correspond pas au nouveau mot de passe.",
@@ -57,7 +51,14 @@ function ResetPasswordForm() {
 
     setIsSubmitting(true);
     try {
-      setSessionRenewed(await resetPassword(token, password));
+      const renewed = await resetPassword(token, password);
+      setSessionRenewed(renewed);
+      if (renewed) {
+        const currentUser = await getCurrentUser().catch(() => null);
+        if (currentUser && ADMIN_ROLES.includes(currentUser.role)) {
+          setProfileHref("/admin/profil");
+        }
+      }
       setIsComplete(true);
     } catch (requestError) {
       setErrors([
@@ -91,7 +92,7 @@ function ResetPasswordForm() {
               Votre mot de passe a été mis a jour.
             </p>
             <Link
-              href={sessionRenewed ? "/profil" : "/auth/login"}
+              href={sessionRenewed ? profileHref : "/auth/login"}
               className="text-sm text-primary"
             >
               {sessionRenewed ? "Retour au profil" : "Aller a la connexion"}

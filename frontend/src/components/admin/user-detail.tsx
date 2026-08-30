@@ -336,7 +336,7 @@ export function UserDetail({
               <span>{emergencyContact?.lastname || "-"}</span>
             </div>
             <div>
-              <span className="font-medium">Prenom: </span>
+              <span className="font-medium">Prénom: </span>
               <span>{emergencyContact?.firstname || "-"}</span>
             </div>
             <div>
@@ -344,7 +344,7 @@ export function UserDetail({
               <span>{emergencyContact?.email || "-"}</span>
             </div>
             <div>
-              <span className="font-medium">Telephone: </span>
+              <span className="font-medium">Téléphone: </span>
               <span>{emergencyContact?.phone || "-"}</span>
             </div>
           </CardContent>

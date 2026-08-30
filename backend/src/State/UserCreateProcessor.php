@@ -58,7 +58,7 @@ class UserCreateProcessor implements ProcessorInterface
         if ($existingUser instanceof User && $existingUser->isEmailVerified()) {
             throw new ValidationException(new ConstraintViolationList([
                 new ConstraintViolation(
-                    'Un compte avec cet email existe deja.',
+                    'Un compte avec cet email existe déjà.',
                     null,
                     [],
                     null,
@@ -85,7 +85,7 @@ class UserCreateProcessor implements ProcessorInterface
         } catch (UniqueConstraintViolationException) {
             throw new ValidationException(new ConstraintViolationList([
                 new ConstraintViolation(
-                    'Un compte avec cet email existe deja.',
+                    'Un compte avec cet email existe déjà.',
                     null,
                     [],
                     null,

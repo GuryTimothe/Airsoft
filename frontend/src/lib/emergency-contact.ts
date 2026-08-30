@@ -49,7 +49,7 @@ export function parseEmergencyContact(
         "firstname",
         "firstName",
         "first_name",
-        "prenom",
+        "prénom",
       ]),
       email: pickString(record, ["email", "mail"]),
       phone: pickString(record, [

@@ -20,6 +20,8 @@ use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Email;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Serializer\Normalizer\DenormalizerInterface;
+use Symfony\Component\Validator\ConstraintViolation;
+use Symfony\Component\Validator\ConstraintViolationList;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 /**
@@ -134,7 +136,16 @@ class RegisterProcessor implements ProcessorInterface
         }
 
         if ($existingUser->isEmailVerified()) {
-            throw new ConflictHttpException('Identifiants invalides.');
+            throw new ValidationException(new ConstraintViolationList([
+                new ConstraintViolation(
+                    'Un compte avec cet email existe déjà.',
+                    null,
+                    [],
+                    null,
+                    'email',
+                    $email,
+                ),
+            ]));
         }
 
         $this->entityManager->remove($existingUser);

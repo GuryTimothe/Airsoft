@@ -104,11 +104,11 @@ export default function SettingsPage() {
 
   return (
     <main className="p-8 space-y-6">
-      <h1 className="text-2xl font-bold">Parametres de l'application</h1>
+      <h1 className="text-2xl font-bold">Paramètres de l'application</h1>
 
       <Card>
         <CardHeader>
-          <CardTitle>Configuration generale</CardTitle>
+          <CardTitle>Configuration générale</CardTitle>
         </CardHeader>
 
         <CardContent className="space-y-4">
@@ -147,7 +147,7 @@ export default function SettingsPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="defaultPrice">
-                  PAF par defaut (€)
+                  PAF par défaut (€)
                   <span className="ml-1 text-destructive">*</span>
                 </Label>
                 <Input
@@ -164,7 +164,7 @@ export default function SettingsPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="defaultMaxPlaces">
-                  Nombre de joueurs par defaut
+                  Nombre de joueurs par défaut
                   <span className="ml-1 text-destructive">*</span>
                 </Label>
                 <Input
@@ -183,7 +183,7 @@ export default function SettingsPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="defaultAddress">
-                  Lieu par defaut
+                  Lieu par défaut
                   <span className="ml-1 text-destructive">*</span>
                 </Label>
                 <Input

@@ -13,13 +13,13 @@ export default function MentionsLegales() {
       <section className="space-y-3">
         <h2 className="text-xl font-semibold">Éditeur du site</h2>
         <p>
-          Nom du site : <strong>MonSite</strong>
+          Nom du site : <strong>Muret Airsoft</strong>
           <br />
-          Responsable de publication : Ton Nom
+          Responsable de publication : Nathan Tharsis
           <br />
-          Email : contact@monsite.com
+          Email : muret.airsoft@gmail.com
           <br />
-          Adresse : 123 rue Exemple, 31000 Toulouse, France
+          Adresse : Chemin de la hilière, 31600 Muret, France
         </p>
       </section>
 
@@ -27,11 +27,11 @@ export default function MentionsLegales() {
       <section className="space-y-3">
         <h2 className="text-xl font-semibold">Hébergement</h2>
         <p>
-          Hébergeur : Vercel Inc.
+          Hébergeur : Hexalab
           <br />
-          Site web : https://vercel.com
+          Site web : https://airsoft.fywolf.org/
           <br />
-          Adresse : 440 N Barranca Ave #4133, Covina, CA 91723, USA
+          Adresse : 6 rue des Lilas, 44000 Nantes, France
         </p>
       </section>
 
@@ -55,7 +55,7 @@ export default function MentionsLegales() {
         </p>
 
         <p>
-          Pour exercer ces droits : <strong>contact@monsite.com</strong>
+          Pour exercer ces droits : <strong>muret.airsoft@gmail.com</strong>
         </p>
       </section>
 

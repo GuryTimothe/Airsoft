@@ -24,20 +24,20 @@ export function Footer() {
           <div className="">
             <div className="text-sm space-y-1">
               <p>
-                <span className="font-bold">Adresse :</span> chemin de la
-                hilière
+                <span className="font-bold">Adresse :</span> Chemin de la
+                hilière, 31600 Muret
               </p>
               <p>
-                <span className="font-bold">Email :</span>
+                <span className="font-bold">Email : </span>
                 <a
                   href="mailto:contact@aem.fr"
                   className="hover:underline transition-colors"
                 >
-                  contact@aem.fr
+                  muret.airsoft@gmail.com
                 </a>
               </p>
               <p>
-                <span className="font-bold">Téléphone :</span> +33 6 00 00 00 00
+                <span className="font-bold">Téléphone :</span> 06 51 71 68 58
               </p>
             </div>
           </div>
@@ -51,7 +51,7 @@ export function Footer() {
                 href="/politique-confidentialite"
                 className="hover:underline transition-colors"
               >
-                confidentialité
+                Confidentialité
               </Link>
               <Link
                 href="/conditions-utilisation"
@@ -63,7 +63,7 @@ export function Footer() {
                 href="/mentions-legales"
                 className="hover:underline transition-colors"
               >
-                mentions légales
+                Mentions légales
               </Link>
             </div>
           </div>

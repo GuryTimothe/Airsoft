@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -13,7 +13,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { login, registerUser } from "@/lib/auth";
+import {
+  isEmailAvailable,
+  login,
+  registerUser,
+  RegisterValidationError,
+} from "@/lib/auth";
 import { serializeEmergencyContact } from "@/lib/emergency-contact";
 import { getCurrentUser } from "@/lib/user-api";
 import {
@@ -53,6 +58,7 @@ export default function AuthForm({ mode = "login" }: Props) {
     formState: { errors, isSubmitting },
     reset,
     setValue,
+    setError,
     control,
   } = useForm<FormData>({ resolver, mode: "onSubmit" });
 
@@ -66,38 +72,24 @@ export default function AuthForm({ mode = "login" }: Props) {
     useWatch({ control, name: "dateOfBirth" }) ?? "",
   );
 
-  const validationMessages = useMemo(() => {
+  const validationMessages = (() => {
     const messages: string[] = [];
-    const visited = new WeakSet<object>();
+    const error = errors as Record<string, { message?: string } | undefined>;
 
-    const collect = (value: unknown) => {
-      if (!value || typeof value !== "object") return;
+    for (const fieldError of Object.values(error)) {
+      const message = fieldError?.message;
+      if (typeof message !== "string") continue;
 
-      if (visited.has(value)) return;
-      visited.add(value);
-
-      const maybeMessage = (value as Record<string, unknown>).message;
-      if (typeof maybeMessage === "string") {
-        messages.push(maybeMessage);
+      // Split combined password error messages for better readability
+      if (message.includes(" | ")) {
+        messages.push(...message.split(" | "));
+      } else {
+        messages.push(message);
       }
+    }
 
-      for (const [key, item] of Object.entries(
-        value as Record<string, unknown>,
-      )) {
-        // React Hook Form attaches DOM refs inside errors; they are cyclic and not useful for UI messages.
-        if ("ref" === key) {
-          continue;
-        }
-
-        if (item && typeof item === "object") {
-          collect(item);
-        }
-      }
-    };
-
-    collect(errors);
     return Array.from(new Set(messages));
-  }, [errors]);
+  })();
 
   function onError() {
     setStatus({
@@ -166,11 +158,24 @@ export default function AuthForm({ mode = "login" }: Props) {
       );
       setPendingRegistration(null);
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Impossible de créer le compte.";
-      setStatus({ type: "error", message });
+      setPendingRegistration(null);
+
+      if (error instanceof RegisterValidationError && error.field) {
+        setError(error.field as keyof RegisterInput, {
+          type: "manual",
+          message: error.message,
+        });
+        setStatus({
+          type: "error",
+          message: "Veuillez corriger les erreurs du formulaire.",
+        });
+      } else {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Impossible de créer le compte.";
+        setStatus({ type: "error", message });
+      }
     } finally {
       setIsConfirmingRegistration(false);
     }
@@ -181,6 +186,20 @@ export default function AuthForm({ mode = "login" }: Props) {
 
     if (mode === "register") {
       const reg = data as RegisterInput;
+
+      const emailAvailable = await isEmailAvailable(reg.email);
+      if (!emailAvailable) {
+        setError("email", {
+          type: "manual",
+          message: "Un compte avec cet email existe déjà.",
+        });
+        setStatus({
+          type: "error",
+          message: "Veuillez corriger les erreurs du formulaire.",
+        });
+        return;
+      }
+
       const emergencyContact = serializeEmergencyContact({
         lastname: reg.guardianLastname?.trim() ?? "",
         firstname: reg.guardianFirstname?.trim() ?? "",
@@ -269,7 +288,6 @@ export default function AuthForm({ mode = "login" }: Props) {
                 id="lastname"
                 {...register("lastname")}
                 className="mt-1 w-full rounded border border-border bg-transparent px-3 py-2"
-                placeholder="Dupont"
                 autoComplete="family-name"
                 aria-invalid={!!getError("lastname")}
                 aria-describedby={
@@ -303,7 +321,6 @@ export default function AuthForm({ mode = "login" }: Props) {
                 id="firstname"
                 {...register("firstname")}
                 className="mt-1 w-full rounded border border-border bg-transparent px-3 py-2"
-                placeholder="Jean"
                 autoComplete="given-name"
                 aria-invalid={!!getError("firstname")}
                 aria-describedby={
@@ -339,7 +356,7 @@ export default function AuthForm({ mode = "login" }: Props) {
             id="email"
             {...register("email")}
             className="mt-1 w-full rounded border border-border bg-transparent px-3 py-2"
-            placeholder="you@exemple.com"
+            placeholder="exemple@exemple.com"
             type="email"
             autoComplete="username"
             aria-invalid={!!getError("email")}
@@ -373,7 +390,6 @@ export default function AuthForm({ mode = "login" }: Props) {
             {...register("password")}
             className="mt-1 w-full rounded border border-border bg-transparent px-3 py-2"
             type="password"
-            placeholder="••••••••"
             autoComplete={
               mode === "login" ? "current-password" : "new-password"
             }
@@ -412,7 +428,6 @@ export default function AuthForm({ mode = "login" }: Props) {
                 {...register("confirm")}
                 className="mt-1 w-full rounded border border-border bg-transparent px-3 py-2"
                 type="password"
-                placeholder="••••••••"
                 autoComplete="new-password"
                 aria-invalid={!!getError("confirm")}
                 aria-describedby={
@@ -475,7 +490,6 @@ export default function AuthForm({ mode = "login" }: Props) {
                 id="pseudo"
                 {...register("pseudo")}
                 className="mt-1 w-full rounded border border-border bg-transparent px-3 py-2"
-                placeholder="MonPseudo"
                 autoComplete="nickname"
                 aria-invalid={!!getError("pseudo")}
                 aria-describedby={
@@ -504,7 +518,7 @@ export default function AuthForm({ mode = "login" }: Props) {
                 id="phone"
                 {...register("phone")}
                 className="mt-1 w-full rounded border border-border bg-transparent px-3 py-2"
-                placeholder="0612345678"
+                placeholder="0600000000"
                 autoComplete="tel"
                 inputMode="tel"
                 aria-invalid={!!getError("phone")}
@@ -552,7 +566,7 @@ export default function AuthForm({ mode = "login" }: Props) {
                   id="guardianLastname"
                   {...register("guardianLastname")}
                   className="mt-1 w-full rounded border border-border bg-transparent px-3 py-2"
-                  autoComplete="family-name"
+                  autoComplete="off"
                   aria-invalid={!!getError("guardianLastname")}
                   aria-describedby={
                     getError("guardianLastname")
@@ -592,7 +606,7 @@ export default function AuthForm({ mode = "login" }: Props) {
                   id="guardianFirstname"
                   {...register("guardianFirstname")}
                   className="mt-1 w-full rounded border border-border bg-transparent px-3 py-2"
-                  autoComplete="given-name"
+                  autoComplete="off"
                   aria-invalid={!!getError("guardianFirstname")}
                   aria-describedby={
                     getError("guardianFirstname")
@@ -632,8 +646,9 @@ export default function AuthForm({ mode = "login" }: Props) {
                   id="guardianEmail"
                   {...register("guardianEmail")}
                   className="mt-1 w-full rounded border border-border bg-transparent px-3 py-2"
+                  placeholder="exemple@exemple.com"
                   type="email"
-                  autoComplete="email"
+                  autoComplete="off"
                   aria-invalid={!!getError("guardianEmail")}
                   aria-describedby={
                     getError("guardianEmail")
@@ -673,7 +688,8 @@ export default function AuthForm({ mode = "login" }: Props) {
                   id="guardianPhone"
                   {...register("guardianPhone")}
                   className="mt-1 w-full rounded border border-border bg-transparent px-3 py-2"
-                  autoComplete="tel"
+                  placeholder="0600000000"
+                  autoComplete="off"
                   inputMode="tel"
                   aria-invalid={!!getError("guardianPhone")}
                   aria-describedby={

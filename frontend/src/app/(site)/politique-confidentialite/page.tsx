@@ -12,8 +12,8 @@ export default function PrivacyPolicy() {
         <h2 className="text-xl font-semibold">Données collectées</h2>
         <p>
           Nous collectons uniquement les données nécessaires au fonctionnement
-          du service : email, nom, photo de profil (via Google OAuth ou
-          inscription).
+          du service : email, nom, prénom, âge, téléphone. Les informations d'un
+          contact d'urgence peuvent également être collectés.
         </p>
       </section>
 
@@ -37,8 +37,7 @@ export default function PrivacyPolicy() {
         <h2 className="text-xl font-semibold">Partage des données</h2>
         <p>
           Les données ne sont jamais vendues. Elles peuvent être transmises
-          uniquement aux services nécessaires au fonctionnement (ex :
-          authentification Google).
+          uniquement aux services nécessaires au fonctionnement.
         </p>
       </section>
 
@@ -56,7 +55,7 @@ export default function PrivacyPolicy() {
           suppression, opposition.
         </p>
 
-        <p>Contact : contact@monsite.com</p>
+        <p>Contact : muret.airsoft@gmail.com</p>
       </section>
     </main>
   );
