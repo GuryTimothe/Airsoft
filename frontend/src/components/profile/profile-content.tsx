@@ -624,15 +624,14 @@ export function ProfileContent() {
     setIsUpdatingPassword(true);
 
     try {
-      await updateMyPassword({
+      const result = await updateMyPassword({
         currentPassword: passwordForm.currentPassword,
         newPassword: passwordForm.newPassword,
       });
-      clearAuthToken();
+      setUser(result.user);
       resetPasswordForm();
+      setPasswordMessage("Mot de passe mis a jour.");
       setIsPasswordModalOpen(false);
-      router.replace("/auth/login");
-      router.refresh();
     } catch (error) {
       if (error instanceof ProfileValidationError) {
         setPasswordErrors(error.messages);
@@ -738,7 +737,7 @@ export function ProfileContent() {
       <section className="rounded-lg border border-border bg-card p-6">
         <h2 className="text-xl font-semibold">Modifier mon profil</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Choisissez l'action a effectuer. Chaque bouton ouvre une fenêtre de
+          Choisissez l'action à effectuer. Chaque bouton ouvre une fenêtre de
           modification.
         </p>
 

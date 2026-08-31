@@ -220,6 +220,13 @@ describe("GameListCard", () => {
     await waitFor(() => {
       expect(mockedRegisterToGame).toHaveBeenCalledWith(1);
     });
+
+    expect(
+      await screen.findByRole("button", {
+        name: "Annuler l'inscription à Forêt",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("shows register error when API fails", async () => {

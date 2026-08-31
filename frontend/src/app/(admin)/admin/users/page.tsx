@@ -36,8 +36,8 @@ export default async function UsersPage() {
             Gestion des utilisateurs
           </h1>
           <p className="text-sm text-muted-foreground">
-            Cette section est reservee a l'administration. Les utilisateurs ne
-            sont pas affiches sur le site public.
+            Cette section est réservée à l'administration. Les utilisateurs ne
+            sont pas affichés sur le site public.
           </p>
         </div>
 

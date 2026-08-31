@@ -175,7 +175,6 @@ export default function UserTable({
           <input
             className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
             type="text"
-            placeholder="Ex. Martin"
             value={searchInput}
             onChange={(event) => setSearchInput(event.target.value)}
           />
@@ -196,7 +195,7 @@ export default function UserTable({
         </label>
 
         <label className="space-y-2 text-sm">
-          <span>Filtrer par role</span>
+          <span>Filtrer par rôle</span>
           <select
             className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
             value={roleFilter}
@@ -214,7 +213,7 @@ export default function UserTable({
         </label>
 
         <label className="space-y-2 text-sm">
-          <span>Filtrer par acces prive</span>
+          <span>Filtrer par accès privé</span>
           <select
             className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
             value={privateFilter}
@@ -223,13 +222,13 @@ export default function UserTable({
             }
           >
             <option value="all">Tous</option>
-            <option value="yes">Autorise</option>
-            <option value="no">Refuse</option>
+            <option value="yes">Autorisé</option>
+            <option value="no">Refusé</option>
           </select>
         </label>
 
         <label className="space-y-2 text-sm">
-          <span>Filtrer par age</span>
+          <span>Filtrer par âge</span>
           <select
             className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
             value={ageFilter}
@@ -262,7 +261,7 @@ export default function UserTable({
             setSearchBy("lastname");
           }}
         >
-          Reinitialiser les filtres
+          Réinitialiser les filtres
         </Button>
       </div>
 
@@ -272,8 +271,8 @@ export default function UserTable({
             <TableHead>Nom</TableHead>
             <TableHead>Email</TableHead>
             <TableHead>Age</TableHead>
-            <TableHead>Role</TableHead>
-            <TableHead>Acces parties privees</TableHead>
+            <TableHead>Rôle</TableHead>
+            <TableHead>Accès parties privées</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -305,7 +304,7 @@ export default function UserTable({
                 </TableCell>
                 <TableCell>
                   <Badge variant={user.canSeePrivate ? "default" : "outline"}>
-                    {user.canSeePrivate ? "Autorise" : "Refuse"}
+                    {user.canSeePrivate ? "Autorisé" : "Refusé"}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">
