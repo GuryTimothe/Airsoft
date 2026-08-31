@@ -36,7 +36,7 @@ export function GamesExportControls() {
 
       <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-3 lg:items-end">
         <label className="space-y-2 text-sm">
-          <span>Date debut min</span>
+          <span>Date début min</span>
           <input
             className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
             type="date"
@@ -46,7 +46,7 @@ export function GamesExportControls() {
         </label>
 
         <label className="space-y-2 text-sm">
-          <span>Date debut max</span>
+          <span>Date début max</span>
           <input
             className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
             type="date"
@@ -70,7 +70,7 @@ export function GamesExportControls() {
             }}
             disabled={isExporting}
           >
-            Reinit
+            Réinitialiser les filtres
           </Button>
         </div>
       </div>

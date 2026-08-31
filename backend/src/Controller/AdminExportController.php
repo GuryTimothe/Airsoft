@@ -82,40 +82,35 @@ final class AdminExportController extends AbstractController
         ]);
 
         return $this->createCsvResponse(
-            sprintf('game_%d_registrations_export', $id),
+            sprintf('partie_%d_inscriptions_export', $id),
             [
-                'registrationId',
-                'gameId',
-                'gameTitle',
-                'userId',
-                'lastname',
-                'firstname',
-                'email',
-                'pseudo',
-                'role',
-                'isPresent',
-                'registeredAt',
+                'Titre de la partie',
+                'Nom',
+                'Prénom',
+                'Email',
+                'Pseudo',
+                'Rôle',
+                'Présence',
+                'Inscription le',
             ],
             array_map(
                 static function ($registration): array {
                     $user = $registration->getUser();
 
                     return [
-                        $registration->getId(),
-                        $registration->getGameId(),
                         $registration->getGame()?->getTitle() ?? '',
-                        $registration->getUserId(),
-                        $user?->getLastname()  ?? '',
-                        $user?->getFirstname() ?? '',
-                        $user?->getEmail()     ?? '',
-                        $user?->getPseudo()    ?? '',
-                        $user?->getRole()      ?? '',
-                        $registration->isPresent() ? '1' : '0',
-                        $registration->getCreatedAt()->format(DATE_ATOM),
+                        $user?->getLastname()                 ?? '',
+                        $user?->getFirstname()                ?? '',
+                        $user?->getEmail()                    ?? '',
+                        $user?->getPseudo()                   ?? '',
+                        self::formatRegistrationExportRole($user?->getRole()),
+                        $registration->isPresent() ? 'Présent' : 'Absent',
+                        $registration->getCreatedAt()->format('d/m/Y H:i'),
                     ];
                 },
                 $registrations,
             ),
+            'dmY',
         );
     }
 
@@ -141,46 +136,43 @@ final class AdminExportController extends AbstractController
         ]);
 
         return $this->createCsvResponse(
-            'users_export',
+            'utilisateurs_export',
             [
-                'id',
-                'lastname',
-                'firstname',
-                'email',
-                'pseudo',
-                'phone',
-                'dateOfBirth',
-                'isMinor',
-                'role',
-                'canSeePrivate',
-                'emergencyContactLastname',
-                'emergencyContactFirstname',
-                'emergencyContactEmail',
-                'emergencyContactPhone',
-                'createdAt',
-                'updatedAt',
+                'Nom',
+                'Prénom',
+                'Email',
+                'Pseudo',
+                'Tel',
+                'Date de naissance',
+                'Âge',
+                'Rôle',
+                'Accès parties privées',
+                'Contact d\'urgence : Nom',
+                'Contact d\'urgence : Prénom',
+                'Contact d\'urgence : Email',
+                'Contact d\'urgence : Tel',
+                'Création du compte le',
             ],
             array_map(
                 fn (User $user): array => [
-                    $user->getId(),
                     $user->getLastname(),
                     $user->getFirstname(),
                     $user->getEmail(),
                     $user->getPseudo() ?? '',
-                    $user->getPhone()  ?? '',
+                    self::formatSpreadsheetText($user->getPhone()),
                     $user->getDateOfBirth()->format('Y-m-d'),
-                    $this->isMinor($user) ? '1' : '0',
-                    $user->getRole(),
-                    $user->getCanSeePrivate() ? '1' : '0',
-                    $user->getEmergencyContactLastname()      ?? '',
-                    $user->getEmergencyContactFirstname()     ?? '',
-                    $user->getEmergencyContactEmail()         ?? '',
-                    $user->getEmergencyContactPhone()         ?? '',
-                    $user->getCreatedAt()?->format(DATE_ATOM) ?? '',
-                    $user->getUpdatedAt()?->format(DATE_ATOM) ?? '',
+                    $this->isMinor($user) ? 'Mineur' : 'Majeur',
+                    self::formatRegistrationExportRole($user->getRole()),
+                    $user->getCanSeePrivate() ? 'Autorisé' : 'Refusé',
+                    $user->getEmergencyContactLastname()  ?? '',
+                    $user->getEmergencyContactFirstname() ?? '',
+                    $user->getEmergencyContactEmail()     ?? '',
+                    self::formatSpreadsheetText($user->getEmergencyContactPhone()),
+                    $user->getCreatedAt()?->format('d/m/Y') ?? '',
                 ],
                 $users,
             ),
+            'dmY',
         );
     }
 
@@ -191,6 +183,26 @@ final class AdminExportController extends AbstractController
         }
 
         $this->denyAccessUnlessGranted('ROLE_ADMIN');
+    }
+
+    private static function formatRegistrationExportRole(?string $role): string
+    {
+        return match ($role) {
+            'ROLE_USER'        => 'utilisateur',
+            'ROLE_ADMIN'       => 'admin',
+            'ROLE_SUPER_ADMIN' => 'super admin',
+            'ROLE_ORGANIZER'   => 'organisateur',
+            default            => $role ?? '',
+        };
+    }
+
+    private static function formatSpreadsheetText(?string $value): string
+    {
+        if (null === $value || '' === $value) {
+            return '';
+        }
+
+        return sprintf('="%s"', str_replace('"', '""', $value));
     }
 
     private function denyAccessUnlessGrantedAdminOrSuperAdminOrOrganizer(): void
@@ -333,14 +345,6 @@ final class AdminExportController extends AbstractController
         return $birthDate->diff($today)->y < 18;
     }
 
-    private function computeAge(User $user): int
-    {
-        $today     = new \DateTimeImmutable('today');
-        $birthDate = \DateTimeImmutable::createFromInterface($user->getDateOfBirth());
-
-        return $birthDate->diff($today)->y;
-    }
-
     /**
      * @param list<Game> $games
      */
@@ -370,7 +374,7 @@ final class AdminExportController extends AbstractController
                 fputcsv($handle, ['Nombre de places', (string) $gameMaxPlaces], ';', '"', '');
                 fputcsv($handle, ['Date', $gameDate], ';', '"', '');
                 fputcsv($handle, [], ';', '"', '');
-                fputcsv($handle, ['Nom', 'Prenom', 'Age', 'Adresse mail', 'Tel', 'Presence'], ';', '"', '');
+                fputcsv($handle, ['Nom', 'Prénom', 'Âge', 'Email', 'Tel', 'Présence'], ';', '"', '');
 
                 if ([] === $registrations) {
                     fputcsv($handle, ['Aucun joueur inscrit', '', '', '', '', ''], ';', '"', '');
@@ -382,7 +386,7 @@ final class AdminExportController extends AbstractController
                     fputcsv($handle, [
                         $user?->getLastname()  ?? '',
                         $user?->getFirstname() ?? '',
-                        $user instanceof User ? (string) $this->computeAge($user) : '',
+                        $user instanceof User ? ($this->isMinor($user) ? 'Mineur' : 'Majeur') : '',
                         $user?->getEmail() ?? '',
                         $user?->getPhone() ?? '',
                         $registration->isPresent() ? 'Present' : 'Absent',
@@ -399,7 +403,7 @@ final class AdminExportController extends AbstractController
         $response->headers->set('Content-Type', 'text/csv; charset=UTF-8');
         $response->headers->set(
             'Content-Disposition',
-            sprintf('attachment; filename="games_players_export_%s.csv"', (new \DateTimeImmutable())->format('Ymd_His')),
+            sprintf('attachment; filename="parties_export_%s.csv"', (new \DateTimeImmutable())->format('dmY')),
         );
 
         return $response;
@@ -409,7 +413,7 @@ final class AdminExportController extends AbstractController
      * @param list<string> $headers
      * @param list<array<int, bool|int|float|string|null>> $rows
      */
-    private function createCsvResponse(string $filenamePrefix, array $headers, array $rows): StreamedResponse
+    private function createCsvResponse(string $filenamePrefix, array $headers, array $rows, string $filenameDateFormat = 'Ymd_His'): StreamedResponse
     {
         $response = new StreamedResponse(function () use ($headers, $rows): void {
             $handle = fopen('php://output', 'wb');
@@ -431,7 +435,7 @@ final class AdminExportController extends AbstractController
         $response->headers->set('Content-Type', 'text/csv; charset=UTF-8');
         $response->headers->set(
             'Content-Disposition',
-            sprintf('attachment; filename="%s_%s.csv"', $filenamePrefix, (new \DateTimeImmutable())->format('Ymd_His')),
+            sprintf('attachment; filename="%s_%s.csv"', $filenamePrefix, (new \DateTimeImmutable())->format($filenameDateFormat)),
         );
 
         return $response;

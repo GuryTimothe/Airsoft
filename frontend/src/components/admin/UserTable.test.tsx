@@ -134,7 +134,7 @@ describe("UserTable", () => {
     expect(screen.getByText("16 ans")).toBeInTheDocument();
     expect(screen.getByText("34 ans")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("Filtrer par role"), {
+    fireEvent.change(screen.getByLabelText("Filtrer par rôle"), {
       target: { value: "ROLE_ADMIN" },
     });
 
@@ -144,11 +144,11 @@ describe("UserTable", () => {
       expect(screen.queryByText("Nina Roux")).not.toBeInTheDocument();
     });
 
-    fireEvent.change(screen.getByLabelText("Filtrer par role"), {
+    fireEvent.change(screen.getByLabelText("Filtrer par rôle"), {
       target: { value: "all" },
     });
 
-    fireEvent.change(screen.getByLabelText("Filtrer par acces prive"), {
+    fireEvent.change(screen.getByLabelText("Filtrer par accès privé"), {
       target: { value: "no" },
     });
 
@@ -165,17 +165,17 @@ describe("UserTable", () => {
     );
 
     const resetButton = screen.getByRole("button", {
-      name: "Reinitialiser les filtres",
+      name: "Réinitialiser les filtres",
     });
     expect(resetButton).toBeDisabled();
 
-    fireEvent.change(screen.getByLabelText("Filtrer par role"), {
+    fireEvent.change(screen.getByLabelText("Filtrer par rôle"), {
       target: { value: "ROLE_ADMIN" },
     });
-    fireEvent.change(screen.getByLabelText("Filtrer par acces prive"), {
+    fireEvent.change(screen.getByLabelText("Filtrer par accès privé"), {
       target: { value: "no" },
     });
-    fireEvent.change(screen.getByLabelText("Filtrer par age"), {
+    fireEvent.change(screen.getByLabelText("Filtrer par âge"), {
       target: { value: "minor" },
     });
     fireEvent.change(screen.getByLabelText("Rechercher par"), {
@@ -189,11 +189,11 @@ describe("UserTable", () => {
     fireEvent.click(resetButton);
 
     await waitFor(() => {
-      expect(screen.getByLabelText("Filtrer par role")).toHaveValue("all");
-      expect(screen.getByLabelText("Filtrer par acces prive")).toHaveValue(
+      expect(screen.getByLabelText("Filtrer par rôle")).toHaveValue("all");
+      expect(screen.getByLabelText("Filtrer par accès privé")).toHaveValue(
         "all",
       );
-      expect(screen.getByLabelText("Filtrer par age")).toHaveValue("all");
+      expect(screen.getByLabelText("Filtrer par âge")).toHaveValue("all");
       expect(screen.getByLabelText("Rechercher par")).toHaveValue("lastname");
       expect(screen.getByText("Alex Martin")).toBeInTheDocument();
       expect(screen.getByText("Lucas Durand")).toBeInTheDocument();
@@ -208,7 +208,7 @@ describe("UserTable", () => {
       <UserTable initialUsers={users} referenceDateIso={referenceDateIso} />,
     );
 
-    fireEvent.change(screen.getByLabelText("Filtrer par age"), {
+    fireEvent.change(screen.getByLabelText("Filtrer par âge"), {
       target: { value: "minor" },
     });
 
@@ -219,7 +219,7 @@ describe("UserTable", () => {
       expect(screen.queryByText("Sonia Boss")).not.toBeInTheDocument();
     });
 
-    fireEvent.change(screen.getByLabelText("Filtrer par age"), {
+    fireEvent.change(screen.getByLabelText("Filtrer par âge"), {
       target: { value: "adult" },
     });
 

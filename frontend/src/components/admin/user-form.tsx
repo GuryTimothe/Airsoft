@@ -490,7 +490,7 @@ export function UserForm({
       <CardHeader>
         <CardTitle>{pageTitle}</CardTitle>
         <CardDescription>
-          Gerer les informations de compte et permissions admin.
+          Gérer les informations de compte et permissions admin.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -791,7 +791,7 @@ export function UserForm({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="canSeePrivate">Acces parties privees</Label>
+                <Label htmlFor="canSeePrivate">Accès parties privées</Label>
                 <div className="flex h-10 items-center rounded-lg border border-input bg-background px-3">
                   <input
                     id="canSeePrivate"
@@ -810,8 +810,8 @@ export function UserForm({
                 </div>
                 {isPrivateAccessLocked ? (
                   <p className="text-xs text-muted-foreground">
-                    Pour ce role, l'acces aux parties privees est toujours
-                    autorise.
+                    Pour ce rôle, l'accès aux parties privées est toujours
+                    autorisé.
                   </p>
                 ) : null}
               </div>

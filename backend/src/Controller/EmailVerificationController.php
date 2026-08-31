@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\EmailVerificationToken;
+use App\Entity\User;
 use App\Security\Jwt\JwtCookieManager;
 use Doctrine\ORM\EntityManagerInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
@@ -41,8 +42,9 @@ final class EmailVerificationController extends AbstractController
             return new JsonResponse(['message' => 'Ce lien de validation est invalide ou expire.'], JsonResponse::HTTP_BAD_REQUEST);
         }
 
-        $user         = $verificationToken->getUser();
-        $pendingEmail = $verificationToken->getPendingEmail();
+        $user               = $verificationToken->getUser();
+        $pendingEmail       = $verificationToken->getPendingEmail();
+        $shouldRenewSession = null !== $pendingEmail && $this->hasAuthenticatedSessionForUser($request, $user);
         if (null !== $pendingEmail) {
             $user->setEmail($pendingEmail);
         } else {
@@ -55,6 +57,10 @@ final class EmailVerificationController extends AbstractController
             return new JsonResponse(['message' => 'Votre adresse e-mail est validée.']);
         }
 
+        if (!$shouldRenewSession) {
+            return new JsonResponse(['message' => 'Votre nouvelle adresse e-mail est validée.']);
+        }
+
         $jwt      = $this->jwtManager->create($user);
         $response = new JsonResponse([
             'message' => 'Votre nouvelle adresse e-mail est validée.',
@@ -63,5 +69,23 @@ final class EmailVerificationController extends AbstractController
         $this->jwtCookieManager->addTokenCookie($response, $jwt, $request->isSecure());
 
         return $response;
+    }
+
+    private function hasAuthenticatedSessionForUser(Request $request, User $user): bool
+    {
+        $token = $this->jwtCookieManager->extractTokenFromRequest($request);
+        if (null === $token) {
+            return false;
+        }
+
+        try {
+            $payload = $this->jwtManager->parse($token);
+        } catch (\Throwable) {
+            return false;
+        }
+
+        $identifier = $payload['username'] ?? null;
+
+        return is_string($identifier) && hash_equals($user->getEmail(), $identifier);
     }
 }

@@ -210,7 +210,7 @@ export function UserDetail({
             {user.firstname} {user.lastname}
           </h1>
           <p className="text-sm text-muted-foreground">
-            Detail du compte utilisateur.
+            Détail du compte utilisateur.
           </p>
         </div>
 
@@ -280,7 +280,7 @@ export function UserDetail({
       <Card>
         <CardHeader>
           <CardTitle>Informations principales</CardTitle>
-          <CardDescription>Profil, role et acces.</CardDescription>
+          <CardDescription>Profil, rôle et accès.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 text-sm">
           <div className="flex items-center gap-2">
@@ -302,11 +302,11 @@ export function UserDetail({
             <span>{roleLabel(user.role)}</span>
           </div>
           <div>
-            <span className="font-medium">Acces parties privees: </span>
+            <span className="font-medium">Accès parties privées: </span>
             <span>{user.canSeePrivate ? "Oui" : "Non"}</span>
           </div>
           <div>
-            <span className="font-medium">Age: </span>
+            <span className="font-medium">Âge: </span>
             <span>{age ?? "Non renseigne"}</span>
           </div>
           <div>

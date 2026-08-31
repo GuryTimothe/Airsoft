@@ -10,6 +10,7 @@ use App\Dto\MeUpdateOutput;
 use App\Entity\User;
 use App\Security\Jwt\JwtRevocationStore;
 use Doctrine\ORM\EntityManagerInterface;
+use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Validator\ConstraintViolation;
@@ -25,6 +26,7 @@ class MePasswordUpdateProcessor implements ProcessorInterface
         private UserPasswordHasherInterface $passwordHasher,
         private Security $security,
         private JwtRevocationStore $jwtRevocationStore,
+        private JWTTokenManagerInterface $jwtManager,
     ) {
     }
 
@@ -82,7 +84,7 @@ class MePasswordUpdateProcessor implements ProcessorInterface
         $this->jwtRevocationStore->rotateUserTokenNonce($targetUser);
         $this->entityManager->flush();
 
-        return new MeUpdateOutput($targetUser, '');
+        return new MeUpdateOutput($targetUser, $this->jwtManager->create($targetUser));
     }
 
     private function resolveTargetUser(?User $previousData): User

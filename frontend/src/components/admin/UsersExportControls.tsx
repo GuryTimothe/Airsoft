@@ -56,7 +56,7 @@ export function UsersExportControls() {
 
       <div className="mt-3 grid gap-3 md:grid-cols-3 md:items-end">
         <label className="space-y-2 text-sm">
-          <span>Age</span>
+          <span>Âge</span>
           <select
             className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
             value={ageGroup}
@@ -71,7 +71,7 @@ export function UsersExportControls() {
         </label>
 
         <fieldset className="space-y-2 text-sm md:col-span-2">
-          <legend>Roles</legend>
+          <legend>Rôles</legend>
           <div className="flex flex-wrap gap-3">
             {ROLE_OPTIONS.map((role) => (
               <label
@@ -95,7 +95,7 @@ export function UsersExportControls() {
       <div className="mt-3 flex items-center gap-3">
         <Button type="button" onClick={handleExport} disabled={isExporting}>
           <Download className="mr-2 h-4 w-4" />
-          {isExporting ? "Export en cours..." : "Exporter users CSV"}
+          {isExporting ? "Export en cours..." : "Exporter utilisateurs CSV"}
         </Button>
 
         <Button
@@ -107,7 +107,7 @@ export function UsersExportControls() {
           }}
           disabled={isExporting}
         >
-          Reinitialiser filtres export
+          Réinitialiser les filtres
         </Button>
       </div>
 

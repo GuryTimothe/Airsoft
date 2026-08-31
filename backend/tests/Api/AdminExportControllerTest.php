@@ -4,6 +4,7 @@ namespace App\Tests\Api;
 
 use App\Entity\Game;
 use App\Entity\GameRegistration;
+use App\Entity\EmergencyContact;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
@@ -64,10 +65,16 @@ final class AdminExportControllerTest extends WebTestCase
 
         self::assertResponseIsSuccessful();
         self::assertResponseHeaderSame('content-type', 'text/csv; charset=UTF-8');
+        self::assertResponseHeaderSame(
+            'content-disposition',
+            sprintf('attachment; filename="parties_export_%s.csv"', (new \DateTimeImmutable())->format('dmY')),
+        );
 
         $content = (string) $client->getResponse()->getContent();
         self::assertStringStartsWith("\xEF\xBB\xBF", $content);
         self::assertStringContainsString('Included export game', $content);
+        self::assertStringContainsString('Nom;Prénom;Âge;Email;Tel;Présence', $content);
+        self::assertStringContainsString('Majeur', $content);
         self::assertStringNotContainsString('Excluded export game', $content);
         self::assertStringContainsString((string) $includedGame->getId(), $content);
     }
@@ -111,6 +118,15 @@ final class AdminExportControllerTest extends WebTestCase
         [$adultAdmin]            = $this->createUser($entityManager, $passwordHasher, 'ROLE_ADMIN', '1992-02-02');
         [$minorAdmin]            = $this->createUser($entityManager, $passwordHasher, 'ROLE_ADMIN', '2012-02-02');
         [$adultUser]             = $this->createUser($entityManager, $passwordHasher, 'ROLE_USER', '1995-02-02');
+        $adultAdmin->setPhone('0612345678');
+        $adultAdmin->setEmergencyContact(
+            (new EmergencyContact())
+                ->setLastname('Contact')
+                ->setFirstname('Urgence')
+                ->setEmail('contact-export@example.com')
+                ->setPhone('0712345678')
+        );
+        $entityManager->flush();
 
         $token = $this->loginAndGetToken($client, $admin->getEmail(), $adminPassword);
 
@@ -119,9 +135,24 @@ final class AdminExportControllerTest extends WebTestCase
         ]);
 
         self::assertResponseIsSuccessful();
+        self::assertResponseHeaderSame(
+            'content-disposition',
+            sprintf('attachment; filename="utilisateurs_export_%s.csv"', (new \DateTimeImmutable())->format('dmY')),
+        );
 
         $content = (string) $client->getResponse()->getContent();
+        $header = strtok(substr($content, 3), "\n");
+        self::assertSame('Nom,Prénom,Email,Pseudo,Tel,"Date de naissance",Âge,Rôle,"Accès parties privées","Contact d\'urgence : Nom","Contact d\'urgence : Prénom","Contact d\'urgence : Email","Contact d\'urgence : Tel","Création du compte le"', rtrim((string) $header, "\r"));
         self::assertStringContainsString($adultAdmin->getEmail(), $content);
+        self::assertStringContainsString('admin', $content);
+        self::assertStringNotContainsString('ROLE_ADMIN', $content);
+        self::assertStringContainsString('Majeur', $content);
+        self::assertStringContainsString('Autorisé', $content);
+        self::assertStringContainsString('=""0612345678""', $content);
+        self::assertStringContainsString('=""0712345678""', $content);
+        self::assertStringContainsString($adultAdmin->getCreatedAt()?->format('d/m/Y') ?? '', $content);
+        self::assertStringNotContainsString($adultAdmin->getCreatedAt()?->format(DATE_ATOM) ?? '', $content);
+        self::assertStringNotContainsString('updatedAt', $content);
         self::assertStringNotContainsString($minorAdmin->getEmail(), $content);
         self::assertStringNotContainsString($adultUser->getEmail(), $content);
     }
@@ -161,11 +192,23 @@ final class AdminExportControllerTest extends WebTestCase
         ]);
 
         self::assertResponseIsSuccessful();
+        self::assertResponseHeaderSame(
+            'content-disposition',
+            sprintf('attachment; filename="partie_%d_inscriptions_export_%s.csv"', $game->getId(), (new \DateTimeImmutable())->format('dmY')),
+        );
 
         $content = (string) $client->getResponse()->getContent();
+        $header = strtok(substr($content, 3), "\n");
+        self::assertSame('"Titre de la partie",Nom,Prénom,Email,Pseudo,Rôle,Présence,"Inscription le"', rtrim((string) $header, "\r"));
         self::assertStringContainsString($playerOne->getEmail(), $content);
         self::assertStringContainsString($playerTwo->getEmail(), $content);
+        self::assertStringContainsString('utilisateur', $content);
+        self::assertStringNotContainsString('ROLE_USER', $content);
+        self::assertStringContainsString('Présent', $content);
+        self::assertStringContainsString('Absent', $content);
         self::assertStringContainsString('Registrations export game', $content);
+        self::assertMatchesRegularExpression('/\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}/', $content);
+        self::assertStringNotContainsString($registrationOne->getCreatedAt()->format(DATE_ATOM), $content);
     }
 
     private function createGame(EntityManagerInterface $entityManager, string $title, string $startDateTime): Game
