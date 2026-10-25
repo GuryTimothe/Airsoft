@@ -79,34 +79,30 @@ Vérification rapide:
 
 ### 5.1 Branches et environnements
 
-- `dev`: cible staging (prévu dans `deploy.yml`)
-- `main`: cible production
+- `dev`: branche d'intégration
+- `main`: branche de production
 
 ### 5.2 Pipeline actif dans le dépôt
 
 Le workflow d'orchestration est `.github/workflows/ci-cd.yml` et se déclenche sur chaque push.
 
 Ordre d'exécution effectif:
-1. `frontend-ci.yml` (lint -> format check -> tests)
-2. `backend-ci.yml` (php-cs-fixer check -> phpstan -> phpunit)
-3. `security-scanner.yml`
-4. `lighthouse.yml`
-5. `pa11y.yml`
-6. `release.yml` uniquement sur `main`
+1. `frontend-ci.yml` (lint -> format check -> tests) et `backend-ci.yml`
+   (php-cs-fixer check -> phpstan -> phpunit), en parallèle
+2. `security-scanner.yml`, après les deux précédents
 
 Important:
-- Le job `deploy-prod` est actif dans `ci-cd.yml` et s'exécute sur `main` uniquement.
+- La CI ne déploie pas. Elle s'arrête après l'analyse de sécurité.
 - Il n'existe pas d'environnement de staging automatisé à ce jour.
 
-### 5.3 Workflow deploy
+### 5.3 Déploiement
 
-Le workflow `.github/workflows/deploy.yml` déclenche un déploiement Coolify via
-son API, puis attend le statut final du déploiement.
+Il n'y a plus de workflow de déploiement. Coolify est abonné au dépôt par
+webhook git et redéploie de lui-même à chaque push sur la branche suivie.
 
-Il s'exécute via `workflow_call` (ou `workflow_dispatch`), avec les secrets:
-- `COOLIFY_URL`
-- `COOLIFY_TOKEN`
-- `COOLIFY_RESOURCE_UUID`
+Conséquence: la CI et le déploiement sont indépendants. Une CI rouge n'empêche
+pas Coolify de déployer; protéger la branche par une règle exigeant des checks
+verts avant merge est le moyen de couvrir ce cas.
 
 Voir [DEPLOYMENT_PROTOCOL.md](./DEPLOYMENT_PROTOCOL.md) section 2.5 pour la
 configuration de la ressource Coolify et les variables d'environnement.
@@ -223,7 +219,7 @@ Important:
 - [ ] Notes de version lues (breaking changes identifiés).
 - [ ] Plan de rollback valide.
 - [ ] Validation staging planifiée.
-- [ ] Vérification que les secrets `COOLIFY_*` sont présents dans GitHub.
+- [ ] Vérification des variables d'environnement de la ressource Coolify.
 
 ### 9.2 Après
 
