@@ -68,6 +68,7 @@ services:
 
       DATABASE_URL: postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB:-app}?serverVersion=18&charset=utf8
       REDIS_URL: redis://redis:6379
+      BACKEND_PORT: ${BACKEND_PORT:-8000}
 
       JWT_SECRET_KEY: "%kernel.project_dir%/config/jwt/private.pem"
       JWT_PUBLIC_KEY: "%kernel.project_dir%/config/jwt/public.pem"
@@ -92,7 +93,7 @@ services:
       # persist: a new one would invalidate every session on each redeploy.
       - backend_jwt:/app/config/jwt
     expose:
-      - "8000"
+      - "${BACKEND_PORT:-8000}"
     depends_on:
       database:
         condition: service_healthy
@@ -114,12 +115,16 @@ services:
         # to the backend, so no API origin is baked into the client bundle.
         NEXT_PUBLIC_API_URL: ""
     environment:
-      # Coolify reads this magic variable to assign a domain and route it to
-      # port 3000. Keep PUBLIC_URL identical to the domain it generates.
+      # Coolify parses the service and port out of this variable's NAME, so the
+      # trailing 3000 cannot be interpolated: the frontend's in-stack port stays
+      # fixed. That is harmless here because nothing is published to the host --
+      # Coolify's proxy reaches the container directly, so there is no clash with
+      # other apps. Changing it means renaming this variable to match.
+      # Keep PUBLIC_URL identical to the domain Coolify generates.
       - SERVICE_FQDN_FRONTEND_3000
       - NODE_ENV=production
       - NEXT_PUBLIC_API_URL=
-      - INTERNAL_API_URL=http://backend:8000
+      - INTERNAL_API_URL=http://backend:${BACKEND_PORT:-8000}
     expose:
       - "3000"
     depends_on:

@@ -18,8 +18,13 @@ RUN chown -R app-user:app-group /app
 
 USER app-user
 
-EXPOSE 3000
+# next's --port option declares .env('PORT'), so the env var alone sets the port.
+# Kept in exec form rather than passing a ${PORT} flag through a shell, which
+# would leave /bin/sh as PID 1's child and swallow SIGTERM on shutdown.
+ENV PORT=3000
+
+EXPOSE ${PORT}
 
 ENTRYPOINT ["/sbin/tini", "--"]
 
-CMD ["npm", "run", "dev", "--", "--hostname", "0.0.0.0", "--port", "3000"]
+CMD ["npm", "run", "dev", "--", "--hostname", "0.0.0.0"]

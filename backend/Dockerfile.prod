@@ -32,11 +32,12 @@ RUN composer install \
 
 FROM base AS runner
 
-# SERVER_NAME as a bare port (no hostname) makes Caddy serve plain HTTP and skip
-# automatic TLS: the Coolify proxy terminates HTTPS in front of this container.
+# BACKEND_PORT is the single knob for the listen port: docker-entrypoint.sh turns
+# it into Caddy's SERVER_NAME. A bare port with no hostname makes Caddy serve
+# plain HTTP and skip automatic TLS, since a reverse proxy terminates HTTPS.
 ENV APP_ENV=prod \
     APP_DEBUG=0 \
-    SERVER_NAME=:8000
+    BACKEND_PORT=8000
 
 COPY docker/php/prod.ini /usr/local/etc/php/conf.d/zz-app.ini
 
@@ -54,12 +55,14 @@ RUN addgroup -S app-group \
 
 USER app-user
 
-EXPOSE 8000
+EXPOSE ${BACKEND_PORT}
 
-# Exercises the database and Redis, not just the HTTP listener, so Coolify only
-# shifts traffic to a container whose dependencies actually answer.
+# Exercises the database and Redis, not just the HTTP listener, so an orchestrator
+# only shifts traffic to a container whose dependencies actually answer.
+# Docker leaves $VAR in HEALTHCHECK for the shell rather than substituting it at
+# build time, so this follows BACKEND_PORT at runtime.
 HEALTHCHECK --interval=10s --timeout=3s --retries=5 --start-period=30s \
-    CMD curl -fsS http://localhost:8000/health || exit 1
+    CMD curl -fsS "http://localhost:${BACKEND_PORT:-8000}/health" || exit 1
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
 

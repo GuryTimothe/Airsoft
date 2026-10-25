@@ -66,14 +66,32 @@ DATABASE_URL=postgresql://app:password@database:5432/app?serverVersion=18&charse
 ```env
 BACKEND_PORT=8000
 FRONTEND_PORT=3000
+DB_PORT=5432
+REDIS_PORT=6379
 ```
 
 | Variable | Description | Valeur par défaut |
 |----------|-------------|------------------|
-| `BACKEND_PORT` | Port exposé pour l'API Symfony | `8000` |
-| `FRONTEND_PORT` | Port exposé pour l'application Next.js | `3000` |
+| `BACKEND_PORT` | Port de l'API Symfony, dans le conteneur et sur l'hôte | `8000` |
+| `FRONTEND_PORT` | Port de l'application Next.js, dans le conteneur et sur l'hôte | `3000` |
+| `DB_PORT` | Port PostgreSQL publié sur l'hôte (développement uniquement) | `5432` |
+| `REDIS_PORT` | Port Redis publié sur l'hôte (développement uniquement) | `6379` |
 
-URLs accessibles après démarrage :
+Ces variables servent à éviter les collisions avec d'autres applications ou
+environnements déjà en écoute sur les ports par défaut.
+
+`BACKEND_PORT` et `FRONTEND_PORT` pilotent à la fois le port d'écoute du
+conteneur et le port publié, afin qu'une seule valeur déplace le service de bout
+en bout. `DB_PORT` et `REDIS_PORT` n'agissent que sur le port publié : PostgreSQL
+et Redis conservent leurs ports standards à l'intérieur du conteneur, ce qui
+laisse `DATABASE_URL` et `REDIS_URL` inchangés.
+
+> En déploiement Coolify, le port du frontend reste fixé à `3000` : Coolify
+> l'extrait du *nom* de la variable `SERVICE_FQDN_FRONTEND_3000` et ne peut donc
+> pas l'interpoler. Ce port n'est pas publié sur l'hôte, il ne peut donc pas
+> entrer en collision.
+
+URLs accessibles après démarrage (avec les valeurs par défaut) :
 
 - Frontend : http://localhost:3000
 - Backend API : http://localhost:8000

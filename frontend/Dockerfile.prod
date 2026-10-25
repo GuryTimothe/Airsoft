@@ -20,7 +20,9 @@ RUN apk add --no-cache tini \
 
 WORKDIR /app
 
+# Next's standalone server reads PORT at runtime.
 ENV NODE_ENV=production
+ENV PORT=3000
 
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
@@ -30,7 +32,7 @@ RUN chown -R app-user:app-group /app
 
 USER app-user
 
-EXPOSE 3000
+EXPOSE ${PORT}
 
 ENTRYPOINT ["/sbin/tini", "--"]
 
