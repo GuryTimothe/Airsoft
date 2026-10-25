@@ -86,10 +86,9 @@ en bout. `DB_PORT` et `REDIS_PORT` n'agissent que sur le port publié : PostgreS
 et Redis conservent leurs ports standards à l'intérieur du conteneur, ce qui
 laisse `DATABASE_URL` et `REDIS_URL` inchangés.
 
-> En déploiement Coolify, le port du frontend reste fixé à `3000` : Coolify
-> l'extrait du *nom* de la variable `SERVICE_FQDN_FRONTEND_3000` et ne peut donc
-> pas l'interpoler. Ce port n'est pas publié sur l'hôte, il ne peut donc pas
-> entrer en collision.
+> En déploiement Coolify, `FRONTEND_PORT` est le port publié sur l'hôte, celui
+> vers lequel le reverse proxy redirige. Le backend n'est pas publié : il reste
+> joignable uniquement depuis le réseau interne de la stack.
 
 URLs accessibles après démarrage (avec les valeurs par défaut) :
 
