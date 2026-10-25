@@ -183,6 +183,56 @@ final class UserVoterTest extends TestCase
         $this->assertSame(1, $voter->vote($this->createToken($actor), $target, [UserVoter::UPDATE_USER]));
     }
 
+    public function testAdminCanUpdateOrganizer(): void
+    {
+        $voter = new UserVoter();
+        $actor = (new User())->setRole('ROLE_ADMIN');
+        $target = (new User())->setRole('ROLE_ORGANIZER');
+
+        $this->assertSame(1, $voter->vote($this->createToken($actor), $target, [UserVoter::UPDATE_USER]));
+    }
+
+    public function testAdminCannotUpdateAdmin(): void
+    {
+        $voter = new UserVoter();
+        $actor = (new User())->setRole('ROLE_ADMIN');
+        $target = (new User())->setRole('ROLE_ADMIN');
+
+        $this->assertSame(-1, $voter->vote($this->createToken($actor), $target, [UserVoter::UPDATE_USER]));
+    }
+
+    /**
+     * The escalation this guards against: an admin patching a super admin down
+     * to ROLE_USER. The operation authorizes against previous_object, so the
+     * voter sees the target's stored role rather than the submitted one.
+     */
+    public function testAdminCannotUpdateSuperAdmin(): void
+    {
+        $voter = new UserVoter();
+        $actor = (new User())->setRole('ROLE_ADMIN');
+        $target = (new User())->setRole('ROLE_SUPER_ADMIN');
+
+        $this->assertSame(-1, $voter->vote($this->createToken($actor), $target, [UserVoter::UPDATE_USER]));
+    }
+
+    public function testSuperAdminCanUpdateAdmin(): void
+    {
+        $voter = new UserVoter();
+        $actor = (new User())->setRole('ROLE_SUPER_ADMIN');
+        $target = (new User())->setRole('ROLE_ADMIN');
+
+        $this->assertSame(1, $voter->vote($this->createToken($actor), $target, [UserVoter::UPDATE_USER]));
+    }
+
+    public function testSuperAdminCanUpdateAnotherSuperAdmin(): void
+    {
+        $voter = new UserVoter();
+        $actor = (new User())->setRole('ROLE_SUPER_ADMIN');
+        $target = (new User())->setRole('ROLE_SUPER_ADMIN');
+
+        $this->assertSame(1, $voter->vote($this->createToken($actor), $target, [UserVoter::UPDATE_USER]));
+    }
+
     public function testUserCannotUpdateUser(): void
     {
         $voter = new UserVoter();

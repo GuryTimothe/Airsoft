@@ -26,22 +26,19 @@
 
 ## 2. Dispositif de validation continue
 
-La conformité est contrôlée automatiquement à chaque push.
+**Tests unitaires** : tests Jest ciblés sur des composants (ex. `GameListCard.a11y.test.tsx`, `AuthForm.a11y.test.tsx`), exécutés à chaque push par `frontend-ci.yml`. C'est aujourd'hui le seul contrôle d'accessibilité automatisé.
 
-**Lighthouse CI** (`.github/workflows/lighthouse.yml`)
-- Score d'accessibilité WCAG 2.1 AA calculé à chaque push
-- Seuil de validation : score > 80
-- Rapport en artefact GitHub Actions
+**Audits manuels** : Lighthouse et Pa11y restent disponibles en local et ne sont plus exécutés par la CI.
 
-**Pa11y CI** (`.github/workflows/pa11y.yml`)
-- Conformité WCAG AA vérifiée via axe + htmlcs (`.pa11yci.json`)
-- Scan des pages clés : accueil, connexion, inscription, tableau de bord, paramètres, admin
-- Seuil : max 3 problèmes par page, sinon échec du pipeline
-- Rapport détaillé : `pa11y-report.json`
+```bash
+cd frontend
+npm run test:pa11y        # axe + htmlcs, configuration .pa11yci.json
+```
 
-**Tests unitaires** : tests Jest ciblés sur des composants (ex. `GameListCard.a11y.test.tsx`, `AuthForm.a11y.test.tsx`)
-
-**Intérêt de l'approche** : toute régression d'accessibilité est détectée dès son introduction, sans dépendre d'une revue manuelle récurrente — contrôle systématique plutôt qu'a posteriori.
+> Les URL listées dans `.pa11yci.json` sont obsolètes : `/register`, `/login`,
+> `/dashboard` et `/settings` n'existent pas (les routes réelles sont
+> `/auth/register`, `/auth/login`, `/profil` et `/admin/settings`). Elles
+> doivent être corrigées avant de se fier au rapport.
 
 ## 3. Mesures mises en œuvre
 

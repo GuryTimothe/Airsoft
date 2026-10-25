@@ -24,20 +24,15 @@ backend-ci.yml        frontend-ci.yml
 └──────────────┬──────────────┘
                ↓
         security-scanner.yml
-               ↓
-          lighthouse.yml
-               ↓
-             pa11y.yml
-               ↓
-        (main uniquement)
-          release.yml
-               ↓
-            deploy.yml
-       
 
-        [PASS] → Merge / Déploiement possible
+
+        [PASS] → Merge possible
 
         [FAIL] → Merge bloqué
+
+
+Le déploiement est indépendant de la CI : Coolify le déclenche
+depuis son propre webhook git (voir section 2.5).
 ```
 
 ---
@@ -54,10 +49,10 @@ Le pipeline est exécuté automatiquement lors de push sur GitHub.
 | `backend-ci.yml` | Validation de l'application Symfony (linting, formatage, tests automatisés) | Parallèle |
 | `frontend-ci.yml` | Validation de l'application Next.js (linting, formatage, tests automatisés) | Parallèle |
 | `security-scanner.yml` | Analyse de sécurité, qualité du code et détection des vulnérabilités | Après `frontend-ci.yml` et `backend-ci.yml`|
-| `lighthouse.yml` | Audit des performances frontend et vérification des budgets qualité | Après `frontend-ci.yml` |
-| `pa11y.yml` | Tests automatisés d'accessibilité selon les critères WCAG | Après `lighthouse.yml` |
-| `deploy.yml` | Déploiement automatique vers les environnements configurés | Après validation complète du pipeline sur la branche `main` uniquement |
-| `release.yml` | Génération du changelog et gestion des versions | Branche `main` uniquement |
+
+> La CI s'arrête après l'analyse de sécurité. Les audits Lighthouse et Pa11y
+> ainsi que l'automatisation des releases ont été retirés du pipeline, et le
+> déploiement ne passe plus par GitHub Actions.
 
 ### Résultat attendu
 
@@ -159,30 +154,23 @@ Le pipeline CD automatise la création des versions applicatives et prépare le 
 
 ---
 
-## 2.1 Versioning et Release Automation
+## 2.1 Versioning
 
-### Outil utilisé
+Le versioning suit le Semantic Versioning et s'appuie sur les Conventional
+Commits (section 2.2).
 
-```bash
-release-please (Google)
-```
-
-L'outil permet d'automatiser :
-
-- la gestion des versions
-- la génération du changelog
-- la création des releases GitHub
-- la création des tags Git
+L'automatisation `release-please` a été retirée du pipeline CI. Les fichiers de
+configuration (`.release-pleaserc.json`, `.release-please-manifest.json`) sont
+conservés, ce qui permet de la réactiver dans un workflow dédié si besoin. En
+attendant, les versions, le changelog et les tags sont gérés manuellement.
 
 ---
 
 ### Déclenchement
 
-Une release est préparée après validation complète du pipeline CI sur la branche `main`
-
-Le merge sur `main` déclenche deux mécanismes distincts et indépendants :
-- **`release-please`** : génère la version, le changelog et le tag Git (opérationnel)
-- **`deploy.yml`** : tente un déploiement via FTP (non opérationnel tant qu'aucun serveur n'est configuré)
+Un push sur `main` déclenche deux mécanismes distincts et indépendants :
+- **GitHub Actions** : valide le code (lint, tests, analyse de sécurité)
+- **Coolify** : construit et redéploie la stack depuis son webhook git
 
 ## 2.2 Convention des Commits
 
@@ -240,7 +228,8 @@ Exemple :
 
 ## 2.4 Déploiement par Environnement
 
-> Aucun environnement distant est existant
+L'hébergement est assuré par **Coolify**, une plateforme auto-hébergée qui
+construit et exécute les images Docker du projet.
 
 ---
 
@@ -252,33 +241,75 @@ L'environnement production est destiné à contenir la version accessible aux ut
 
 - Merge vers `main`
 
-**Actions prévues :**
+**Actions :**
 
 ```bash
-- Build des applications backend et frontend
-- Génération de la release (release-please)
-- Tentative de déploiement via FTP (deploy.yml)
+- Validation du code par la CI (lint, tests, analyse de sécurité)
+- En parallèle, Coolify reçoit le webhook git
+- Build des images et redémarrage de la stack par Coolify
 ```
+
+> La CI et le déploiement sont indépendants : un échec de la CI n'empêche pas
+> Coolify de déployer. Protéger `main` par une règle exigeant des checks verts
+> avant merge est le moyen de couvrir ce cas.
 
 ---
 
-## 2.5 Déploiement via FTP
+## 2.5 Déploiement via Coolify
 
-Le déploiement repose sur un transfert de fichiers par FTP plutôt que sur une conteneurisation.
+Le déploiement est conteneurisé et **entièrement piloté par Coolify**. GitHub
+Actions n'intervient pas : aucun workflow ne contacte la production.
+
+Coolify s'abonne au dépôt via un webhook git. À chaque push sur la branche
+suivie, il récupère les sources, construit les images et redémarre la stack.
 
 **Fichier :**
 
 ```bash
-.github/workflows/deploy.yml
+docker-compose.coolify.yml       # stack déployée par Coolify
 ```
 
-**Étapes prévues :**
+**Étapes :**
 
 ```bash
-- Build des applications backend et frontend
-- Connexion au serveur cible via FTP
-- Transfert des fichiers buildés
+- Push sur la branche suivie
+- GitHub notifie Coolify via le webhook
+- Coolify clone le dépôt et construit les images
+- Redémarrage de la stack, healthcheck /health du backend avant mise en service
 ```
+
+### Configuration Coolify
+
+Créer une ressource de type **Docker Compose** pointant sur le dépôt, avec
+`docker-compose.coolify.yml` comme fichier de composition.
+
+Le proxy interne de Coolify n'est pas utilisé. La stack publie un seul port sur
+l'hôte, `FRONTEND_PORT`, vers lequel le reverse proxy de l'infrastructure
+redirige le trafic.
+
+Le navigateur appelle le serveur Next.js, qui relaie `/api/*` vers le backend via
+le réseau interne (`next.config.ts`). Le backend n'est donc pas publié et n'a
+besoin ni de domaine ni d'exposition CORS.
+
+**Secrets GitHub requis :** aucun. Le déploiement ne passant plus par GitHub
+Actions, les secrets `VPS_*` et `COOLIFY_*` peuvent être supprimés du dépôt.
+
+**Variables d'environnement à définir dans Coolify :**
+
+| Variable | Description |
+|----------|-------------|
+| `FRONTEND_PORT` | Port publié sur l'hôte pour le reverse proxy (défaut `3000`) |
+| `PUBLIC_URL` | Origine publique servie par le proxy, sans slash final |
+| `CORS_ALLOW_ORIGIN` | Regex ancrée autorisant cette origine |
+| `APP_SECRET` | Secret applicatif Symfony |
+| `POSTGRES_PASSWORD` | Mot de passe PostgreSQL |
+| `JWT_PASSPHRASE` | Passphrase protégeant la clé privée RSA |
+| `MAILER_DSN`, `MAILER_FROM` | Configuration SMTP |
+| `SUPER_ADMIN_*` | Compte super administrateur initial |
+
+La paire de clés JWT est générée automatiquement au premier démarrage du
+conteneur backend et conservée dans le volume `backend_jwt`. Elle ne doit pas
+être régénérée : tous les tokens émis seraient invalidés.
 
 
 # 3. Gestion des Releases
@@ -321,14 +352,9 @@ Les fichiers utilisés pour le déploiement sont organisés comme suit :
 │   ├── ci-cd.yml
 │   ├── backend-ci.yml
 │   ├── frontend-ci.yml
-│   ├── security-scanner.yml
-│   ├── lighthouse.yml
-│   ├── pa11y.yml
-│   ├── deploy.yml
-│   └── release.yml
+│   └── security-scanner.yml
 │
-├── release configuration
-│
+docker-compose.coolify.yml
 backend/
 frontend/
 ```
@@ -352,10 +378,10 @@ frontend/
 
 | Outil | Utilisation |
 |-------|-------------|
-| GitHub Actions | Automatisation CI/CD |
-| FTP | Transfert des fichiers vers le serveur cible |
-| release-please | Gestion des versions |
-| Semantic Versioning | Convention des releases |
-| Conventional Commits | Automatisation changelog |
+| GitHub Actions | Validation du code (lint, tests, analyse de sécurité) |
+| Coolify | Build des images et déploiement via webhook git |
+| FrankenPHP | Serveur applicatif PHP du conteneur backend |
+| Semantic Versioning | Convention de versionnage |
+| Conventional Commits | Convention de messages de commit |
 
 ---

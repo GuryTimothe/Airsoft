@@ -109,7 +109,12 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
             security: "is_granted('PUBLIC_ACCESS')",
         ),
         new Patch(
-            securityPostDenormalize: "is_granted('UPDATE_USER', object)",
+            // previous_object, not object: by this stage the payload has been
+            // denormalized into the entity, so object already carries the
+            // submitted role. Authorizing against it would let an admin target a
+            // super admin simply by sending role=ROLE_USER in the same request.
+            // The role being assigned is validated in UserUpdateProcessor.
+            securityPostDenormalize: "is_granted('UPDATE_USER', previous_object)",
             processor: UserUpdateProcessor::class,
             validationContext: ['groups' => ['user:admin:update']],
         ),

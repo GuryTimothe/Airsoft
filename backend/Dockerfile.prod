@@ -1,45 +1,71 @@
-FROM php:8.5-cli-alpine
+# syntax=docker/dockerfile:1
 
-RUN apk add --no-cache \
-    curl \
-    git \
-    icu-dev \
-    postgresql-dev \
-    tini \
-    unzip \
-    $PHPIZE_DEPS \
-    && docker-php-ext-install intl pdo_pgsql \
-    && apk del $PHPIZE_DEPS
+# FrankenPHP (Caddy + PHP embedded in a single binary) replaces the PHP built-in
+# server, which is single-request-at-a-time and explicitly unsupported in production.
+# One process serves both static files and PHP, so no php-fpm + nginx + supervisor stack.
+FROM dunglas/frankenphp:1.13.3-php8.4-alpine AS base
 
-RUN echo "opcache.enable=1" >> /usr/local/etc/php/conf.d/opcache.ini \
-    && echo "opcache.memory_consumption=128" >> /usr/local/etc/php/conf.d/opcache.ini \
-    && echo "opcache.max_accelerated_files=10000" >> /usr/local/etc/php/conf.d/opcache.ini \
-    && echo "opcache.revalidate_freq=0" >> /usr/local/etc/php/conf.d/opcache.ini
-
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
-
-RUN addgroup -S app-group \
-    && adduser -S app-user -G app-group
+# install-php-extensions ships with the FrankenPHP images.
+RUN install-php-extensions \
+        intl \
+        pdo_pgsql \
+        opcache \
+        apcu
 
 WORKDIR /app
 
+
+FROM base AS vendor
+
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
 COPY composer.json composer.lock symfony.lock ./
 
-RUN composer install --no-interaction --no-progress --prefer-dist --no-scripts --no-dev --optimize-autoloader
+RUN composer install \
+        --no-interaction \
+        --no-progress \
+        --prefer-dist \
+        --no-scripts \
+        --no-dev \
+        --optimize-autoloader
 
+
+FROM base AS runner
+
+# BACKEND_PORT is the single knob for the listen port: docker-entrypoint.sh turns
+# it into Caddy's SERVER_NAME. A bare port with no hostname makes Caddy serve
+# plain HTTP and skip automatic TLS, since a reverse proxy terminates HTTPS.
+ENV APP_ENV=prod \
+    APP_DEBUG=0 \
+    BACKEND_PORT=8000
+
+COPY docker/php/prod.ini /usr/local/etc/php/conf.d/zz-app.ini
+
+# vendor/ is excluded by .dockerignore, so the application copy cannot clobber it.
 COPY . .
+COPY --from=vendor /app/vendor ./vendor
 
-COPY docker-entrypoint.sh /app/docker-entrypoint.sh
-RUN chmod +x /app/docker-entrypoint.sh \
-    && chown app-user:app-group /app/docker-entrypoint.sh
-
-RUN mkdir -p var/cache var/log config/jwt \
-    && chown -R app-user:app-group /app
+# docker-entrypoint.sh is tracked as 0644 in git, so the exec bit is set here.
+# /data and /config are Caddy's XDG dirs, declared by the base image.
+RUN addgroup -S app-group \
+    && adduser -S app-user -G app-group \
+    && mkdir -p var/cache var/log config/jwt \
+    && chmod +x docker-entrypoint.sh \
+    && chown -R app-user:app-group /app /data /config
 
 USER app-user
 
-EXPOSE 8000
+EXPOSE ${BACKEND_PORT}
 
-ENTRYPOINT ["/sbin/tini", "--", "/app/docker-entrypoint.sh"]
+# Exercises the database and Redis, not just the HTTP listener, so an orchestrator
+# only shifts traffic to a container whose dependencies actually answer.
+# Docker leaves $VAR in HEALTHCHECK for the shell rather than substituting it at
+# build time, so this follows BACKEND_PORT at runtime.
+HEALTHCHECK --interval=10s --timeout=3s --retries=5 --start-period=30s \
+    CMD curl -fsS "http://localhost:${BACKEND_PORT:-8000}/health" || exit 1
 
-CMD ["php", "-S", "0.0.0.0:8000", "-t", "public"]
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
+
+# Consumed by docker-php-entrypoint, which the FrankenPHP image rewrites to
+# exec `frankenphp run`.
+CMD ["--config", "/etc/frankenphp/Caddyfile", "--adapter", "caddyfile"]

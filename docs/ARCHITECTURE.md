@@ -99,16 +99,14 @@ Application web full-stack avec séparation nette entre **backend API** et **fro
 | **Repository** | GitHub | Hébergement code | https://github.com |
 | **Commits** | Conventional Commits | Traçabilité commits | feat:, fix:, chore:, refactor: |
 | **CI/CD** | GitHub Actions | Tests, build, deploy automatiques | .github/workflows/ |
-| **Release** | release-please | Version automation + changelog | .release-pleaserc.json |
 
 **Workflows** :
 - `ci-cd.yml` - Orchestration des différents jobs CI/CD
 - `backend-ci.yml` - Linting, formatage, tests et scan automatisés du backend
 - `frontend-ci.yml` - Linting, formatage et tests automatisés du frontend
-- `deploy.yml` - Déploiement automatique vers les environnements configurés
-- `lighthouse.yml` - Vérification des performances et du respect des budgets qualité
-- `pa11y.yml` - Tests automatisés d'accessibilité WCAG
-- `release.yml` - Génération du changelog et gestion des versions sur main
+
+Le déploiement ne fait pas partie de la CI: Coolify redéploie depuis son
+propre webhook git.
 - `security-scanner.yml` - Analyse qualité du code et détection de vulnérabilités
 
 ### 5. Outils de Build et Compilation
