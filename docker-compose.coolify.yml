@@ -34,16 +34,25 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-app}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in Coolify}
     volumes:
-      # The image's PGDATA. Mounting the parent /var/lib/postgresql instead is a
-      # known footgun across major-version upgrades.
-      - database_pgdata:/var/lib/postgresql/data
+      # Postgres 18 moved PGDATA to /var/lib/postgresql/18/docker and declares
+      # VOLUME /var/lib/postgresql, so the parent is the correct mount point.
+      # Mounting /var/lib/postgresql/data here (the pre-18 location) leaves the
+      # real data directory outside the volume and loses it on every redeploy.
+      - database_pgdata:/var/lib/postgresql
     healthcheck:
+      # The :-app fallbacks hold whether this is expanded by compose or by the
+      # container shell, so an empty POSTGRES_DB/POSTGRES_USER cannot turn into
+      # `pg_isready -d  -U ` and fail the probe.
       test:
-        ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+        [
+          "CMD-SHELL",
+          "pg_isready -d $${POSTGRES_DB:-app} -U $${POSTGRES_USER:-app}",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      # initdb on a fresh volume can take a while before the socket is up.
+      start_period: 60s
     restart: unless-stopped
 
   redis:
