@@ -24,20 +24,15 @@ backend-ci.yml        frontend-ci.yml
 └──────────────┬──────────────┘
                ↓
         security-scanner.yml
-               ↓
-          lighthouse.yml
-               ↓
-             pa11y.yml
-               ↓
-        (main uniquement)
-          release.yml
-               ↓
-            deploy.yml
-       
 
-        [PASS] → Merge / Déploiement possible
+
+        [PASS] → Merge possible
 
         [FAIL] → Merge bloqué
+
+
+Le déploiement est indépendant de la CI : Coolify le déclenche
+depuis son propre webhook git (voir section 2.5).
 ```
 
 ---
@@ -54,10 +49,10 @@ Le pipeline est exécuté automatiquement lors de push sur GitHub.
 | `backend-ci.yml` | Validation de l'application Symfony (linting, formatage, tests automatisés) | Parallèle |
 | `frontend-ci.yml` | Validation de l'application Next.js (linting, formatage, tests automatisés) | Parallèle |
 | `security-scanner.yml` | Analyse de sécurité, qualité du code et détection des vulnérabilités | Après `frontend-ci.yml` et `backend-ci.yml`|
-| `lighthouse.yml` | Audit des performances frontend et vérification des budgets qualité | Après `frontend-ci.yml` |
-| `pa11y.yml` | Tests automatisés d'accessibilité selon les critères WCAG | Après `lighthouse.yml` |
-| `deploy.yml` | Déploiement automatique vers les environnements configurés | Après validation complète du pipeline sur la branche `main` uniquement |
-| `release.yml` | Génération du changelog et gestion des versions | Branche `main` uniquement |
+
+> La CI s'arrête après l'analyse de sécurité. Les audits Lighthouse et Pa11y
+> ainsi que l'automatisation des releases ont été retirés du pipeline, et le
+> déploiement ne passe plus par GitHub Actions.
 
 ### Résultat attendu
 
@@ -159,30 +154,23 @@ Le pipeline CD automatise la création des versions applicatives et prépare le 
 
 ---
 
-## 2.1 Versioning et Release Automation
+## 2.1 Versioning
 
-### Outil utilisé
+Le versioning suit le Semantic Versioning et s'appuie sur les Conventional
+Commits (section 2.2).
 
-```bash
-release-please (Google)
-```
-
-L'outil permet d'automatiser :
-
-- la gestion des versions
-- la génération du changelog
-- la création des releases GitHub
-- la création des tags Git
+L'automatisation `release-please` a été retirée du pipeline CI. Les fichiers de
+configuration (`.release-pleaserc.json`, `.release-please-manifest.json`) sont
+conservés, ce qui permet de la réactiver dans un workflow dédié si besoin. En
+attendant, les versions, le changelog et les tags sont gérés manuellement.
 
 ---
 
 ### Déclenchement
 
-Une release est préparée après validation complète du pipeline CI sur la branche `main`
-
-Le merge sur `main` déclenche deux mécanismes distincts et indépendants :
-- **`release-please`** : génère la version, le changelog et le tag Git (opérationnel)
-- **`deploy.yml`** : déclenche le déploiement sur Coolify via son API
+Un push sur `main` déclenche deux mécanismes distincts et indépendants :
+- **GitHub Actions** : valide le code (lint, tests, analyse de sécurité)
+- **Coolify** : construit et redéploie la stack depuis son webhook git
 
 ## 2.2 Convention des Commits
 
@@ -256,34 +244,38 @@ L'environnement production est destiné à contenir la version accessible aux ut
 **Actions :**
 
 ```bash
-- Validation complète du pipeline CI
-- Génération de la release (release-please)
-- Appel de l'API Coolify (deploy.yml)
-- Build et redémarrage des conteneurs par Coolify
-- Attente de la fin du déploiement et remontée du statut dans GitHub Actions
+- Validation du code par la CI (lint, tests, analyse de sécurité)
+- En parallèle, Coolify reçoit le webhook git
+- Build des images et redémarrage de la stack par Coolify
 ```
+
+> La CI et le déploiement sont indépendants : un échec de la CI n'empêche pas
+> Coolify de déployer. Protéger `main` par une règle exigeant des checks verts
+> avant merge est le moyen de couvrir ce cas.
 
 ---
 
 ## 2.5 Déploiement via Coolify
 
-Le déploiement est conteneurisé. GitHub Actions ne transfère aucun fichier :
-Coolify récupère lui-même le dépôt, construit les images et redémarre la stack.
+Le déploiement est conteneurisé et **entièrement piloté par Coolify**. GitHub
+Actions n'intervient pas : aucun workflow ne contacte la production.
 
-**Fichiers :**
+Coolify s'abonne au dépôt via un webhook git. À chaque push sur la branche
+suivie, il récupère les sources, construit les images et redémarre la stack.
+
+**Fichier :**
 
 ```bash
-.github/workflows/deploy.yml     # déclenche et surveille le déploiement
 docker-compose.coolify.yml       # stack déployée par Coolify
 ```
 
 **Étapes :**
 
 ```bash
-- POST /api/v1/deploy?uuid=<resource> sur l'instance Coolify
-- Récupération du deployment_uuid retourné
-- Polling de GET /api/v1/deployments/<uuid> jusqu'au statut final
-- Succès si "finished", échec si "failed" ou "cancelled", timeout à 25 minutes
+- Push sur la branche suivie
+- GitHub notifie Coolify via le webhook
+- Coolify clone le dépôt et construit les images
+- Redémarrage de la stack, healthcheck /health avant bascule du trafic
 ```
 
 ### Configuration Coolify
@@ -295,13 +287,8 @@ Seul le frontend est exposé publiquement. Le navigateur appelle le serveur
 Next.js, qui relaie `/api/*` vers le backend via le réseau interne
 (`next.config.ts`), donc le backend n'a ni domaine public ni exposition CORS.
 
-**Secrets GitHub requis :**
-
-| Secret | Description |
-|--------|-------------|
-| `COOLIFY_URL` | URL de l'instance Coolify (HTTPS) |
-| `COOLIFY_TOKEN` | Jeton d'API Coolify disposant du droit de déploiement |
-| `COOLIFY_RESOURCE_UUID` | UUID de la ressource Coolify à déployer |
+**Secrets GitHub requis :** aucun. Le déploiement ne passant plus par GitHub
+Actions, les secrets `VPS_*` et `COOLIFY_*` peuvent être supprimés du dépôt.
 
 **Variables d'environnement à définir dans Coolify :**
 
@@ -360,14 +347,9 @@ Les fichiers utilisés pour le déploiement sont organisés comme suit :
 │   ├── ci-cd.yml
 │   ├── backend-ci.yml
 │   ├── frontend-ci.yml
-│   ├── security-scanner.yml
-│   ├── lighthouse.yml
-│   ├── pa11y.yml
-│   ├── deploy.yml
-│   └── release.yml
+│   └── security-scanner.yml
 │
-├── release configuration
-│
+docker-compose.coolify.yml
 backend/
 frontend/
 ```
@@ -391,11 +373,10 @@ frontend/
 
 | Outil | Utilisation |
 |-------|-------------|
-| GitHub Actions | Automatisation CI/CD |
-| Coolify | Build des images et exécution de la stack en production |
+| GitHub Actions | Validation du code (lint, tests, analyse de sécurité) |
+| Coolify | Build des images et déploiement via webhook git |
 | FrankenPHP | Serveur applicatif PHP du conteneur backend |
-| release-please | Gestion des versions |
-| Semantic Versioning | Convention des releases |
-| Conventional Commits | Automatisation changelog |
+| Semantic Versioning | Convention de versionnage |
+| Conventional Commits | Convention de messages de commit |
 
 ---
