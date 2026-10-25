@@ -63,7 +63,9 @@ services:
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      # PONG on stdout is not enough on its own: redis-cli exits 0 even when the
+      # server answers an error, so match the payload.
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -109,6 +111,19 @@ services:
       - backend_jwt:/app/config/jwt
     expose:
       - "${BACKEND_PORT:-8000}"
+    # Mirrors the image's own HEALTHCHECK, restated here so the probe is visible
+    # in the stack definition and follows BACKEND_PORT. /health checks Postgres
+    # and Redis too, so the backend only reports healthy once it can serve.
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://127.0.0.1:$${BACKEND_PORT:-8000}/health || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
     depends_on:
       database:
         condition: service_healthy
@@ -139,6 +154,21 @@ services:
       # Coolify's own proxy is not used, so there is no SERVICE_FQDN_* magic
       # variable here and the port is free to move.
       - "${FRONTEND_PORT:-3000}:${FRONTEND_PORT:-3000}"
+    # node is guaranteed present in this image; curl and busybox wget are not.
+    # Hits /healthz, which does not call the API, so a backend outage surfaces on
+    # the backend's probe instead of restarting a healthy frontend.
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     depends_on:
       backend:
         condition: service_healthy
