@@ -12,6 +12,7 @@ use ApiPlatform\Metadata\Post;
 use App\Dto\GameRegistrationInput;
 use App\Dto\GameRegistrationPresenceInput;
 use App\Repository\GameRegistrationRepository;
+use App\State\GameRegistrationCancelProcessor;
 use App\State\GameRegistrationCreateProcessor;
 use App\State\GameRegistrationPresenceProcessor;
 use App\State\MyGameRegistrationsProvider;
@@ -40,7 +41,10 @@ use Symfony\Component\Serializer\Annotation\SerializedName;
             input: GameRegistrationPresenceInput::class,
             processor: GameRegistrationPresenceProcessor::class,
         ),
-        new Delete(security: "is_granted('DELETE_GAME_REGISTRATION', object)"),
+        new Delete(
+            security: "is_granted('DELETE_GAME_REGISTRATION', object)",
+            processor: GameRegistrationCancelProcessor::class,
+        ),
     ]
 )]
 #[ApiFilter(SearchFilter::class, properties: ['game.id' => 'exact', 'user.id' => 'exact', 'user.email' => 'exact'])]

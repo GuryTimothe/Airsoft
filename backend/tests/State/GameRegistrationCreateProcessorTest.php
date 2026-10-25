@@ -3,7 +3,6 @@
 namespace App\Tests\State;
 
 use ApiPlatform\Metadata\Post;
-use ApiPlatform\Validator\Exception\ValidationException;
 use App\Dto\GameRegistrationInput;
 use App\Entity\Game;
 use App\Entity\GameRegistration;
@@ -13,11 +12,14 @@ use App\Repository\GameRepository;
 use App\State\GameRegistrationCreateProcessor;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\Mailer\MailerInterface;
+use Symfony\Component\Mime\Email;
 use Symfony\Component\Validator\ConstraintViolationList;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
@@ -64,16 +66,18 @@ final class GameRegistrationCreateProcessorTest extends TestCase
         $registrationRepo->method('countByGame')->willReturn($registrationCount);
 
         $entityManager = $this->createMock(EntityManagerInterface::class);
+        $mailer        = $this->createMock(MailerInterface::class);
+        $logger        = $this->createMock(LoggerInterface::class);
 
-        return new GameRegistrationCreateProcessor($security, $validator, $gameRepo, $registrationRepo, $entityManager);
+        return new GameRegistrationCreateProcessor($security, $validator, $gameRepo, $registrationRepo, $entityManager, $mailer, 'noreply@example.com', $logger);
     }
 
     public function testThrowsBadRequestWhenGameReferenceIsInvalid(): void
     {
-        $user = new User();
+        $user      = new User();
         $processor = $this->createProcessor($user, null);
 
-        $input = new GameRegistrationInput();
+        $input       = new GameRegistrationInput();
         $input->game = 'not-a-valid-reference';
 
         $this->expectException(BadRequestHttpException::class);
@@ -82,10 +86,10 @@ final class GameRegistrationCreateProcessorTest extends TestCase
 
     public function testThrowsBadRequestWhenGameReferenceIsEmpty(): void
     {
-        $user = new User();
+        $user      = new User();
         $processor = $this->createProcessor($user, null);
 
-        $input = new GameRegistrationInput();
+        $input       = new GameRegistrationInput();
         $input->game = '';
 
         $this->expectException(BadRequestHttpException::class);
@@ -94,10 +98,10 @@ final class GameRegistrationCreateProcessorTest extends TestCase
 
     public function testThrowsNotFoundWhenGameDoesNotExist(): void
     {
-        $user = new User();
+        $user      = new User();
         $processor = $this->createProcessor($user, null);
 
-        $input = new GameRegistrationInput();
+        $input       = new GameRegistrationInput();
         $input->game = '42';
 
         $this->expectException(NotFoundHttpException::class);
@@ -108,7 +112,7 @@ final class GameRegistrationCreateProcessorTest extends TestCase
     {
         $processor = $this->createProcessor(null, $this->createGame());
 
-        $input = new GameRegistrationInput();
+        $input       = new GameRegistrationInput();
         $input->game = '1';
 
         $this->expectException(AccessDeniedHttpException::class);
@@ -117,12 +121,12 @@ final class GameRegistrationCreateProcessorTest extends TestCase
 
     public function testThrowsConflictWhenAlreadyRegistered(): void
     {
-        $user = new User();
-        $game = $this->createGame();
-        $existing = new GameRegistration();
+        $user      = new User();
+        $game      = $this->createGame();
+        $existing  = new GameRegistration();
         $processor = $this->createProcessor($user, $game, $existing);
 
-        $input = new GameRegistrationInput();
+        $input       = new GameRegistrationInput();
         $input->game = '/api/games/1';
 
         $this->expectException(ConflictHttpException::class);
@@ -132,11 +136,11 @@ final class GameRegistrationCreateProcessorTest extends TestCase
 
     public function testThrowsAccessDeniedWhenGameIsPrivateAndUserCannotSeePrivate(): void
     {
-        $user = (new User())->setCanSeePrivate(false);
-        $game = $this->createGame(false);
+        $user      = (new User())->setCanSeePrivate(false);
+        $game      = $this->createGame(false);
         $processor = $this->createProcessor($user, $game);
 
-        $input = new GameRegistrationInput();
+        $input       = new GameRegistrationInput();
         $input->game = '1';
 
         $this->expectException(AccessDeniedHttpException::class);
@@ -146,11 +150,11 @@ final class GameRegistrationCreateProcessorTest extends TestCase
 
     public function testThrowsConflictWhenGameIsFull(): void
     {
-        $user = new User();
-        $game = $this->createGame(true, 5);
+        $user      = new User();
+        $game      = $this->createGame(true, 5);
         $processor = $this->createProcessor($user, $game, null, 5, false);
 
-        $input = new GameRegistrationInput();
+        $input       = new GameRegistrationInput();
         $input->game = '1';
 
         $this->expectException(ConflictHttpException::class);
@@ -160,7 +164,9 @@ final class GameRegistrationCreateProcessorTest extends TestCase
 
     public function testSuccessfulRegistrationWithNumericGameId(): void
     {
-        $user = new User();
+        $user = (new User())
+            ->setFirstname('Jean')
+            ->setEmail('jean@example.com');
         $game = $this->createGame(true, 20);
 
         $entityManager = $this->createMock(EntityManagerInterface::class);
@@ -183,9 +189,21 @@ final class GameRegistrationCreateProcessorTest extends TestCase
         $registrationRepo->method('findOneBy')->willReturn(null);
         $registrationRepo->method('countByGame')->willReturn(0);
 
-        $processor = new GameRegistrationCreateProcessor($security, $validator, $gameRepo, $registrationRepo, $entityManager);
+        $mailer = $this->createMock(MailerInterface::class);
+        $mailer->expects($this->once())
+            ->method('send')
+            ->with($this->callback(static function (Email $email): bool {
+                return 'Inscription confirmée : Test' === $email->getSubject()
+                    && ['jean@example.com']           === array_map(
+                        static fn ($address): string => $address->getAddress(),
+                        $email->getTo(),
+                    );
+            }));
+        $logger = $this->createMock(LoggerInterface::class);
 
-        $input = new GameRegistrationInput();
+        $processor = new GameRegistrationCreateProcessor($security, $validator, $gameRepo, $registrationRepo, $entityManager, $mailer, 'noreply@example.com', $logger);
+
+        $input       = new GameRegistrationInput();
         $input->game = '1';
 
         $result = $processor->process($input, new Post());
@@ -197,7 +215,9 @@ final class GameRegistrationCreateProcessorTest extends TestCase
 
     public function testSuccessfulRegistrationWithIriGameReference(): void
     {
-        $user = new User();
+        $user = (new User())
+            ->setFirstname('Jean')
+            ->setEmail('jean@example.com');
         $game = $this->createGame(true, 20);
 
         $entityManager = $this->createMock(EntityManagerInterface::class);
@@ -220,9 +240,12 @@ final class GameRegistrationCreateProcessorTest extends TestCase
         $registrationRepo->method('findOneBy')->willReturn(null);
         $registrationRepo->method('countByGame')->willReturn(0);
 
-        $processor = new GameRegistrationCreateProcessor($security, $validator, $gameRepo, $registrationRepo, $entityManager);
+        $mailer = $this->createMock(MailerInterface::class);
+        $logger = $this->createMock(LoggerInterface::class);
 
-        $input = new GameRegistrationInput();
+        $processor = new GameRegistrationCreateProcessor($security, $validator, $gameRepo, $registrationRepo, $entityManager, $mailer, 'noreply@example.com', $logger);
+
+        $input       = new GameRegistrationInput();
         $input->game = '/api/games/42';
 
         $result = $processor->process($input, new Post());
@@ -232,7 +255,10 @@ final class GameRegistrationCreateProcessorTest extends TestCase
 
     public function testAdminCanRegisterWhenGameIsFull(): void
     {
-        $user = (new User())->setRole('ROLE_ADMIN');
+        $user = (new User())
+            ->setFirstname('Admin')
+            ->setEmail('admin@example.com')
+            ->setRole('ROLE_ADMIN');
         $game = $this->createGame(true, 1);
 
         $entityManager = $this->createMock(EntityManagerInterface::class);
@@ -253,9 +279,12 @@ final class GameRegistrationCreateProcessorTest extends TestCase
         $registrationRepo->method('findOneBy')->willReturn(null);
         $registrationRepo->method('countByGame')->willReturn(1);
 
-        $processor = new GameRegistrationCreateProcessor($security, $validator, $gameRepo, $registrationRepo, $entityManager);
+        $mailer = $this->createMock(MailerInterface::class);
+        $logger = $this->createMock(LoggerInterface::class);
 
-        $input = new GameRegistrationInput();
+        $processor = new GameRegistrationCreateProcessor($security, $validator, $gameRepo, $registrationRepo, $entityManager, $mailer, 'noreply@example.com', $logger);
+
+        $input       = new GameRegistrationInput();
         $input->game = '1';
 
         $result = $processor->process($input, new Post());
