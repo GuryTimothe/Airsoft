@@ -2,99 +2,143 @@ name: Deploy
 
 on:
   workflow_dispatch:
+    inputs:
+      force:
+        description: "Rebuild without the Docker layer cache"
+        required: false
+        default: false
+        type: boolean
   workflow_call:
+    inputs:
+      force:
+        description: "Rebuild without the Docker layer cache"
+        required: false
+        default: false
+        type: boolean
+    secrets:
+      COOLIFY_URL:
+        description: "Coolify instance base URL, e.g. https://coolify.example.com"
+        required: true
+      COOLIFY_TOKEN:
+        description: "Coolify API token with deploy permission"
+        required: true
+      COOLIFY_RESOURCE_UUID:
+        description: "UUID of the Coolify resource to deploy"
+        required: true
 
 permissions:
   contents: read
 
 concurrency:
   group: deploy-production
-  cancel-in-progress: true
+  # Never cancel a deploy in flight: Coolify would be left mid-rollout.
+  cancel-in-progress: false
 
 jobs:
   deploy:
-    name: Deploy on VPS
+    name: Deploy via Coolify
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     environment:
       name: production
     env:
-      VPS_HOST: ${{ secrets.VPS_HOST }}
-      VPS_PORT: ${{ secrets.VPS_PORT }}
-      VPS_USER: ${{ secrets.VPS_USER }}
-      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-      HAS_SSH_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY != '' }}
-      HAS_PASSWORD: ${{ secrets.VPS_PASSWORD != '' }}
+      COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+      COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+      COOLIFY_RESOURCE_UUID: ${{ secrets.COOLIFY_RESOURCE_UUID }}
+      FORCE_REBUILD: ${{ inputs.force && 'true' || 'false' }}
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-
-      - name: Validate required settings
+      # Coolify pulls the source itself, so there is nothing to check out or
+      # upload. This job only triggers the deploy and reports its outcome.
+      - name: Validate configuration
         run: |
           set -euo pipefail
-          test -n "$VPS_HOST" || (echo "Missing secret VPS_HOST" && exit 1)
-          test -n "$VPS_PORT" || (echo "Missing secret VPS_PORT" && exit 1)
-          test -n "$VPS_USER" || (echo "Missing secret VPS_USER" && exit 1)
-          test -n "$DEPLOY_PATH" || (echo "Missing secret DEPLOY_PATH" && exit 1)
+          test -n "${COOLIFY_URL}" || { echo "::error::Missing secret COOLIFY_URL"; exit 1; }
+          test -n "${COOLIFY_TOKEN}" || { echo "::error::Missing secret COOLIFY_TOKEN"; exit 1; }
+          test -n "${COOLIFY_RESOURCE_UUID}" || { echo "::error::Missing secret COOLIFY_RESOURCE_UUID"; exit 1; }
+          case "${COOLIFY_URL}" in
+            https://*) ;;
+            *) echo "::error::COOLIFY_URL must start with https://"; exit 1 ;;
+          esac
 
-      - name: Install SFTP client
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y lftp
-
-      - name: Setup SSH key authentication for SFTP
-        if: ${{ env.HAS_SSH_KEY == 'true' }}
+      - name: Trigger deployment
+        id: trigger
         run: |
           set -euo pipefail
-          mkdir -p ~/.ssh
-          printf '%s\n' "${{ secrets.VPS_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
+          api="${COOLIFY_URL%/}/api/v1"
 
-      - name: Upload project files with SFTP (SSH key)
-        if: ${{ env.HAS_SSH_KEY == 'true' }}
-        run: |
-          set -euo pipefail
-          lftp -u "$VPS_USER", sftp://$VPS_HOST:$VPS_PORT <<EOF
-          set cmd:fail-exit yes
-          set net:max-retries 2
-          set net:timeout 20
-          set sftp:auto-confirm yes
-          set sftp:connect-program "ssh -a -x -i ~/.ssh/id_rsa -p $VPS_PORT -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-          mirror -R --delete --verbose \
-            --exclude-glob .git/ \
-            --exclude-glob .github/ \
-            --exclude-glob frontend/node_modules/ \
-            --exclude-glob frontend/.next/ \
-            --exclude-glob backend/vendor/ \
-            --exclude-glob .env.prod \
-            ./ "$DEPLOY_PATH/"
-          bye
-          EOF
+          # Status and body are captured separately so a 4xx/5xx can be reported
+          # with the server's message instead of dying inside a substitution.
+          status="$(curl -sS -o response.json -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
+            -H "Accept: application/json" \
+            "${api}/deploy?uuid=${COOLIFY_RESOURCE_UUID}&force=${FORCE_REBUILD}")"
 
-      - name: Upload project files with SFTP (password)
-        if: ${{ env.HAS_SSH_KEY != 'true' && env.HAS_PASSWORD == 'true' }}
+          if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+            echo "::error::Coolify returned HTTP ${status} when queueing the deploy"
+            cat response.json || true
+            exit 1
+          fi
+
+          if ! jq -e '(.deployments // []) | length > 0' response.json >/dev/null; then
+            echo "::error::Coolify accepted the request but queued no deployment"
+            cat response.json || true
+            exit 1
+          fi
+
+          deployment_uuid="$(jq -r '.deployments[0].deployment_uuid // empty' response.json)"
+          if [ -z "$deployment_uuid" ]; then
+            echo "::error::Response contained no deployment_uuid"
+            cat response.json || true
+            exit 1
+          fi
+
+          echo "deployment_uuid=${deployment_uuid}" >> "$GITHUB_OUTPUT"
+          echo "Queued deployment ${deployment_uuid}"
+
+      - name: Wait for deployment to finish
         env:
-          LFTP_PASSWORD: ${{ secrets.VPS_PASSWORD }}
+          DEPLOYMENT_UUID: ${{ steps.trigger.outputs.deployment_uuid }}
         run: |
           set -euo pipefail
-          lftp -u "$VPS_USER","$LFTP_PASSWORD" sftp://$VPS_HOST:$VPS_PORT <<EOF
-          set cmd:fail-exit yes
-          set net:max-retries 2
-          set net:timeout 20
-          set sftp:auto-confirm yes
-          mirror -R --delete --verbose \
-            --exclude-glob .git/ \
-            --exclude-glob .github/ \
-            --exclude-glob frontend/node_modules/ \
-            --exclude-glob frontend/.next/ \
-            --exclude-glob backend/vendor/ \
-            --exclude-glob .env.prod \
-            ./ "$DEPLOY_PATH/"
-          bye
-          EOF
+          api="${COOLIFY_URL%/}/api/v1"
+          deadline=$(( SECONDS + 1500 ))
+          last_status="unknown"
 
-      - name: Fail when no SFTP authentication secret is configured
-        if: ${{ env.HAS_SSH_KEY != 'true' && env.HAS_PASSWORD != 'true' }}
-        run: |
-          echo "Set one authentication method for SFTP: VPS_SSH_PRIVATE_KEY or VPS_PASSWORD"
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            # A transient poll failure must not fail the deploy, so this request
+            # is allowed to error and is retried on the next iteration.
+            body="$(curl -sS \
+              -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
+              -H "Accept: application/json" \
+              "${api}/deployments/${DEPLOYMENT_UUID}" 2>/dev/null || true)"
+
+            status="$(printf '%s' "${body}" | jq -r '.status // empty' 2>/dev/null || true)"
+            [ -n "$status" ] && last_status="$status"
+
+            case "$status" in
+              finished)
+                echo "Deployment ${DEPLOYMENT_UUID} finished."
+                exit 0
+                ;;
+              failed|error)
+                echo "::error::Deployment ${DEPLOYMENT_UUID} failed. Check the deployment logs in Coolify."
+                exit 1
+                ;;
+              cancelled|cancelled-by-user)
+                echo "::error::Deployment ${DEPLOYMENT_UUID} was cancelled."
+                exit 1
+                ;;
+              "")
+                echo "Status unavailable, retrying..."
+                ;;
+              *)
+                echo "Status: ${status}"
+                ;;
+            esac
+
+            sleep 10
+          done
+
+          echo "::error::Timed out after 25 minutes waiting for ${DEPLOYMENT_UUID} (last status: ${last_status}). It may still be running in Coolify."
           exit 1

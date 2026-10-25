@@ -182,7 +182,7 @@ Une release est préparée après validation complète du pipeline CI sur la bra
 
 Le merge sur `main` déclenche deux mécanismes distincts et indépendants :
 - **`release-please`** : génère la version, le changelog et le tag Git (opérationnel)
-- **`deploy.yml`** : tente un déploiement via FTP (non opérationnel tant qu'aucun serveur n'est configuré)
+- **`deploy.yml`** : déclenche le déploiement sur Coolify via son API
 
 ## 2.2 Convention des Commits
 
@@ -240,7 +240,8 @@ Exemple :
 
 ## 2.4 Déploiement par Environnement
 
-> Aucun environnement distant est existant
+L'hébergement est assuré par **Coolify**, une plateforme auto-hébergée qui
+construit et exécute les images Docker du projet.
 
 ---
 
@@ -252,33 +253,71 @@ L'environnement production est destiné à contenir la version accessible aux ut
 
 - Merge vers `main`
 
-**Actions prévues :**
+**Actions :**
 
 ```bash
-- Build des applications backend et frontend
+- Validation complète du pipeline CI
 - Génération de la release (release-please)
-- Tentative de déploiement via FTP (deploy.yml)
+- Appel de l'API Coolify (deploy.yml)
+- Build et redémarrage des conteneurs par Coolify
+- Attente de la fin du déploiement et remontée du statut dans GitHub Actions
 ```
 
 ---
 
-## 2.5 Déploiement via FTP
+## 2.5 Déploiement via Coolify
 
-Le déploiement repose sur un transfert de fichiers par FTP plutôt que sur une conteneurisation.
+Le déploiement est conteneurisé. GitHub Actions ne transfère aucun fichier :
+Coolify récupère lui-même le dépôt, construit les images et redémarre la stack.
 
-**Fichier :**
-
-```bash
-.github/workflows/deploy.yml
-```
-
-**Étapes prévues :**
+**Fichiers :**
 
 ```bash
-- Build des applications backend et frontend
-- Connexion au serveur cible via FTP
-- Transfert des fichiers buildés
+.github/workflows/deploy.yml     # déclenche et surveille le déploiement
+docker-compose.coolify.yml       # stack déployée par Coolify
 ```
+
+**Étapes :**
+
+```bash
+- POST /api/v1/deploy?uuid=<resource> sur l'instance Coolify
+- Récupération du deployment_uuid retourné
+- Polling de GET /api/v1/deployments/<uuid> jusqu'au statut final
+- Succès si "finished", échec si "failed" ou "cancelled", timeout à 25 minutes
+```
+
+### Configuration Coolify
+
+Créer une ressource de type **Docker Compose** pointant sur le dépôt, avec
+`docker-compose.coolify.yml` comme fichier de composition.
+
+Seul le frontend est exposé publiquement. Le navigateur appelle le serveur
+Next.js, qui relaie `/api/*` vers le backend via le réseau interne
+(`next.config.ts`), donc le backend n'a ni domaine public ni exposition CORS.
+
+**Secrets GitHub requis :**
+
+| Secret | Description |
+|--------|-------------|
+| `COOLIFY_URL` | URL de l'instance Coolify (HTTPS) |
+| `COOLIFY_TOKEN` | Jeton d'API Coolify disposant du droit de déploiement |
+| `COOLIFY_RESOURCE_UUID` | UUID de la ressource Coolify à déployer |
+
+**Variables d'environnement à définir dans Coolify :**
+
+| Variable | Description |
+|----------|-------------|
+| `PUBLIC_URL` | Origine publique, sans slash final |
+| `CORS_ALLOW_ORIGIN` | Regex ancrée autorisant cette origine |
+| `APP_SECRET` | Secret applicatif Symfony |
+| `POSTGRES_PASSWORD` | Mot de passe PostgreSQL |
+| `JWT_PASSPHRASE` | Passphrase protégeant la clé privée RSA |
+| `MAILER_DSN`, `MAILER_FROM` | Configuration SMTP |
+| `SUPER_ADMIN_*` | Compte super administrateur initial |
+
+La paire de clés JWT est générée automatiquement au premier démarrage du
+conteneur backend et conservée dans le volume `backend_jwt`. Elle ne doit pas
+être régénérée : tous les tokens émis seraient invalidés.
 
 
 # 3. Gestion des Releases
@@ -353,7 +392,8 @@ frontend/
 | Outil | Utilisation |
 |-------|-------------|
 | GitHub Actions | Automatisation CI/CD |
-| FTP | Transfert des fichiers vers le serveur cible |
+| Coolify | Build des images et exécution de la stack en production |
+| FrankenPHP | Serveur applicatif PHP du conteneur backend |
 | release-please | Gestion des versions |
 | Semantic Versioning | Convention des releases |
 | Conventional Commits | Automatisation changelog |
