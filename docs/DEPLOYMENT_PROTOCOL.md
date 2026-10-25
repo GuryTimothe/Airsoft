@@ -275,7 +275,7 @@ docker-compose.coolify.yml       # stack déployée par Coolify
 - Push sur la branche suivie
 - GitHub notifie Coolify via le webhook
 - Coolify clone le dépôt et construit les images
-- Redémarrage de la stack, healthcheck /health avant bascule du trafic
+- Redémarrage de la stack, healthcheck /health du backend avant mise en service
 ```
 
 ### Configuration Coolify
@@ -283,9 +283,13 @@ docker-compose.coolify.yml       # stack déployée par Coolify
 Créer une ressource de type **Docker Compose** pointant sur le dépôt, avec
 `docker-compose.coolify.yml` comme fichier de composition.
 
-Seul le frontend est exposé publiquement. Le navigateur appelle le serveur
-Next.js, qui relaie `/api/*` vers le backend via le réseau interne
-(`next.config.ts`), donc le backend n'a ni domaine public ni exposition CORS.
+Le proxy interne de Coolify n'est pas utilisé. La stack publie un seul port sur
+l'hôte, `FRONTEND_PORT`, vers lequel le reverse proxy de l'infrastructure
+redirige le trafic.
+
+Le navigateur appelle le serveur Next.js, qui relaie `/api/*` vers le backend via
+le réseau interne (`next.config.ts`). Le backend n'est donc pas publié et n'a
+besoin ni de domaine ni d'exposition CORS.
 
 **Secrets GitHub requis :** aucun. Le déploiement ne passant plus par GitHub
 Actions, les secrets `VPS_*` et `COOLIFY_*` peuvent être supprimés du dépôt.
@@ -294,7 +298,8 @@ Actions, les secrets `VPS_*` et `COOLIFY_*` peuvent être supprimés du dépôt.
 
 | Variable | Description |
 |----------|-------------|
-| `PUBLIC_URL` | Origine publique, sans slash final |
+| `FRONTEND_PORT` | Port publié sur l'hôte pour le reverse proxy (défaut `3000`) |
+| `PUBLIC_URL` | Origine publique servie par le proxy, sans slash final |
 | `CORS_ALLOW_ORIGIN` | Regex ancrée autorisant cette origine |
 | `APP_SECRET` | Secret applicatif Symfony |
 | `POSTGRES_PASSWORD` | Mot de passe PostgreSQL |

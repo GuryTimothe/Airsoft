@@ -1,6 +1,11 @@
 #!/bin/sh
 set -eu
 
+# Caddy takes its listen address from SERVER_NAME. Derive it from BACKEND_PORT so
+# the port has one source of truth; an explicit SERVER_NAME still wins.
+SERVER_NAME="${SERVER_NAME:-:${BACKEND_PORT:-8000}}"
+export SERVER_NAME
+
 # Signing keys must survive redeploys: a fresh keypair would invalidate every
 # session. config/jwt is a named volume seeded with the image's ownership, so
 # this writes once on the first boot.
