@@ -75,12 +75,13 @@ class UserUpdateProcessor implements ProcessorInterface
             $data->setCanSeePrivate(true);
         }
 
-        $emailChangeRequested = false;
-        $newEmail             = null;
+        // Holds the requested address only when it actually differs, so it doubles
+        // as the "an email change is pending" signal.
+        $pendingEmail = null;
         if ($this->isEmailInitialized($data) && $this->isEmailInitialized($previousData)) {
-            $newEmail             = $data->getEmail();
-            $emailChangeRequested = $newEmail !== $previousData->getEmail();
-            if ($emailChangeRequested) {
+            $requestedEmail = $data->getEmail();
+            if ($requestedEmail !== $previousData->getEmail()) {
+                $pendingEmail = $requestedEmail;
                 $data->setEmail($previousData->getEmail());
             }
         }
@@ -100,8 +101,8 @@ class UserUpdateProcessor implements ProcessorInterface
             ]));
         }
 
-        if ($emailChangeRequested && is_string($newEmail)) {
-            $this->sendEmailVerification($data, $newEmail, $actor);
+        if (null !== $pendingEmail) {
+            $this->sendEmailVerification($data, $pendingEmail, $actor);
         }
 
         if ($previousData->getRole() !== $data->getRole()) {
