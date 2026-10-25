@@ -95,20 +95,29 @@ Ordre d'exécution effectif:
 6. `release.yml` uniquement sur `main`
 
 Important:
-- Les jobs `deploy-dev` et `deploy-prod` sont actuellement commentés dans `ci-cd.yml`.
-- Le déploiement automatique n'est donc pas déclenché depuis l'orchestrateur aujourd'hui.
+- Le job `deploy-prod` est actif dans `ci-cd.yml` et s'exécute sur `main` uniquement.
+- Il n'existe pas d'environnement de staging automatisé à ce jour.
 
-### 5.3 Workflow deploy disponible (non relié actuellement)
+### 5.3 Workflow deploy
 
-Le workflow `.github/workflows/deploy.yml` existe et supporte:
-- déploiement FTP vers staging si branche `dev`,
-- déploiement FTP vers production si branche `main`.
+Le workflow `.github/workflows/deploy.yml` déclenche un déploiement Coolify via
+son API, puis attend le statut final du déploiement.
 
-Il est prévu pour une exécution via `workflow_call`, avec secrets FTP:
-- `FTP_SERVER_DEV`, `FTP_USERNAME_DEV`, `FTP_PASSWORD_DEV`
-- `FTP_SERVER_PROD`, `FTP_USERNAME_PROD`, `FTP_PASSWORD_PROD`
+Il s'exécute via `workflow_call` (ou `workflow_dispatch`), avec les secrets:
+- `COOLIFY_URL`
+- `COOLIFY_TOKEN`
+- `COOLIFY_RESOURCE_UUID`
+
+Voir [DEPLOYMENT_PROTOCOL.md](./DEPLOYMENT_PROTOCOL.md) section 2.5 pour la
+configuration de la ressource Coolify et les variables d'environnement.
 
 ### 5.4 Migration en environnement de déploiement
+
+Les migrations sont appliquées automatiquement par `backend/docker-entrypoint.sh`
+au démarrage du conteneur, avec `--all-or-nothing`. Aucune action manuelle n'est
+requise lors d'un déploiement Coolify.
+
+Pour une exécution manuelle:
 
 ```bash
 cd backend
@@ -214,7 +223,7 @@ Important:
 - [ ] Notes de version lues (breaking changes identifiés).
 - [ ] Plan de rollback valide.
 - [ ] Validation staging planifiée.
-- [ ] Vérification que les secrets FTP existent si déploiement FTP activé.
+- [ ] Vérification que les secrets `COOLIFY_*` sont présents dans GitHub.
 
 ### 9.2 Après
 

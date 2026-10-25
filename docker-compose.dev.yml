@@ -19,6 +19,9 @@ services:
         max-file: "5"
 
   frontend:
+    # Dev only: ./frontend is bind-mounted from the host and the .next volume is
+    # root-owned, so the image's app-user cannot write the build output.
+    user: "0:0"
     build:
       context: ./frontend
       dockerfile: Dockerfile.dev

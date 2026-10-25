@@ -65,7 +65,6 @@ services:
 
   frontend:
     container_name: airsoft-frontend
-    user: "0:0"
     depends_on:
       backend:
         condition: service_healthy

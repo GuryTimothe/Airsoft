@@ -43,4 +43,9 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     needs: [frontend, backend, scanner, lighthouse, pa11y, release]
     uses: ./.github/workflows/deploy.yml
-    secrets: inherit
+    # Passed explicitly rather than with `secrets: inherit`, which would hand the
+    # deploy job every repository secret including the release token.
+    secrets:
+      COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+      COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+      COOLIFY_RESOURCE_UUID: ${{ secrets.COOLIFY_RESOURCE_UUID }}

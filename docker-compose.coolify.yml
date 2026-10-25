@@ -1,0 +1,138 @@
+# Self-contained production stack for Coolify's Docker Compose build pack.
+#
+# Coolify deploys a single compose file, so this does not use the
+# docker-compose.yml + docker-compose.prod.yml override pair that start-prod.sh
+# relies on for local production testing.
+#
+# Only the frontend is published. The browser talks to the Next.js server, which
+# proxies /api/* to the backend over the internal network (see next.config.ts
+# rewrites), so the backend needs no public domain and no CORS exposure.
+#
+# Set these in Coolify -> Environment Variables before the first deploy:
+#   PUBLIC_URL             Public origin, e.g. https://airsoft.example.com (no trailing slash)
+#   CORS_ALLOW_ORIGIN      Anchored regex, e.g. ^https://airsoft\.example\.com$
+#   APP_SECRET             32+ random bytes, hex
+#   POSTGRES_PASSWORD      Database password
+#   JWT_PASSPHRASE         Protects the generated RSA private key
+#   MAILER_DSN             SMTP DSN
+#   MAILER_FROM            Sender address
+#   SUPER_ADMIN_EMAIL / _FIRSTNAME / _LASTNAME / _PASSWORD
+#                          Consumed once by migration Version20260714110000;
+#                          they must stay set for a replay on a fresh database.
+
+services:
+  database:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-app}
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in Coolify}
+    volumes:
+      # The image's PGDATA. Mounting the parent /var/lib/postgresql instead is a
+      # known footgun across major-version upgrades.
+      - database_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    # Without persistence a restart drops every JWT nonce, the revocation
+    # blocklist and the rate-limit counters, which signs every user out.
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    environment:
+      APP_ENV: prod
+      APP_DEBUG: "0"
+      APP_SECRET: ${APP_SECRET:?set APP_SECRET in Coolify}
+      DEFAULT_URI: ${PUBLIC_URL:?set PUBLIC_URL in Coolify}
+      CORS_ALLOW_ORIGIN: ${CORS_ALLOW_ORIGIN:?set CORS_ALLOW_ORIGIN in Coolify}
+
+      DATABASE_URL: postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB:-app}?serverVersion=18&charset=utf8
+      REDIS_URL: redis://redis:6379
+
+      JWT_SECRET_KEY: "%kernel.project_dir%/config/jwt/private.pem"
+      JWT_PUBLIC_KEY: "%kernel.project_dir%/config/jwt/public.pem"
+      JWT_PASSPHRASE: ${JWT_PASSPHRASE:?set JWT_PASSPHRASE in Coolify}
+      # Validated with hash_equals on every request: changing either value
+      # rejects all tokens already issued.
+      JWT_ISSUER: ${PUBLIC_URL}
+      JWT_AUDIENCE: ${PUBLIC_URL}
+      JWT_INACTIVITY_TIMEOUT: ${JWT_INACTIVITY_TIMEOUT:-1800}
+      LOGIN_CSRF_TOKEN_TTL: ${LOGIN_CSRF_TOKEN_TTL:-600}
+
+      MAILER_DSN: ${MAILER_DSN:?set MAILER_DSN in Coolify}
+      MAILER_FROM: ${MAILER_FROM:?set MAILER_FROM in Coolify}
+      FRONTEND_URL: ${PUBLIC_URL}
+
+      SUPER_ADMIN_EMAIL: ${SUPER_ADMIN_EMAIL:?set SUPER_ADMIN_EMAIL in Coolify}
+      SUPER_ADMIN_FIRSTNAME: ${SUPER_ADMIN_FIRSTNAME:?set SUPER_ADMIN_FIRSTNAME in Coolify}
+      SUPER_ADMIN_LASTNAME: ${SUPER_ADMIN_LASTNAME:?set SUPER_ADMIN_LASTNAME in Coolify}
+      SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:?set SUPER_ADMIN_PASSWORD in Coolify}
+    volumes:
+      # The keypair is generated on first boot by docker-entrypoint.sh and must
+      # persist: a new one would invalidate every session on each redeploy.
+      - backend_jwt:/app/config/jwt
+    expose:
+      - "8000"
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "10"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        # Empty => the browser calls the Next.js origin and the rewrite forwards
+        # to the backend, so no API origin is baked into the client bundle.
+        NEXT_PUBLIC_API_URL: ""
+    environment:
+      # Coolify reads this magic variable to assign a domain and route it to
+      # port 3000. Keep PUBLIC_URL identical to the domain it generates.
+      - SERVICE_FQDN_FRONTEND_3000
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=
+      - INTERNAL_API_URL=http://backend:8000
+    expose:
+      - "3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "10"
+
+volumes:
+  database_pgdata:
+  redis_data:
+  backend_jwt:
