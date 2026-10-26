@@ -221,7 +221,7 @@ final class AdminExportControllerTest extends WebTestCase
         $game->setAddress('Terrain export');
         $game->setPrice(10.0);
         $game->setMaxPlaces(20);
-        $game->setStartDateTime(new \DateTime($startDateTime));
+        $game->setStartDateTime(new \DateTimeImmutable($startDateTime));
         $game->setIsPublic(true);
 
         $entityManager->persist($game);
@@ -246,7 +246,7 @@ final class AdminExportControllerTest extends WebTestCase
         $user->setLastname('Export');
         $user->setFirstname('User');
         $user->setEmail($email);
-        $user->setDateOfBirth(new \DateTime($dateOfBirth));
+        $user->setDateOfBirth(new \DateTimeImmutable($dateOfBirth));
         $user->setRole($role);
         $user->setCanSeePrivate(false);
         $user->setPassword($passwordHasher->hashPassword($user, $plainPassword));
@@ -283,16 +283,16 @@ final class AdminExportControllerTest extends WebTestCase
 
         return $payload['token'];
     }
-/**
-     * The export controllers return a StreamedResponse, whose body is produced
-     * by a callback when the response is sent. getContent() on one returns an
-     * empty string, which is what these assertions were reading.
+
+    /**
+     * The export controllers return a StreamedResponse, whose body a callback
+     * writes when the response is sent. getResponse()->getContent() is empty
+     * for one: the browser already ran that callback during the request and
+     * kept the output (HttpKernelBrowser::filterResponse), and a stream is only
+     * sent once. The captured body is on the BrowserKit response.
      */
     private function streamedContent(KernelBrowser $client): string
     {
-        ob_start();
-        $client->getResponse()->sendContent();
-
-        return (string) ob_get_clean();
+        return (string) $client->getInternalResponse()->getContent();
     }
 }
