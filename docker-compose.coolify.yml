@@ -1,0 +1,185 @@
+# Self-contained production stack for Coolify's Docker Compose build pack.
+#
+# Coolify deploys a single compose file, so this does not use the
+# docker-compose.yml + docker-compose.prod.yml override pair that start-prod.sh
+# relies on for local production testing.
+#
+# Only the frontend publishes a host port, on FRONTEND_PORT, for an external
+# reverse proxy to forward to. Coolify's built-in proxy is not used, so no
+# SERVICE_FQDN_* magic variable appears here.
+#
+# The browser talks to the Next.js server, which proxies /api/* to the backend
+# over the internal network (see next.config.ts rewrites), so the backend stays
+# unpublished and needs no CORS exposure.
+#
+# Set these in Coolify -> Environment Variables before the first deploy:
+#   FRONTEND_PORT          Host port to publish for the reverse proxy (default 3000)
+#   PUBLIC_URL             Public origin the proxy serves, e.g.
+#                          https://airsoft.example.com (no trailing slash)
+#   CORS_ALLOW_ORIGIN      Anchored regex, e.g. ^https://airsoft\.example\.com$
+#   APP_SECRET             32+ random bytes, hex
+#   POSTGRES_PASSWORD      Database password
+#   JWT_PASSPHRASE         Protects the generated RSA private key
+#   MAILER_DSN             SMTP DSN
+#   MAILER_FROM            Sender address
+#   SUPER_ADMIN_EMAIL / _FIRSTNAME / _LASTNAME / _PASSWORD
+#                          Consumed once by migration Version20260714110000;
+#                          they must stay set for a replay on a fresh database.
+
+services:
+  database:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-app}
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in Coolify}
+    volumes:
+      # Postgres 18 moved PGDATA to /var/lib/postgresql/18/docker and declares
+      # VOLUME /var/lib/postgresql, so the parent is the correct mount point.
+      # Mounting /var/lib/postgresql/data here (the pre-18 location) leaves the
+      # real data directory outside the volume and loses it on every redeploy.
+      - database_pgdata:/var/lib/postgresql
+    healthcheck:
+      # The :-app fallbacks hold whether this is expanded by compose or by the
+      # container shell, so an empty POSTGRES_DB/POSTGRES_USER cannot turn into
+      # `pg_isready -d  -U ` and fail the probe.
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -d $${POSTGRES_DB:-app} -U $${POSTGRES_USER:-app}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      # initdb on a fresh volume can take a while before the socket is up.
+      start_period: 60s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    # Without persistence a restart drops every JWT nonce, the revocation
+    # blocklist and the rate-limit counters, which signs every user out.
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      # PONG on stdout is not enough on its own: redis-cli exits 0 even when the
+      # server answers an error, so match the payload.
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    environment:
+      APP_ENV: prod
+      APP_DEBUG: "0"
+      APP_SECRET: ${APP_SECRET:?set APP_SECRET in Coolify}
+      DEFAULT_URI: ${PUBLIC_URL:?set PUBLIC_URL in Coolify}
+      CORS_ALLOW_ORIGIN: ${CORS_ALLOW_ORIGIN:?set CORS_ALLOW_ORIGIN in Coolify}
+
+      DATABASE_URL: postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB:-app}?serverVersion=18&charset=utf8
+      REDIS_URL: redis://redis:6379
+      BACKEND_PORT: ${BACKEND_PORT:-8000}
+
+      JWT_SECRET_KEY: "%kernel.project_dir%/config/jwt/private.pem"
+      JWT_PUBLIC_KEY: "%kernel.project_dir%/config/jwt/public.pem"
+      JWT_PASSPHRASE: ${JWT_PASSPHRASE:?set JWT_PASSPHRASE in Coolify}
+      # Validated with hash_equals on every request: changing either value
+      # rejects all tokens already issued.
+      JWT_ISSUER: ${PUBLIC_URL}
+      JWT_AUDIENCE: ${PUBLIC_URL}
+      JWT_INACTIVITY_TIMEOUT: ${JWT_INACTIVITY_TIMEOUT:-1800}
+      LOGIN_CSRF_TOKEN_TTL: ${LOGIN_CSRF_TOKEN_TTL:-600}
+
+      MAILER_DSN: ${MAILER_DSN:?set MAILER_DSN in Coolify}
+      MAILER_FROM: ${MAILER_FROM:?set MAILER_FROM in Coolify}
+      FRONTEND_URL: ${PUBLIC_URL}
+
+      SUPER_ADMIN_EMAIL: ${SUPER_ADMIN_EMAIL:?set SUPER_ADMIN_EMAIL in Coolify}
+      SUPER_ADMIN_FIRSTNAME: ${SUPER_ADMIN_FIRSTNAME:?set SUPER_ADMIN_FIRSTNAME in Coolify}
+      SUPER_ADMIN_LASTNAME: ${SUPER_ADMIN_LASTNAME:?set SUPER_ADMIN_LASTNAME in Coolify}
+      SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:?set SUPER_ADMIN_PASSWORD in Coolify}
+    volumes:
+      # The keypair is generated on first boot by docker-entrypoint.sh and must
+      # persist: a new one would invalidate every session on each redeploy.
+      - backend_jwt:/app/config/jwt
+    expose:
+      - "${BACKEND_PORT:-8000}"
+    # Mirrors the image's own HEALTHCHECK, restated here so the probe is visible
+    # in the stack definition and follows BACKEND_PORT. /health checks Postgres
+    # and Redis too, so the backend only reports healthy once it can serve.
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://127.0.0.1:$${BACKEND_PORT:-8000}/health || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "10"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        # Empty => the browser calls the Next.js origin and the rewrite forwards
+        # to the backend, so no API origin is baked into the client bundle.
+        NEXT_PUBLIC_API_URL: ""
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=
+      - INTERNAL_API_URL=http://backend:${BACKEND_PORT:-8000}
+      - PORT=${FRONTEND_PORT:-3000}
+    ports:
+      # Published on the host so an external reverse proxy can reach it.
+      # Coolify's own proxy is not used, so there is no SERVICE_FQDN_* magic
+      # variable here and the port is free to move.
+      - "${FRONTEND_PORT:-3000}:${FRONTEND_PORT:-3000}"
+    # node is guaranteed present in this image; curl and busybox wget are not.
+    # Hits /healthz, which does not call the API, so a backend outage surfaces on
+    # the backend's probe instead of restarting a healthy frontend.
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "10"
+
+volumes:
+  database_pgdata:
+  redis_data:
+  backend_jwt:

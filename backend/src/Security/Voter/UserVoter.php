@@ -42,16 +42,27 @@ final class UserVoter extends Voter
                 || \in_array('ROLE_ORGANIZER', $roles, true),
             self::DELETE_USER => $this->canDeleteUser($user, $subject),
             self::CREATE_USER => $this->canCreateUser($user, $subject),
-            self::UPDATE_USER => $this->canUpdateUser($user),
+            self::UPDATE_USER => $this->canUpdateUser($user, $subject),
             default           => false,
         };
     }
 
-    private function canUpdateUser(User $user): bool
+    private function canUpdateUser(User $user, User $subject): bool
     {
         $roles = $user->getRoles();
 
-        return \in_array('ROLE_ADMIN', $roles, true) || \in_array('ROLE_SUPER_ADMIN', $roles, true);
+        if (\in_array('ROLE_SUPER_ADMIN', $roles, true)) {
+            return true;
+        }
+
+        if (!\in_array('ROLE_ADMIN', $roles, true)) {
+            return false;
+        }
+
+        // Same rule as creation and deletion: an admin may not act on another
+        // privileged account. Without this an admin could demote a super admin,
+        // because UserUpdateProcessor only validates the role being assigned.
+        return !\in_array($subject->getRole(), ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN'], true);
     }
 
     private function canCreateUser(User $user, User $subject): bool

@@ -56,8 +56,15 @@ services:
       SUPER_ADMIN_LASTNAME: ${SUPER_ADMIN_LASTNAME}
       SUPER_ADMIN_EMAIL: ${SUPER_ADMIN_EMAIL}
       SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD}
+      BACKEND_PORT: ${BACKEND_PORT:-8000}
     healthcheck:
-      test: ["CMD", "curl", "-f", "-s", "http://localhost:8000/health"]
+      # $$ escapes compose interpolation so the container shell expands it and
+      # the probe follows BACKEND_PORT.
+      test:
+        [
+          "CMD-SHELL",
+          "curl -f -s http://localhost:$${BACKEND_PORT:-8000}/health || exit 1",
+        ]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -65,13 +72,14 @@ services:
 
   frontend:
     container_name: airsoft-frontend
-    user: "0:0"
     depends_on:
       backend:
         condition: service_healthy
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
       INTERNAL_API_URL: ${INTERNAL_API_URL}
+      # Next.js reads PORT in both dev and standalone production mode.
+      PORT: ${FRONTEND_PORT:-3000}
 
 volumes:
   database_pgdata:

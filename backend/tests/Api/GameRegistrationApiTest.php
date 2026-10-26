@@ -12,21 +12,25 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 final class GameRegistrationApiTest extends WebTestCase
 {
+    use RequiresIntegrationServices;
+    use AuthenticatesThroughTheApi;
+
     public function testRegistrationRequiresAuthentication(): void
     {
         $client = static::createClient();
         $entityManager = static::getContainer()->get(EntityManagerInterface::class);
 
-        try {
-            $entityManager->getConnection()->connect();
-        } catch (\Throwable $exception) {
-            self::markTestSkipped('Database is not available for API integration test: '.$exception->getMessage());
-        }
+        $this->skipIfDatabaseUnavailable($entityManager);
 
         $game = $this->createGame($entityManager, 'Game auth required', 10);
 
+        // Carries a CSRF token so the request reaches the firewall: without one
+        // LoginCsrfRequestSubscriber answers 403 before authentication runs,
+        // which says nothing about whether the endpoint requires a login.
         $client->jsonRequest('POST', '/api/game_registrations', [
             'game' => '/api/games/'.$game->getId(),
+        ], [
+            'HTTP_X_CSRF_TOKEN' => $this->fetchCsrfToken($client),
         ]);
 
         self::assertResponseStatusCodeSame(401);
@@ -40,11 +44,7 @@ final class GameRegistrationApiTest extends WebTestCase
         $entityManager = $container->get(EntityManagerInterface::class);
         $passwordHasher = $container->get(UserPasswordHasherInterface::class);
 
-        try {
-            $entityManager->getConnection()->connect();
-        } catch (\Throwable $exception) {
-            self::markTestSkipped('Database is not available for API integration test: '.$exception->getMessage());
-        }
+        $this->skipIfDatabaseUnavailable($entityManager);
 
         $game = $this->createGame($entityManager, 'Game limited', 1);
         [$playerOne, $playerOnePassword] = $this->createUser($entityManager, $passwordHasher, 'ROLE_USER');
@@ -90,11 +90,7 @@ final class GameRegistrationApiTest extends WebTestCase
         $entityManager = $container->get(EntityManagerInterface::class);
         $passwordHasher = $container->get(UserPasswordHasherInterface::class);
 
-        try {
-            $entityManager->getConnection()->connect();
-        } catch (\Throwable $exception) {
-            self::markTestSkipped('Database is not available for API integration test: '.$exception->getMessage());
-        }
+        $this->skipIfDatabaseUnavailable($entityManager);
 
         $game = $this->createGame($entityManager, 'Game admin cancel', 10);
         [$admin, $adminPassword] = $this->createUser($entityManager, $passwordHasher, 'ROLE_ADMIN');
@@ -124,11 +120,7 @@ final class GameRegistrationApiTest extends WebTestCase
         $entityManager = $container->get(EntityManagerInterface::class);
         $passwordHasher = $container->get(UserPasswordHasherInterface::class);
 
-        try {
-            $entityManager->getConnection()->connect();
-        } catch (\Throwable $exception) {
-            self::markTestSkipped('Database is not available for API integration test: '.$exception->getMessage());
-        }
+        $this->skipIfDatabaseUnavailable($entityManager);
 
         $game = $this->createGame($entityManager, 'Game admin register', 10);
         [$admin, $adminPassword] = $this->createUser($entityManager, $passwordHasher, 'ROLE_ADMIN');
@@ -156,11 +148,7 @@ final class GameRegistrationApiTest extends WebTestCase
         $entityManager = $container->get(EntityManagerInterface::class);
         $passwordHasher = $container->get(UserPasswordHasherInterface::class);
 
-        try {
-            $entityManager->getConnection()->connect();
-        } catch (\Throwable $exception) {
-            self::markTestSkipped('Database is not available for API integration test: '.$exception->getMessage());
-        }
+        $this->skipIfDatabaseUnavailable($entityManager);
 
         $game = $this->createGame($entityManager, 'Game admin full register', 1);
         [$admin, $adminPassword] = $this->createUser($entityManager, $passwordHasher, 'ROLE_ADMIN');
@@ -191,11 +179,7 @@ final class GameRegistrationApiTest extends WebTestCase
         $entityManager = $container->get(EntityManagerInterface::class);
         $passwordHasher = $container->get(UserPasswordHasherInterface::class);
 
-        try {
-            $entityManager->getConnection()->connect();
-        } catch (\Throwable $exception) {
-            self::markTestSkipped('Database is not available for API integration test: '.$exception->getMessage());
-        }
+        $this->skipIfDatabaseUnavailable($entityManager);
 
         $game = $this->createGame($entityManager, 'Private game', 10);
         $game->setIsPublic(false);
@@ -221,11 +205,7 @@ final class GameRegistrationApiTest extends WebTestCase
         $entityManager = $container->get(EntityManagerInterface::class);
         $passwordHasher = $container->get(UserPasswordHasherInterface::class);
 
-        try {
-            $entityManager->getConnection()->connect();
-        } catch (\Throwable $exception) {
-            self::markTestSkipped('Database is not available for API integration test: '.$exception->getMessage());
-        }
+        $this->skipIfDatabaseUnavailable($entityManager);
 
         $game = $this->createGame($entityManager, 'Game my registrations', 10);
         [$playerOne, $playerOnePassword] = $this->createUser($entityManager, $passwordHasher, 'ROLE_USER');
@@ -252,10 +232,11 @@ final class GameRegistrationApiTest extends WebTestCase
 
         $payload = json_decode($client->getResponse()->getContent(), true);
         self::assertIsArray($payload);
-        self::assertArrayHasKey('hydra:member', $payload);
-        self::assertIsArray($payload['hydra:member']);
-        self::assertCount(1, $payload['hydra:member']);
-        self::assertSame($playerOne->getId(), $payload['hydra:member'][0]['userId'] ?? null);
+        // API Platform 4 defaults hydra_prefix to false.
+        self::assertArrayHasKey('member', $payload);
+        self::assertIsArray($payload['member']);
+        self::assertCount(1, $payload['member']);
+        self::assertSame($playerOne->getId(), $payload['member'][0]['userId'] ?? null);
     }
 
     public function testAdminCanToggleRegistrationPresenceTrueAndFalse(): void
@@ -266,11 +247,7 @@ final class GameRegistrationApiTest extends WebTestCase
         $entityManager = $container->get(EntityManagerInterface::class);
         $passwordHasher = $container->get(UserPasswordHasherInterface::class);
 
-        try {
-            $entityManager->getConnection()->connect();
-        } catch (\Throwable $exception) {
-            self::markTestSkipped('Database is not available for API integration test: '.$exception->getMessage());
-        }
+        $this->skipIfDatabaseUnavailable($entityManager);
 
         $game = $this->createGame($entityManager, 'Game presence toggle', 10);
         [$admin, $adminPassword] = $this->createUser($entityManager, $passwordHasher, 'ROLE_ADMIN');
@@ -293,8 +270,7 @@ final class GameRegistrationApiTest extends WebTestCase
 
         self::assertResponseStatusCodeSame(200);
 
-        $entityManager->refresh($registration);
-        self::assertTrue($registration->isPresent());
+        self::assertTrue($this->isPresentInDatabase((int) $registration->getId()));
 
         $client->request('PATCH', '/api/game_registrations/'.$registration->getId(), server: [
             'HTTP_AUTHORIZATION' => 'Bearer '.$adminToken,
@@ -303,8 +279,7 @@ final class GameRegistrationApiTest extends WebTestCase
 
         self::assertResponseStatusCodeSame(200);
 
-        $entityManager->refresh($registration);
-        self::assertFalse($registration->isPresent());
+        self::assertFalse($this->isPresentInDatabase((int) $registration->getId()));
     }
 
     public function testOrganizerCanToggleRegistrationPresence(): void
@@ -315,11 +290,7 @@ final class GameRegistrationApiTest extends WebTestCase
         $entityManager = $container->get(EntityManagerInterface::class);
         $passwordHasher = $container->get(UserPasswordHasherInterface::class);
 
-        try {
-            $entityManager->getConnection()->connect();
-        } catch (\Throwable $exception) {
-            self::markTestSkipped('Database is not available for API integration test: '.$exception->getMessage());
-        }
+        $this->skipIfDatabaseUnavailable($entityManager);
 
         $game = $this->createGame($entityManager, 'Organizer presence toggle', 10);
         [$organizer, $organizerPassword] = $this->createUser($entityManager, $passwordHasher, 'ROLE_ORGANIZER');
@@ -340,8 +311,7 @@ final class GameRegistrationApiTest extends WebTestCase
 
         self::assertResponseStatusCodeSame(200);
 
-        $entityManager->refresh($registration);
-        self::assertTrue($registration->isPresent());
+        self::assertTrue($this->isPresentInDatabase((int) $registration->getId()));
 
         $client->request('GET', '/api/game_registrations?game.id='.$game->getId(), server: [
             'HTTP_AUTHORIZATION' => 'Bearer '.$organizerToken,
@@ -394,20 +364,20 @@ final class GameRegistrationApiTest extends WebTestCase
         return [$user, $plainPassword];
     }
 
-    private function loginAndGetToken(KernelBrowser $client, string $email, string $plainPassword): string
+    /**
+     * Every request reboots the kernel, so the entity manager captured at the
+     * top of a test, and the entities it loaded, are detached by the time the
+     * response comes back: refresh() on one throws "is not managed". This reads
+     * the row again through the container the last request left behind.
+     */
+    private function isPresentInDatabase(int $registrationId): bool
     {
-        $client->jsonRequest('POST', '/api/login', [
-            'email' => $email,
-            'password' => $plainPassword,
-        ]);
+        $entityManager = static::getContainer()->get(EntityManagerInterface::class);
+        $entityManager->clear();
 
-        self::assertResponseStatusCodeSame(200);
+        $registration = $entityManager->find(GameRegistration::class, $registrationId);
+        self::assertNotNull($registration);
 
-        $payload = json_decode($client->getResponse()->getContent(), true);
-        self::assertIsArray($payload);
-        self::assertArrayHasKey('token', $payload);
-        self::assertIsString($payload['token']);
-
-        return $payload['token'];
+        return $registration->isPresent();
     }
 }

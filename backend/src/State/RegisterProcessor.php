@@ -71,7 +71,9 @@ class RegisterProcessor implements ProcessorInterface
         $user->setCanSeePrivate(false);
 
         if (null !== $input->dateOfBirth) {
-            $user->setDateOfBirth(new \DateTime($input->dateOfBirth->format('Y-m-d')));
+            // Still truncated to the day: the column stores a date, and an
+            // incoming time component would otherwise survive in memory.
+            $user->setDateOfBirth(new \DateTimeImmutable($input->dateOfBirth->format('Y-m-d')));
         }
 
         if (null !== $input->emergencyContact && '' !== trim($input->emergencyContact)) {

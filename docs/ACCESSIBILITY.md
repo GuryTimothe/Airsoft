@@ -26,22 +26,17 @@
 
 ## 2. Dispositif de validation continue
 
-La conformité est contrôlée automatiquement à chaque push.
+**Tests unitaires** : tests Jest ciblés sur des composants (ex. `GameListCard.a11y.test.tsx`, `AuthForm.a11y.test.tsx`), exécutés à chaque push par `frontend-ci.yml`. C'est aujourd'hui le seul contrôle d'accessibilité automatisé.
 
-**Lighthouse CI** (`.github/workflows/lighthouse.yml`)
-- Score d'accessibilité WCAG 2.1 AA calculé à chaque push
-- Seuil de validation : score > 80
-- Rapport en artefact GitHub Actions
+**Audits manuels** : Pa11y a été retiré du dépôt. Plus aucun workflow ne
+l'exécutait, et les URL de sa configuration ne correspondaient plus aux routes
+réelles (`/register`, `/login`, `/dashboard` et `/settings` au lieu de
+`/auth/register`, `/auth/login`, `/profil` et `/admin/settings`), de sorte que
+son rapport ne mesurait rien.
 
-**Pa11y CI** (`.github/workflows/pa11y.yml`)
-- Conformité WCAG AA vérifiée via axe + htmlcs (`.pa11yci.json`)
-- Scan des pages clés : accueil, connexion, inscription, tableau de bord, paramètres, admin
-- Seuil : max 3 problèmes par page, sinon échec du pipeline
-- Rapport détaillé : `pa11y-report.json`
-
-**Tests unitaires** : tests Jest ciblés sur des composants (ex. `GameListCard.a11y.test.tsx`, `AuthForm.a11y.test.tsx`)
-
-**Intérêt de l'approche** : toute régression d'accessibilité est détectée dès son introduction, sans dépendre d'une revue manuelle récurrente — contrôle systématique plutôt qu'a posteriori.
+Les audits ponctuels passent donc par Lighthouse dans Chrome
+(F12 → Lighthouse), sur une build de production, comme décrit dans
+[QUALITY_CRITERIA.md](./QUALITY_CRITERIA.md).
 
 ## 3. Mesures mises en œuvre
 

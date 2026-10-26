@@ -85,7 +85,7 @@ Preuves :
 | Tests CI/CD | GitHub Actions | À chaque push | 1 test en échec |
 | Couverture | Jest + PHPUnit | À chaque merge | < 70 % |
 | Lint | ESLint + PHPStan | À chaque push | > 0 erreur |
-| Performance | Lighthouse CI (workflow `lighthouse.yml`) | À chaque push via `ci-cd.yml` | Performance < 50, Accessibility < 80 |
+| Analyse de sécurité | Semgrep (workflow `security-scanner.yml`) | À chaque push | Vulnérabilité détectée |
 | Logs | Symfony Monolog | Production | Error rate > 1 % |
 | Monitoring applicatif | Sentry | Temps réel | Nouvelle exception détectée |
 

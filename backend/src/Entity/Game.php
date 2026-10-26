@@ -47,13 +47,17 @@ class Game
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $description = null;
 
-    #[ORM\Column(type: 'datetime')]
+    // Immutable, like createdAt and updatedAt: the serializer builds a
+    // DateTimeImmutable for any DateTimeInterface-typed target, and DBAL 4's
+    // mutable DateTimeType refuses that value outright, so mapping this as
+    // 'datetime' made every write fail.
+    #[ORM\Column(type: 'datetime_immutable')]
     #[Assert\NotNull]
     #[Assert\GreaterThanOrEqual(
         'today',
         message: "La date de la partie doit \u00eatre aujourd'hui ou dans le futur."
     )]
-    private \DateTimeInterface $startDateTime;
+    private \DateTimeImmutable $startDateTime;
 
     #[ORM\Column(type: 'string', length: 255)]
     private string $address;
@@ -118,12 +122,12 @@ class Game
         return $this;
     }
 
-    public function getStartDateTime(): \DateTimeInterface
+    public function getStartDateTime(): \DateTimeImmutable
     {
         return $this->startDateTime;
     }
 
-    public function setStartDateTime(\DateTimeInterface $startDateTime): self
+    public function setStartDateTime(\DateTimeImmutable $startDateTime): self
     {
         $this->startDateTime = $startDateTime;
 
