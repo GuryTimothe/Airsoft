@@ -39,6 +39,10 @@ cd ..
 docker compose up --build -d
 ```
 
+> Suppose un `.env` à la racine, copié depuis `.env.example` : c'est
+> `COMPOSE_FILE` qui y sélectionne la paire `docker-compose.yml` +
+> `docker-compose.dev.yml`. Voir [QUICKSTART.md](../QUICKSTART.md).
+
 ### 4.3 Mettre à jour les dépendances dans les conteneurs
 
 Backend:

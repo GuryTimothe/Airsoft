@@ -245,6 +245,13 @@ Depuis la racine du projet :
 docker compose up --build
 ```
 
+> Cette commande fonctionne grâce à `COMPOSE_FILE` défini dans `.env`, qui
+> sélectionne la paire `docker-compose.yml` + `docker-compose.dev.yml`.
+> `docker-compose.yml` seul ne déclare aucun contexte de build pour `backend` et
+> `frontend` : sans cette variable, Docker Compose refuse de les démarrer. Les
+> anciens scripts `start-dev` / `stop-dev`, qui passaient les deux `-f`, ont été
+> supprimés au profit de cette configuration.
+
 Le premier démarrage peut prendre plusieurs minutes (construction des images et installation des dépendances).
 
 Une fois les conteneurs démarrés :
