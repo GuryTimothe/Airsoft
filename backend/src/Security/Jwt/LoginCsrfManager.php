@@ -40,6 +40,16 @@ final class LoginCsrfManager
         return $token;
     }
 
+    /**
+     * Spends the token: it is valid once, not for the rest of its TTL.
+     *
+     * DEL does the checking. It reports how many keys it removed, and Redis
+     * runs it atomically, so of two requests presenting the same token exactly
+     * one is told it won -- which a read followed by a delete could not
+     * guarantee. The previous implementation only asked whether the key existed
+     * and left it in place, so a token lifted from a request could be replayed
+     * freely until it expired.
+     */
     public function consumeToken(?string $headerToken): bool
     {
         if (!\is_string($headerToken) || '' === trim($headerToken)) {
@@ -47,13 +57,8 @@ final class LoginCsrfManager
         }
 
         $token = trim($headerToken);
-        $key   = $this->csrfKey($token);
 
-        if (1 !== $this->redis->exists($key)) {
-            return false;
-        }
-
-        return true;
+        return 1 === $this->redis->del($this->csrfKey($token));
     }
 
     private function csrfKey(string $token): string
