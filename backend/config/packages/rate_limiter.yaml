@@ -15,3 +15,20 @@ framework:
       limit: 50
       interval: "5 minutes"
       cache_pool: rate_limiter
+
+    # Tighter than the others on purpose: each accepted request sends mail to an
+    # address the caller chose, so an unthrottled endpoint floods a victim's
+    # inbox and times replies for existing accounts.
+    password_reset_request_limiter:
+      policy: fixed_window
+      limit: 5
+      interval: "15 minutes"
+      cache_pool: rate_limiter
+
+    # Submits a token, so this is what a brute force would hammer. Sliding so a
+    # burst cannot sit on a window boundary.
+    password_reset_confirm_limiter:
+      policy: sliding_window
+      limit: 10
+      interval: "15 minutes"
+      cache_pool: rate_limiter

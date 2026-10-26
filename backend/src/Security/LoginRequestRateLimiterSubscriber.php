@@ -10,11 +10,18 @@ use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Component\RateLimiter\RateLimiterFactory;
 
+/**
+ * Throttles the endpoints an anonymous caller can reach: logging in,
+ * registering, checking whether an address is taken, and the password reset.
+ * The name predates the reset paths.
+ */
 final class LoginRequestRateLimiterSubscriber implements EventSubscriberInterface
 {
     public function __construct(
         private readonly RateLimiterFactory $loginRequestLimiter,
         private readonly RateLimiterFactory $registerRequestLimiter,
+        private readonly RateLimiterFactory $passwordResetRequestLimiter,
+        private readonly RateLimiterFactory $passwordResetConfirmLimiter,
     ) {
     }
 
@@ -63,6 +70,27 @@ final class LoginRequestRateLimiterSubscriber implements EventSubscriberInterfac
                 event: $event,
                 limiter: $this->registerRequestLimiter,
                 message: 'Too many registration attempts. Please try again in 5 minutes.'
+            );
+
+            return;
+        }
+
+        // Both reset entry points send mail, the authenticated one included.
+        if ('/api/password-reset/request' === $path || '/api/me/password-reset/request' === $path) {
+            $this->consumeOrReject(
+                event: $event,
+                limiter: $this->passwordResetRequestLimiter,
+                message: 'Too many password reset requests. Please try again in 15 minutes.'
+            );
+
+            return;
+        }
+
+        if ('/api/password-reset/confirm' === $path) {
+            $this->consumeOrReject(
+                event: $event,
+                limiter: $this->passwordResetConfirmLimiter,
+                message: 'Too many password reset attempts. Please try again in 15 minutes.'
             );
         }
     }
