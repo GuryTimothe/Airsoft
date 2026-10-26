@@ -128,6 +128,9 @@ final class AdminExportControllerTest extends WebTestCase
         [$adultAdmin]            = $this->createUser($entityManager, $passwordHasher, 'ROLE_ADMIN', '1992-02-02');
         [$minorAdmin]            = $this->createUser($entityManager, $passwordHasher, 'ROLE_ADMIN', '2012-02-02');
         [$adultUser]             = $this->createUser($entityManager, $passwordHasher, 'ROLE_USER', '1995-02-02');
+        // The "Accès parties privées" column reads Refusé for everyone unless a
+        // user actually has the flag, which the "Autorisé" assertion below needs.
+        $adultAdmin->setCanSeePrivate(true);
         $adultAdmin->setPhone('0612345678');
         $adultAdmin->setEmergencyContact(
             (new EmergencyContact())

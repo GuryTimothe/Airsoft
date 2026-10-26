@@ -60,5 +60,9 @@
     </source>
 
     <extensions>
+        <!-- Rolls back the database after every test. The schema is built inside
+             each test's transaction by the guard in RequiresIntegrationServices,
+             so tests no longer inherit rows from the ones before them. -->
+        <bootstrap class="DAMA\DoctrineTestBundle\PHPUnit\PHPUnitExtension" />
     </extensions>
 </phpunit>
