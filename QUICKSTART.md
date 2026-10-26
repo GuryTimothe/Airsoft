@@ -174,14 +174,24 @@ LOGIN_CSRF_TOKEN_TTL=600
 ## Redis
 
 ```env
-REDIS_URL=redis://redis:6379
+REDIS_PASSWORD=change-me-redis-password
+REDIS_URL=redis://:change-me-redis-password@redis:6379
 ```
 
 | Variable | Description |
 |----------|-------------|
-| `REDIS_URL` | URL de connexion au service Redis |
+| `REDIS_PASSWORD` | Mot de passe exigé par le serveur Redis (`--requirepass`) |
+| `REDIS_URL` | URL de connexion, mot de passe inclus |
 
-Redis est utilisé pour le cache et la gestion des données temporaires.
+Redis ne stocke pas seulement du cache : il contient les nonces JWT, la liste de
+révocation des jetons et les compteurs de limitation de débit. Une instance sans
+authentification permet donc à quiconque atteint le port de forger ou de révoquer
+des sessions, et de remettre à zéro les limitations.
+
+Les deux variables doivent porter le **même** mot de passe : le serveur le reçoit
+via `--requirepass`, l'application le lit dans `REDIS_URL`. N'utiliser que des
+caractères sûrs en URL, ou les encoder en pourcentage, puisque le mot de passe
+est intégré à la DSN.
 
 ---
 

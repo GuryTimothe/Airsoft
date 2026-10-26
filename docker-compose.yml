@@ -19,11 +19,24 @@ services:
   redis:
     container_name: airsoft-redis
     image: redis:7-alpine
+    command:
+      ["redis-server", "--requirepass", "${REDIS_PASSWORD:?set REDIS_PASSWORD}"]
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      # -a authenticates the probe, which would otherwise be refused; the flag
+      # silences the warning redis-cli prints when a password is passed on the
+      # command line.
+      test:
+        [
+          "CMD-SHELL",
+          "redis-cli -a \"$${REDIS_PASSWORD}\" --no-auth-warning ping | grep -q PONG",
+        ]
       timeout: 5s
       retries: 5
       start_period: 10s
+    environment:
+      # Only so the healthcheck above can read it; redis-server takes the
+      # password from its command line.
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD}
 
   backend:
     container_name: airsoft-backend
