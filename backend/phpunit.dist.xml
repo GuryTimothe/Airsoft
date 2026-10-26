@@ -24,6 +24,11 @@
         <server name="JWT_SECRET_KEY" value="%kernel.project_dir%/config/jwt/private.pem" force="true" />
         <server name="KERNEL_CLASS" value="App\Kernel" force="true" />
         <server name="LOGIN_CSRF_TOKEN_TTL" value="600" force="true" />
+        <!-- Read when a registration or cancellation sends its email. Without
+             them the write endpoints answer 500 with "Environment variable not
+             found", which is what the integration tests hit once they ran. -->
+        <server name="MAILER_FROM" value="no-reply@api.example.test" force="true" />
+        <server name="FRONTEND_URL" value="https://app.example.test" force="true" />
         <server name="REDIS_URL" value="redis://127.0.0.1:6379" force="true" />
         <server name="SHELL_VERBOSITY" value="-1" />
 
