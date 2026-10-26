@@ -108,6 +108,13 @@ services:
       DEFAULT_URI: ${PUBLIC_URL:?set PUBLIC_URL in Coolify}
       CORS_ALLOW_ORIGIN: ${CORS_ALLOW_ORIGIN:?set CORS_ALLOW_ORIGIN in Coolify}
 
+      # Requests reach the backend through the Next server, so without this
+      # every caller looks like that container and the per-IP rate limits all
+      # share one bucket. Symfony reads it on its own; "private_ranges" trusts
+      # the container network, which is the only thing that can reach the
+      # backend here. Left empty, the limits stay global.
+      SYMFONY_TRUSTED_PROXIES: ${SYMFONY_TRUSTED_PROXIES:-}
+
       DATABASE_URL: postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB:-app}?serverVersion=18&charset=utf8
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       BACKEND_PORT: ${BACKEND_PORT:-8000}

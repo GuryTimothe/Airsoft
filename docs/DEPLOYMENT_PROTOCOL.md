@@ -309,6 +309,16 @@ dans le formulaire du webhook GitHub (voir plus bas).
 | `JWT_PASSPHRASE` | Passphrase protégeant la clé privée RSA |
 | `MAILER_DSN`, `MAILER_FROM` | Configuration SMTP |
 | `SUPER_ADMIN_*` | Compte super administrateur initial |
+| `SYMFONY_TRUSTED_PROXIES` | Proxies dont les en-têtes `X-Forwarded-*` sont crus |
+
+> **À renseigner pour que les limitations de débit fonctionnent.** Le backend
+> n'est joignable qu'à travers le serveur Next : tant que cette variable est
+> vide, `getClientIp()` renvoie ce conteneur et **toutes** les limites par IP
+> (connexion, inscription, réinitialisation de mot de passe) partagent un seul
+> compteur. Un seul client peut alors épuiser le quota de tous les autres.
+> `private_ranges` convient ici, le backend n'étant atteignable que depuis le
+> réseau interne ; ne jamais faire confiance à un réseau qu'un client non
+> authentifié peut atteindre.
 
 La paire de clés JWT est générée automatiquement au premier démarrage du
 conteneur backend et conservée dans le volume `backend_jwt`. Elle ne doit pas

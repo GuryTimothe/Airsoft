@@ -23,6 +23,8 @@ services:
     arguments:
       $loginRequestLimiter: "@limiter.login_request_limiter"
       $registerRequestLimiter: "@limiter.register_request_limiter"
+      $passwordResetRequestLimiter: "@limiter.password_reset_request_limiter"
+      $passwordResetConfirmLimiter: "@limiter.password_reset_confirm_limiter"
 
   App\Security\Jwt\LoginSuccessHandler:
     arguments:
