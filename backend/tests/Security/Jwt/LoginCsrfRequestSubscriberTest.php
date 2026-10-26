@@ -17,7 +17,7 @@ final class LoginCsrfRequestSubscriberTest extends TestCase
     public function testRejectsProtectedApiPostWithoutValidCsrfToken(): void
     {
         $redis = $this->createMock(RedisJwtClient::class);
-        $redis->expects($this->never())->method('exists');
+        $redis->expects($this->never())->method('del');
 
         $subscriber = new LoginCsrfRequestSubscriber(new LoginCsrfManager(120, 'redis://unused', $redis));
         $event      = new RequestEvent(
@@ -40,9 +40,11 @@ final class LoginCsrfRequestSubscriberTest extends TestCase
     public function testAcceptsProtectedApiPostWhenCsrfTokenIsValid(): void
     {
         $redis = $this->createMock(RedisJwtClient::class);
+        // Consuming the token deletes it: DEL reporting one removal is what
+        // marks the request as carrying a valid, unspent token.
         $redis
             ->expects($this->once())
-            ->method('exists')
+            ->method('del')
             ->with(sprintf('jwt:csrf:login:%s', hash('sha256', 'csrf-token')))
             ->willReturn(1);
 
@@ -63,7 +65,7 @@ final class LoginCsrfRequestSubscriberTest extends TestCase
     public function testSkipsBearerAuthenticatedRequests(): void
     {
         $redis = $this->createMock(RedisJwtClient::class);
-        $redis->expects($this->never())->method('exists');
+        $redis->expects($this->never())->method('del');
 
         $subscriber = new LoginCsrfRequestSubscriber(new LoginCsrfManager(120, 'redis://unused', $redis));
         $request    = Request::create('/api/games', 'POST');
@@ -83,7 +85,7 @@ final class LoginCsrfRequestSubscriberTest extends TestCase
     public function testSkipsExemptRoutes(string $path): void
     {
         $redis = $this->createMock(RedisJwtClient::class);
-        $redis->expects($this->never())->method('exists');
+        $redis->expects($this->never())->method('del');
 
         $subscriber = new LoginCsrfRequestSubscriber(new LoginCsrfManager(120, 'redis://unused', $redis));
         $event      = new RequestEvent(

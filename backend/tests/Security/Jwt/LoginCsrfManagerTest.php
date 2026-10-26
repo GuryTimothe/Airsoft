@@ -60,7 +60,7 @@ final class LoginCsrfManagerTest extends TestCase
     public function testConsumeTokenReturnsFalseForMissingToken(): void
     {
         $redis = $this->createMock(RedisJwtClient::class);
-        $redis->expects($this->never())->method('exists');
+        $redis->expects($this->never())->method('del');
 
         $manager = new LoginCsrfManager(120, 'redis://unused', $redis);
 
@@ -74,7 +74,7 @@ final class LoginCsrfManagerTest extends TestCase
 
         $redis
             ->expects($this->once())
-            ->method('exists')
+            ->method('del')
             ->with(sprintf('jwt:csrf:login:%s', hash('sha256', 'known-token')))
             ->willReturn(0);
 
@@ -83,18 +83,36 @@ final class LoginCsrfManagerTest extends TestCase
         $this->assertFalse($manager->consumeToken(' known-token '));
     }
 
-    public function testConsumeTokenReturnsTrueWhenTokenExists(): void
+    public function testConsumeTokenSpendsTheTokenSoItCannotBeReplayed(): void
     {
         $redis = $this->createMock(RedisJwtClient::class);
 
         $redis
             ->expects($this->once())
-            ->method('exists')
+            ->method('del')
             ->with(sprintf('jwt:csrf:login:%s', hash('sha256', 'known-token')))
             ->willReturn(1);
 
         $manager = new LoginCsrfManager(120, 'redis://unused', $redis);
 
         $this->assertTrue($manager->consumeToken('known-token'));
+    }
+
+    public function testSecondUseOfTheSameTokenIsRejected(): void
+    {
+        $redis = $this->createMock(RedisJwtClient::class);
+
+        // Redis removed the key on the first call, so the second finds nothing
+        // to delete. This is the replay the old implementation allowed.
+        $redis
+            ->expects($this->exactly(2))
+            ->method('del')
+            ->with(sprintf('jwt:csrf:login:%s', hash('sha256', 'known-token')))
+            ->willReturnOnConsecutiveCalls(1, 0);
+
+        $manager = new LoginCsrfManager(120, 'redis://unused', $redis);
+
+        $this->assertTrue($manager->consumeToken('known-token'));
+        $this->assertFalse($manager->consumeToken('known-token'));
     }
 }
