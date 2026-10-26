@@ -228,4 +228,4 @@ Important:
 - [ ] Authentification et autorisations OK.
 - [ ] Logs sans pic d'erreurs.
 - [ ] Fonctions critiques validées.
-- [ ] Vérification des jobs GitHub Actions: frontend, backend, scanner, lighthouse, pa11y, release.
+- [ ] Vérification des jobs GitHub Actions: frontend, backend, scanner.

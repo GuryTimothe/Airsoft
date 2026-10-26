@@ -28,17 +28,15 @@
 
 **Tests unitaires** : tests Jest ciblés sur des composants (ex. `GameListCard.a11y.test.tsx`, `AuthForm.a11y.test.tsx`), exécutés à chaque push par `frontend-ci.yml`. C'est aujourd'hui le seul contrôle d'accessibilité automatisé.
 
-**Audits manuels** : Lighthouse et Pa11y restent disponibles en local et ne sont plus exécutés par la CI.
+**Audits manuels** : Pa11y a été retiré du dépôt. Plus aucun workflow ne
+l'exécutait, et les URL de sa configuration ne correspondaient plus aux routes
+réelles (`/register`, `/login`, `/dashboard` et `/settings` au lieu de
+`/auth/register`, `/auth/login`, `/profil` et `/admin/settings`), de sorte que
+son rapport ne mesurait rien.
 
-```bash
-cd frontend
-npm run test:pa11y        # axe + htmlcs, configuration .pa11yci.json
-```
-
-> Les URL listées dans `.pa11yci.json` sont obsolètes : `/register`, `/login`,
-> `/dashboard` et `/settings` n'existent pas (les routes réelles sont
-> `/auth/register`, `/auth/login`, `/profil` et `/admin/settings`). Elles
-> doivent être corrigées avant de se fier au rapport.
+Les audits ponctuels passent donc par Lighthouse dans Chrome
+(F12 → Lighthouse), sur une build de production, comme décrit dans
+[QUALITY_CRITERIA.md](./QUALITY_CRITERIA.md).
 
 ## 3. Mesures mises en œuvre
 

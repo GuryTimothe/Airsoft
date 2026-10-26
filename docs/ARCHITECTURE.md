@@ -136,8 +136,8 @@ propre webhook git.
 | **PHPStan** | Analyse statique | Backend | `php ./vendor/bin/phpstan analyse src/` | Type checking |
 | **ESLint** | Linting | Frontend | `npm run lint` | Code quality |
 | **Prettier** | Formatting | Frontend/Config | `npm run format` | Code style |
-| **Lighthouse** | Audit qualité | Frontend | `lighthouse <url>` | Performance, accessibilité, SEO, bonnes pratiques |
-| **Pa11y** | Tests d'accessibilité | Frontend | `npm run test:pa11y` | Accessibilité WCAG |
+| **Lighthouse** | Audit qualité | Frontend | Chrome : F12 → Lighthouse | Performance, accessibilité, SEO, bonnes pratiques |
+| **Jest (a11y)** | Tests d'accessibilité | Frontend | `npm run test:a11y` | Attributs ARIA et sémantique des composants |
 
 ### 7. Serveurs d'Application
 
