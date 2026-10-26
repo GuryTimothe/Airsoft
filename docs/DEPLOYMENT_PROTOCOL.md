@@ -305,6 +305,7 @@ dans le formulaire du webhook GitHub (voir plus bas).
 | `CORS_ALLOW_ORIGIN` | Regex ancrée autorisant cette origine |
 | `APP_SECRET` | Secret applicatif Symfony |
 | `POSTGRES_PASSWORD` | Mot de passe PostgreSQL |
+| `REDIS_PASSWORD` | Mot de passe Redis, repris dans `REDIS_URL` ; caractères sûrs en URL uniquement |
 | `JWT_PASSPHRASE` | Passphrase protégeant la clé privée RSA |
 | `MAILER_DSN`, `MAILER_FROM` | Configuration SMTP |
 | `SUPER_ADMIN_*` | Compte super administrateur initial |

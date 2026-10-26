@@ -20,6 +20,10 @@
 #   CORS_ALLOW_ORIGIN      Anchored regex, e.g. ^https://airsoft\.example\.com$
 #   APP_SECRET             32+ random bytes, hex
 #   POSTGRES_PASSWORD      Database password
+#   REDIS_PASSWORD         Redis password; it guards the JWT nonces, the
+#                          revocation blocklist and the rate-limit counters.
+#                          URL-safe characters only: it is interpolated into
+#                          REDIS_URL below.
 #   JWT_PASSPHRASE         Protects the generated RSA private key
 #   MAILER_DSN             SMTP DSN
 #   MAILER_FROM            Sender address
@@ -60,13 +64,33 @@ services:
     image: redis:7-alpine
     # Without persistence a restart drops every JWT nonce, the revocation
     # blocklist and the rate-limit counters, which signs every user out.
-    command: ["redis-server", "--appendonly", "yes"]
+    #
+    # requirepass because that same data decides who is authenticated: anything
+    # that reaches this port unauthenticated can mint nonces, clear the
+    # revocation list or reset the rate-limit counters.
+    command:
+      [
+        "redis-server",
+        "--appendonly",
+        "yes",
+        "--requirepass",
+        "${REDIS_PASSWORD:?set REDIS_PASSWORD in Coolify}",
+      ]
+    environment:
+      # Read by the healthcheck only; redis-server takes it from the command
+      # line above.
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in Coolify}
     volumes:
       - redis_data:/data
     healthcheck:
       # PONG on stdout is not enough on its own: redis-cli exits 0 even when the
-      # server answers an error, so match the payload.
-      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      # server answers an error, so match the payload. -a authenticates the
+      # probe, which the server would otherwise refuse.
+      test:
+        [
+          "CMD-SHELL",
+          "redis-cli -a \"$${REDIS_PASSWORD}\" --no-auth-warning ping | grep -q PONG",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -85,7 +109,7 @@ services:
       CORS_ALLOW_ORIGIN: ${CORS_ALLOW_ORIGIN:?set CORS_ALLOW_ORIGIN in Coolify}
 
       DATABASE_URL: postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB:-app}?serverVersion=18&charset=utf8
-      REDIS_URL: redis://redis:6379
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       BACKEND_PORT: ${BACKEND_PORT:-8000}
 
       JWT_SECRET_KEY: "%kernel.project_dir%/config/jwt/private.pem"
