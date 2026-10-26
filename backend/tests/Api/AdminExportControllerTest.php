@@ -170,6 +170,40 @@ final class AdminExportControllerTest extends WebTestCase
         self::assertStringNotContainsString($adultUser->getEmail(), $content);
     }
 
+    public function testExportQuotesCellsThatWouldBeReadAsFormulas(): void
+    {
+        $client    = static::createClient();
+        $container = static::getContainer();
+
+        $entityManager  = $container->get(EntityManagerInterface::class);
+        $passwordHasher = $container->get(UserPasswordHasherInterface::class);
+
+        $this->skipIfDatabaseUnavailable($entityManager);
+
+        [$admin, $adminPassword] = $this->createUser($entityManager, $passwordHasher, 'ROLE_ADMIN', '1990-01-01');
+
+        // A name a user can give themselves, which a spreadsheet would execute.
+        $formula = '=HYPERLINK("http://attacker.example","Cliquez ici")';
+        $admin->setLastname($formula);
+        $entityManager->flush();
+
+        $token = $this->loginAndGetToken($client, $admin->getEmail(), $adminPassword);
+
+        $client->request('GET', '/api/exports/users.csv', server: [
+            'HTTP_AUTHORIZATION' => 'Bearer '.$token,
+        ]);
+
+        self::assertResponseIsSuccessful();
+        $content = $this->streamedContent($client);
+
+        // Wrapped as text: the cell reads ="=HYPERLINK(...)", whose quotes
+        // fputcsv doubles. What must never appear is the bare formula opening a
+        // cell, which is what a delimiter directly before "=HYPERLINK" means.
+        self::assertStringContainsString('=""=HYPERLINK(', $content);
+        self::assertStringNotContainsString(';=HYPERLINK(', $content);
+        self::assertStringNotContainsString("\n=HYPERLINK(", $content);
+    }
+
     public function testAdminCanExportRegistrationsForAGame(): void
     {
         $client    = static::createClient();

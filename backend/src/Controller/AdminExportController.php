@@ -98,11 +98,11 @@ final class AdminExportController extends AbstractController
                     $user = $registration->getUser();
 
                     return [
-                        $registration->getGame()?->getTitle() ?? '',
-                        $user?->getLastname()                 ?? '',
-                        $user?->getFirstname()                ?? '',
-                        $user?->getEmail()                    ?? '',
-                        $user?->getPseudo()                   ?? '',
+                        self::neutralizeFormula($registration->getGame()?->getTitle()),
+                        self::neutralizeFormula($user?->getLastname()),
+                        self::neutralizeFormula($user?->getFirstname()),
+                        self::neutralizeFormula($user?->getEmail()),
+                        self::neutralizeFormula($user?->getPseudo()),
                         self::formatRegistrationExportRole($user?->getRole()),
                         $registration->isPresent() ? 'Présent' : 'Absent',
                         $registration->getCreatedAt()->format('d/m/Y H:i'),
@@ -155,18 +155,18 @@ final class AdminExportController extends AbstractController
             ],
             array_map(
                 fn (User $user): array => [
-                    $user->getLastname(),
-                    $user->getFirstname(),
-                    $user->getEmail(),
-                    $user->getPseudo() ?? '',
+                    self::neutralizeFormula($user->getLastname()),
+                    self::neutralizeFormula($user->getFirstname()),
+                    self::neutralizeFormula($user->getEmail()),
+                    self::neutralizeFormula($user->getPseudo()),
                     self::formatSpreadsheetText($user->getPhone()),
                     $user->getDateOfBirth()->format('Y-m-d'),
                     $this->isMinor($user) ? 'Mineur' : 'Majeur',
                     self::formatRegistrationExportRole($user->getRole()),
                     $user->getCanSeePrivate() ? 'Autorisé' : 'Refusé',
-                    $user->getEmergencyContactLastname()  ?? '',
-                    $user->getEmergencyContactFirstname() ?? '',
-                    $user->getEmergencyContactEmail()     ?? '',
+                    self::neutralizeFormula($user->getEmergencyContactLastname()),
+                    self::neutralizeFormula($user->getEmergencyContactFirstname()),
+                    self::neutralizeFormula($user->getEmergencyContactEmail()),
                     self::formatSpreadsheetText($user->getEmergencyContactPhone()),
                     $user->getCreatedAt()?->format('d/m/Y') ?? '',
                 ],
@@ -203,6 +203,28 @@ final class AdminExportController extends AbstractController
         }
 
         return sprintf('="%s"', str_replace('"', '""', $value));
+    }
+
+    /**
+     * Excel, LibreOffice and Sheets read a cell that opens with one of these as
+     * a formula, so a player calling themselves =HYPERLINK("http://…") or
+     * +cmd|'…' gets it evaluated on whoever opens the export, not displayed.
+     * Quoting the value the way phone numbers already are keeps it inert text.
+     *
+     * Applied to every field a user controls. Values the application itself
+     * produces -- dates, prices, role and presence labels -- are left alone.
+     */
+    private static function neutralizeFormula(?string $value): string
+    {
+        if (null === $value || '' === $value) {
+            return '';
+        }
+
+        if (!str_contains("=+-@\t\r", $value[0])) {
+            return $value;
+        }
+
+        return self::formatSpreadsheetText($value);
     }
 
     private function denyAccessUnlessGrantedAdminOrSuperAdminOrOrganizer(): void
@@ -368,8 +390,8 @@ final class AdminExportController extends AbstractController
                 $gameMaxPlaces = $game->getMaxPlaces();
                 $gameDate      = $game->getStartDateTime()->format('d/m/Y H:i');
 
-                fputcsv($handle, ['Partie', $gameTitle], ';', '"', '');
-                fputcsv($handle, ['Adresse', $gameAddress], ';', '"', '');
+                fputcsv($handle, ['Partie', self::neutralizeFormula($gameTitle)], ';', '"', '');
+                fputcsv($handle, ['Adresse', self::neutralizeFormula($gameAddress)], ';', '"', '');
                 fputcsv($handle, ['PAF', number_format($gamePrice, 2, '.', '').' EUR'], ';', '"', '');
                 fputcsv($handle, ['Nombre de places', (string) $gameMaxPlaces], ';', '"', '');
                 fputcsv($handle, ['Date', $gameDate], ';', '"', '');
@@ -384,11 +406,11 @@ final class AdminExportController extends AbstractController
                     $user = $registration->getUser();
 
                     fputcsv($handle, [
-                        $user?->getLastname()  ?? '',
-                        $user?->getFirstname() ?? '',
+                        self::neutralizeFormula($user?->getLastname()),
+                        self::neutralizeFormula($user?->getFirstname()),
                         $user instanceof User ? ($this->isMinor($user) ? 'Mineur' : 'Majeur') : '',
-                        $user?->getEmail() ?? '',
-                        $user?->getPhone() ?? '',
+                        self::neutralizeFormula($user?->getEmail()),
+                        self::formatSpreadsheetText($user?->getPhone()),
                         $registration->isPresent() ? 'Present' : 'Absent',
                     ], ';', '"', '');
                 }
