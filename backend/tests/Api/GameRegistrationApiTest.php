@@ -232,10 +232,11 @@ final class GameRegistrationApiTest extends WebTestCase
 
         $payload = json_decode($client->getResponse()->getContent(), true);
         self::assertIsArray($payload);
-        self::assertArrayHasKey('hydra:member', $payload);
-        self::assertIsArray($payload['hydra:member']);
-        self::assertCount(1, $payload['hydra:member']);
-        self::assertSame($playerOne->getId(), $payload['hydra:member'][0]['userId'] ?? null);
+        // API Platform 4 defaults hydra_prefix to false.
+        self::assertArrayHasKey('member', $payload);
+        self::assertIsArray($payload['member']);
+        self::assertCount(1, $payload['member']);
+        self::assertSame($playerOne->getId(), $payload['member'][0]['userId'] ?? null);
     }
 
     public function testAdminCanToggleRegistrationPresenceTrueAndFalse(): void
@@ -269,8 +270,7 @@ final class GameRegistrationApiTest extends WebTestCase
 
         self::assertResponseStatusCodeSame(200);
 
-        $entityManager->refresh($registration);
-        self::assertTrue($registration->isPresent());
+        self::assertTrue($this->isPresentInDatabase((int) $registration->getId()));
 
         $client->request('PATCH', '/api/game_registrations/'.$registration->getId(), server: [
             'HTTP_AUTHORIZATION' => 'Bearer '.$adminToken,
@@ -279,8 +279,7 @@ final class GameRegistrationApiTest extends WebTestCase
 
         self::assertResponseStatusCodeSame(200);
 
-        $entityManager->refresh($registration);
-        self::assertFalse($registration->isPresent());
+        self::assertFalse($this->isPresentInDatabase((int) $registration->getId()));
     }
 
     public function testOrganizerCanToggleRegistrationPresence(): void
@@ -312,8 +311,7 @@ final class GameRegistrationApiTest extends WebTestCase
 
         self::assertResponseStatusCodeSame(200);
 
-        $entityManager->refresh($registration);
-        self::assertTrue($registration->isPresent());
+        self::assertTrue($this->isPresentInDatabase((int) $registration->getId()));
 
         $client->request('GET', '/api/game_registrations?game.id='.$game->getId(), server: [
             'HTTP_AUTHORIZATION' => 'Bearer '.$organizerToken,
@@ -364,5 +362,22 @@ final class GameRegistrationApiTest extends WebTestCase
         $entityManager->flush();
 
         return [$user, $plainPassword];
+    }
+
+    /**
+     * Every request reboots the kernel, so the entity manager captured at the
+     * top of a test, and the entities it loaded, are detached by the time the
+     * response comes back: refresh() on one throws "is not managed". This reads
+     * the row again through the container the last request left behind.
+     */
+    private function isPresentInDatabase(int $registrationId): bool
+    {
+        $entityManager = static::getContainer()->get(EntityManagerInterface::class);
+        $entityManager->clear();
+
+        $registration = $entityManager->find(GameRegistration::class, $registrationId);
+        self::assertNotNull($registration);
+
+        return $registration->isPresent();
     }
 }

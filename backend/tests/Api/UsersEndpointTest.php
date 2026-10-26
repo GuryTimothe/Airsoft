@@ -40,11 +40,12 @@ final class UsersEndpointTest extends WebTestCase
 
         $payload = json_decode($client->getResponse()->getContent(), true);
         self::assertIsArray($payload);
-        self::assertArrayHasKey('hydra:member', $payload);
-        self::assertIsArray($payload['hydra:member']);
+        // API Platform 4 defaults hydra_prefix to false.
+        self::assertArrayHasKey('member', $payload);
+        self::assertIsArray($payload['member']);
 
         $targetUserPayload = null;
-        foreach ($payload['hydra:member'] as $userPayload) {
+        foreach ($payload['member'] as $userPayload) {
             if (is_array($userPayload) && ($userPayload['email'] ?? null) === $targetEmail) {
                 $targetUserPayload = $userPayload;
                 break;

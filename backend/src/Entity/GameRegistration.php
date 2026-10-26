@@ -32,6 +32,10 @@ use Symfony\Component\Serializer\Annotation\SerializedName;
     operations: [
         new GetCollection(security: "is_granted('IS_AUTHENTICATED_FULLY')"),
         new GetCollection(
+            // Registered ahead of the generated /game_registrations/{id} route,
+            // which otherwise matches "mine" as an id. That route is API
+            // Platform's NotExposedAction, so this endpoint answered 404.
+            priority: -10,
             uriTemplate: '/game_registrations/mine',
             security: "is_granted('IS_AUTHENTICATED_FULLY')",
             provider: MyGameRegistrationsProvider::class,

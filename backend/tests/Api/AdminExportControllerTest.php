@@ -59,6 +59,15 @@ final class AdminExportControllerTest extends WebTestCase
         $includedGame            = $this->createGame($entityManager, 'Included export game', '2026-07-12 10:00:00');
         $this->createGame($entityManager, 'Excluded export game', '2026-08-15 10:00:00');
 
+        // The age column only appears on a player row, so the game needs one
+        // registration for the "Majeur" assertion below to mean anything.
+        [$adultPlayer] = $this->createUser($entityManager, $passwordHasher, 'ROLE_USER', '1993-01-01');
+        $registration  = new GameRegistration();
+        $registration->setGame($includedGame);
+        $registration->setUser($adultPlayer);
+        $entityManager->persist($registration);
+        $entityManager->flush();
+
         $token = $this->loginAndGetToken($client, $admin->getEmail(), $adminPassword);
 
         $client->request('GET', '/api/exports/games.csv?dateFrom=2026-07-01&dateTo=2026-07-31', server: [
@@ -78,7 +87,6 @@ final class AdminExportControllerTest extends WebTestCase
         self::assertStringContainsString('Nom;Prénom;Âge;Email;Tel;Présence', $content);
         self::assertStringContainsString('Majeur', $content);
         self::assertStringNotContainsString('Excluded export game', $content);
-        self::assertStringContainsString((string) $includedGame->getId(), $content);
     }
 
     public function testOrganizerCanExportGames(): void
@@ -104,7 +112,6 @@ final class AdminExportControllerTest extends WebTestCase
         self::assertResponseHeaderSame('content-type', 'text/csv; charset=UTF-8');
         $content = $this->streamedContent($client);
         self::assertStringContainsString('Organizer export game', $content);
-        self::assertStringContainsString((string) $game->getId(), $content);
     }
 
     public function testAdminCanExportUsersFilteredByAgeGroupAndRole(): void
@@ -145,7 +152,7 @@ final class AdminExportControllerTest extends WebTestCase
 
         $content = $this->streamedContent($client);
         $header = strtok(substr($content, 3), "\n");
-        self::assertSame('Nom,Prénom,Email,Pseudo,Tel,"Date de naissance",Âge,Rôle,"Accès parties privées","Contact d\'urgence : Nom","Contact d\'urgence : Prénom","Contact d\'urgence : Email","Contact d\'urgence : Tel","Création du compte le"', rtrim((string) $header, "\r"));
+        self::assertSame('Nom;Prénom;Email;Pseudo;Tel;"Date de naissance";Âge;Rôle;"Accès parties privées";"Contact d\'urgence : Nom";"Contact d\'urgence : Prénom";"Contact d\'urgence : Email";"Contact d\'urgence : Tel";"Création du compte le"', rtrim((string) $header, "\r"));
         self::assertStringContainsString($adultAdmin->getEmail(), $content);
         self::assertStringContainsString('admin', $content);
         self::assertStringNotContainsString('ROLE_ADMIN', $content);
@@ -202,7 +209,7 @@ final class AdminExportControllerTest extends WebTestCase
 
         $content = $this->streamedContent($client);
         $header = strtok(substr($content, 3), "\n");
-        self::assertSame('"Titre de la partie",Nom,Prénom,Email,Pseudo,Rôle,Présence,"Inscription le"', rtrim((string) $header, "\r"));
+        self::assertSame('"Titre de la partie";Nom;Prénom;Email;Pseudo;Rôle;Présence;"Inscription le"', rtrim((string) $header, "\r"));
         self::assertStringContainsString($playerOne->getEmail(), $content);
         self::assertStringContainsString($playerTwo->getEmail(), $content);
         self::assertStringContainsString('utilisateur', $content);

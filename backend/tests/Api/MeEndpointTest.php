@@ -69,9 +69,14 @@ final class MeEndpointTest extends WebTestCase
         self::assertResponseStatusCodeSame(204);
         self::assertNull($userRepository->find($user->getId()));
 
+        // Deliberately not loginAndGetToken: this login has to fail. It still
+        // needs a CSRF token, or LoginCsrfRequestSubscriber answers 403 before
+        // the credentials are ever checked.
         $client->jsonRequest('POST', '/api/login', [
             'email' => $email,
             'password' => $plainPassword,
+        ], [
+            'HTTP_X_CSRF_TOKEN' => $this->fetchCsrfToken($client),
         ]);
 
         self::assertResponseStatusCodeSame(401);
