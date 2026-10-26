@@ -72,13 +72,16 @@ jobs:
       database:
         image: postgres:18-alpine
         env:
-          POSTGRES_DB: app
+          # config/packages/doctrine.yaml appends dbname_suffix '_test' under
+          # APP_ENV=test, so the suite connects to app_test even though
+          # DATABASE_URL below names app. The service has to host that name.
+          POSTGRES_DB: app_test
           POSTGRES_USER: app
           POSTGRES_PASSWORD: app
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -d app -U app"
+          --health-cmd "pg_isready -d app_test -U app"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
