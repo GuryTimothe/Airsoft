@@ -131,4 +131,7 @@ jobs:
           # REDIS_URL included. DATABASE_URL is not, so it is set here; without
           # it tests/bootstrap.php falls back to SQLite.
           DATABASE_URL: postgresql://app:app@127.0.0.1:5432/app?serverVersion=18&charset=utf8
-        run: vendor/bin/phpunit
+        # A skipped integration test is a failure here: the services are
+        # provided above, so a skip means the suite could not reach them and the
+        # coverage is silently gone. That silence is what hid 15 dead tests.
+        run: vendor/bin/phpunit --display-skipped --fail-on-skipped
