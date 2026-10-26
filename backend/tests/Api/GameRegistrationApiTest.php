@@ -12,16 +12,14 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 final class GameRegistrationApiTest extends WebTestCase
 {
+    use RequiresIntegrationServices;
+
     public function testRegistrationRequiresAuthentication(): void
     {
         $client = static::createClient();
         $entityManager = static::getContainer()->get(EntityManagerInterface::class);
 
-        try {
-            $entityManager->getConnection()->connect();
-        } catch (\Throwable $exception) {
-            self::markTestSkipped('Database is not available for API integration test: '.$exception->getMessage());
-        }
+        $this->skipIfDatabaseUnavailable($entityManager);
 
         $game = $this->createGame($entityManager, 'Game auth required', 10);
 
@@ -40,11 +38,7 @@ final class GameRegistrationApiTest extends WebTestCase
         $entityManager = $container->get(EntityManagerInterface::class);
         $passwordHasher = $container->get(UserPasswordHasherInterface::class);
 
-        try {
-            $entityManager->getConnection()->connect();
-        } catch (\Throwable $exception) {
-            self::markTestSkipped('Database is not available for API integration test: '.$exception->getMessage());
-        }
+        $this->skipIfDatabaseUnavailable($entityManager);
 
         $game = $this->createGame($entityManager, 'Game limited', 1);
         [$playerOne, $playerOnePassword] = $this->createUser($entityManager, $passwordHasher, 'ROLE_USER');
@@ -90,11 +84,7 @@ final class GameRegistrationApiTest extends WebTestCase
         $entityManager = $container->get(EntityManagerInterface::class);
         $passwordHasher = $container->get(UserPasswordHasherInterface::class);
 
-        try {
-            $entityManager->getConnection()->connect();
-        } catch (\Throwable $exception) {
-            self::markTestSkipped('Database is not available for API integration test: '.$exception->getMessage());
-        }
+        $this->skipIfDatabaseUnavailable($entityManager);
 
         $game = $this->createGame($entityManager, 'Game admin cancel', 10);
         [$admin, $adminPassword] = $this->createUser($entityManager, $passwordHasher, 'ROLE_ADMIN');
@@ -124,11 +114,7 @@ final class GameRegistrationApiTest extends WebTestCase
         $entityManager = $container->get(EntityManagerInterface::class);
         $passwordHasher = $container->get(UserPasswordHasherInterface::class);
 
-        try {
-            $entityManager->getConnection()->connect();
-        } catch (\Throwable $exception) {
-            self::markTestSkipped('Database is not available for API integration test: '.$exception->getMessage());
-        }
+        $this->skipIfDatabaseUnavailable($entityManager);
 
         $game = $this->createGame($entityManager, 'Game admin register', 10);
         [$admin, $adminPassword] = $this->createUser($entityManager, $passwordHasher, 'ROLE_ADMIN');
@@ -156,11 +142,7 @@ final class GameRegistrationApiTest extends WebTestCase
         $entityManager = $container->get(EntityManagerInterface::class);
         $passwordHasher = $container->get(UserPasswordHasherInterface::class);
 
-        try {
-            $entityManager->getConnection()->connect();
-        } catch (\Throwable $exception) {
-            self::markTestSkipped('Database is not available for API integration test: '.$exception->getMessage());
-        }
+        $this->skipIfDatabaseUnavailable($entityManager);
 
         $game = $this->createGame($entityManager, 'Game admin full register', 1);
         [$admin, $adminPassword] = $this->createUser($entityManager, $passwordHasher, 'ROLE_ADMIN');
@@ -191,11 +173,7 @@ final class GameRegistrationApiTest extends WebTestCase
         $entityManager = $container->get(EntityManagerInterface::class);
         $passwordHasher = $container->get(UserPasswordHasherInterface::class);
 
-        try {
-            $entityManager->getConnection()->connect();
-        } catch (\Throwable $exception) {
-            self::markTestSkipped('Database is not available for API integration test: '.$exception->getMessage());
-        }
+        $this->skipIfDatabaseUnavailable($entityManager);
 
         $game = $this->createGame($entityManager, 'Private game', 10);
         $game->setIsPublic(false);
@@ -221,11 +199,7 @@ final class GameRegistrationApiTest extends WebTestCase
         $entityManager = $container->get(EntityManagerInterface::class);
         $passwordHasher = $container->get(UserPasswordHasherInterface::class);
 
-        try {
-            $entityManager->getConnection()->connect();
-        } catch (\Throwable $exception) {
-            self::markTestSkipped('Database is not available for API integration test: '.$exception->getMessage());
-        }
+        $this->skipIfDatabaseUnavailable($entityManager);
 
         $game = $this->createGame($entityManager, 'Game my registrations', 10);
         [$playerOne, $playerOnePassword] = $this->createUser($entityManager, $passwordHasher, 'ROLE_USER');
@@ -266,11 +240,7 @@ final class GameRegistrationApiTest extends WebTestCase
         $entityManager = $container->get(EntityManagerInterface::class);
         $passwordHasher = $container->get(UserPasswordHasherInterface::class);
 
-        try {
-            $entityManager->getConnection()->connect();
-        } catch (\Throwable $exception) {
-            self::markTestSkipped('Database is not available for API integration test: '.$exception->getMessage());
-        }
+        $this->skipIfDatabaseUnavailable($entityManager);
 
         $game = $this->createGame($entityManager, 'Game presence toggle', 10);
         [$admin, $adminPassword] = $this->createUser($entityManager, $passwordHasher, 'ROLE_ADMIN');
@@ -315,11 +285,7 @@ final class GameRegistrationApiTest extends WebTestCase
         $entityManager = $container->get(EntityManagerInterface::class);
         $passwordHasher = $container->get(UserPasswordHasherInterface::class);
 
-        try {
-            $entityManager->getConnection()->connect();
-        } catch (\Throwable $exception) {
-            self::markTestSkipped('Database is not available for API integration test: '.$exception->getMessage());
-        }
+        $this->skipIfDatabaseUnavailable($entityManager);
 
         $game = $this->createGame($entityManager, 'Organizer presence toggle', 10);
         [$organizer, $organizerPassword] = $this->createUser($entityManager, $passwordHasher, 'ROLE_ORGANIZER');

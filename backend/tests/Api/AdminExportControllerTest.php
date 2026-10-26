@@ -7,13 +7,14 @@ use App\Entity\GameRegistration;
 use App\Entity\EmergencyContact;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
-use Doctrine\ORM\Tools\SchemaTool;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 final class AdminExportControllerTest extends WebTestCase
 {
+    use RequiresIntegrationServices;
+
     public function testAnonymousCannotExportGames(): void
     {
         $client = static::createClient();
@@ -226,61 +227,6 @@ final class AdminExportControllerTest extends WebTestCase
         $entityManager->flush();
 
         return $game;
-    }
-
-    private function skipIfDatabaseUnavailable(EntityManagerInterface $entityManager): void
-    {
-        try {
-            $connection = $entityManager->getConnection();
-            $connection->executeQuery('SELECT 1');
-
-            $schemaManager = $connection->createSchemaManager();
-            $tables = array_map('strtolower', $schemaManager->listTableNames());
-
-            if (!in_array('users', $tables, true)) {
-                $metadata = $entityManager->getMetadataFactory()->getAllMetadata();
-                if ([] === $metadata) {
-                    self::markTestSkipped('No Doctrine metadata available to initialize test schema.');
-
-                    return;
-                }
-
-                $schemaTool = new SchemaTool($entityManager);
-                $schemaTool->createSchema($metadata);
-            }
-
-            $this->skipIfRedisUnavailable();
-        } catch (\Throwable $exception) {
-            self::markTestSkipped('Database is not available for API integration test: '.$exception->getMessage());
-        }
-    }
-
-    private function skipIfRedisUnavailable(): void
-    {
-        $redisUrl = $_SERVER['REDIS_URL'] ?? $_ENV['REDIS_URL'] ?? getenv('REDIS_URL');
-        if (!\is_string($redisUrl) || '' === trim($redisUrl)) {
-            self::markTestSkipped('Redis URL is missing for API integration test.');
-
-            return;
-        }
-
-        $host = (string) (parse_url($redisUrl, PHP_URL_HOST) ?: '127.0.0.1');
-        $port = (int) (parse_url($redisUrl, PHP_URL_PORT) ?: 6379);
-
-        $socket = @stream_socket_client(
-            sprintf('tcp://%s:%d', $host, $port),
-            $errorCode,
-            $errorMessage,
-            0.2
-        );
-
-        if (false === $socket) {
-            self::markTestSkipped(sprintf('Redis is not available for API integration test: %s', $errorMessage ?: (string) $errorCode));
-
-            return;
-        }
-
-        fclose($socket);
     }
 
     /**

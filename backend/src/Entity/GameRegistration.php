@@ -21,7 +21,12 @@ use Symfony\Component\Serializer\Annotation\Groups;
 use Symfony\Component\Serializer\Annotation\SerializedName;
 
 #[ORM\Entity(repositoryClass: GameRegistrationRepository::class)]
-#[ORM\Table(name: 'game_registration', uniqueConstraints: [new ORM\UniqueConstraint(name: 'uniq_game_registration_game_user', columns: ['game_id', 'user_id'])])]
+// A unique index on (game_id, user_id) was declared through the uniqueConstraints
+// argument of #[ORM\Table], which has never had any effect (doctrine/orm#11357),
+// and no migration created one either: duplicate registrations are currently
+// prevented in application code only. Restoring it means the #[ORM\UniqueConstraint]
+// attribute plus a migration, and a decision about rows that already violate it.
+#[ORM\Table(name: 'game_registration')]
 #[ApiResource(
     normalizationContext: ['groups' => ['game_registration:read']],
     operations: [

@@ -64,6 +64,37 @@ jobs:
   phpunit:
     needs: phpstan
     runs-on: ubuntu-latest
+
+    # The tests under tests/Api drive the kernel end to end: fixtures go through
+    # Doctrine and logging in stores the JWT nonce in Redis. Without both
+    # services they skip themselves, which is how 15 of them went unnoticed.
+    services:
+      database:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: app
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: app
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -d app -U app"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        # redis-cli exits 0 even when the server answers an error, so match the
+        # payload rather than the exit code.
+        options: >-
+          --health-cmd "redis-cli ping | grep -q PONG"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -72,12 +103,32 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ inputs.php-version }}
-          extensions: mbstring, intl, pdo, pdo_mysql
+          # pdo_pgsql is what talks to the service above; the suite never uses MySQL.
+          extensions: mbstring, intl, pdo, pdo_pgsql
 
       - name: Install Composer dependencies
         working-directory: ${{ inputs.working-directory }}
         run: composer install --no-progress --no-interaction --prefer-dist
 
+      # Logging in signs a token, so the keypair has to exist before PHPUnit runs.
+      # The passphrase is the throwaway one phpunit.dist.xml forces, and the keys
+      # live and die with the runner.
+      - name: Generate a throwaway JWT keypair
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          mkdir -p config/jwt
+          openssl genpkey -out config/jwt/private.pem -aes256 \
+            -pass pass:change-me-jwt-passphrase \
+            -algorithm rsa -pkeyopt rsa_keygen_bits:4096
+          openssl pkey -in config/jwt/private.pem \
+            -passin pass:change-me-jwt-passphrase \
+            -out config/jwt/public.pem -pubout
+
       - name: Run PHPUnit tests
         working-directory: ${{ inputs.working-directory }}
+        env:
+          # Every other value the suite needs is forced in phpunit.dist.xml,
+          # REDIS_URL included. DATABASE_URL is not, so it is set here; without
+          # it tests/bootstrap.php falls back to SQLite.
+          DATABASE_URL: postgresql://app:app@127.0.0.1:5432/app?serverVersion=18&charset=utf8
         run: vendor/bin/phpunit

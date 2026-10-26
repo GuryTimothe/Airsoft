@@ -11,6 +11,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 final class MeEndpointTest extends WebTestCase
 {
+    use RequiresIntegrationServices;
+
     public function testGetMeDoesNotExposeCanSeePrivate(): void
     {
         $client = static::createClient();
@@ -19,11 +21,7 @@ final class MeEndpointTest extends WebTestCase
         $entityManager = $container->get(EntityManagerInterface::class);
         $passwordHasher = $container->get(UserPasswordHasherInterface::class);
 
-        try {
-            $entityManager->getConnection()->connect();
-        } catch (\Throwable $exception) {
-            self::markTestSkipped('Database is not available for API integration test: '.$exception->getMessage());
-        }
+        $this->skipIfDatabaseUnavailable($entityManager);
 
         $email = sprintf('me-read-%s@example.com', uniqid('', true));
         $plainPassword = 'ReadMe123!';
@@ -54,11 +52,7 @@ final class MeEndpointTest extends WebTestCase
         $passwordHasher = $container->get(UserPasswordHasherInterface::class);
         $userRepository = $container->get(UserRepository::class);
 
-        try {
-            $entityManager->getConnection()->connect();
-        } catch (\Throwable $exception) {
-            self::markTestSkipped('Database is not available for API integration test: '.$exception->getMessage());
-        }
+        $this->skipIfDatabaseUnavailable($entityManager);
 
         $email = sprintf('me-delete-%s@example.com', uniqid('', true));
         $plainPassword = 'DeleteMe123!';

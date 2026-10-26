@@ -10,6 +10,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 final class UsersEndpointTest extends WebTestCase
 {
+    use RequiresIntegrationServices;
+
     public function testUsersCollectionExposesCanSeePrivate(): void
     {
         $client = static::createClient();
@@ -18,11 +20,7 @@ final class UsersEndpointTest extends WebTestCase
         $entityManager = $container->get(EntityManagerInterface::class);
         $passwordHasher = $container->get(UserPasswordHasherInterface::class);
 
-        try {
-            $entityManager->getConnection()->connect();
-        } catch (\Throwable $exception) {
-            self::markTestSkipped('Database is not available for API integration test: '.$exception->getMessage());
-        }
+        $this->skipIfDatabaseUnavailable($entityManager);
 
         $adminEmail = sprintf('users-collection-admin-%s@example.com', uniqid('', true));
         $adminPassword = 'AdminUsers123!';

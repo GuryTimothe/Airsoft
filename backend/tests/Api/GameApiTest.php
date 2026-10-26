@@ -11,16 +11,14 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 final class GameApiTest extends WebTestCase
 {
+    use RequiresIntegrationServices;
+
     public function testGamesCollectionIsPublicAndHidesPrivateGamesForAnonymous(): void
     {
         $client = static::createClient();
         $entityManager = static::getContainer()->get(EntityManagerInterface::class);
 
-        try {
-            $entityManager->getConnection()->connect();
-        } catch (\Throwable $exception) {
-            self::markTestSkipped('Database is not available for API integration test: '.$exception->getMessage());
-        }
+        $this->skipIfDatabaseUnavailable($entityManager);
 
         $publicGame = $this->createGame($entityManager, 'Public game for anonymous', true);
         $privateGame = $this->createGame($entityManager, 'Private game for anonymous', false);
@@ -42,11 +40,7 @@ final class GameApiTest extends WebTestCase
         $entityManager = $container->get(EntityManagerInterface::class);
         $passwordHasher = $container->get(UserPasswordHasherInterface::class);
 
-        try {
-            $entityManager->getConnection()->connect();
-        } catch (\Throwable $exception) {
-            self::markTestSkipped('Database is not available for API integration test: '.$exception->getMessage());
-        }
+        $this->skipIfDatabaseUnavailable($entityManager);
 
         $publicGame = $this->createGame($entityManager, 'Public game for regular user', true);
         $privateGame = $this->createGame($entityManager, 'Private game for regular user', false);
@@ -73,11 +67,7 @@ final class GameApiTest extends WebTestCase
         $entityManager = $container->get(EntityManagerInterface::class);
         $passwordHasher = $container->get(UserPasswordHasherInterface::class);
 
-        try {
-            $entityManager->getConnection()->connect();
-        } catch (\Throwable $exception) {
-            self::markTestSkipped('Database is not available for API integration test: '.$exception->getMessage());
-        }
+        $this->skipIfDatabaseUnavailable($entityManager);
 
         $publicGame = $this->createGame($entityManager, 'Public game for privileged user', true);
         $privateGame = $this->createGame($entityManager, 'Private game for privileged user', false);
