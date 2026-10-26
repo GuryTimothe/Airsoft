@@ -67,7 +67,7 @@ npm test -- --coverage
 
 | Endpoint | Seuil | Outil | Fréquence |
 |----------|-------|-------|-----------|
-| **GET /api/games** | < 200 ms | Lighthouse / curl | À chaque merge |
+| **GET /api/games** | < 200 ms | curl -w, ou Lighthouse dans Chrome | Manuel |
 | **POST /api/game_registrations** | < 500 ms | curl -w | À chaque merge |
 | **Export CSV** | < 2 sec | curl | 1x semaine |
 | **DB Query** | < 100 ms | Doctrine profiler | À chaque développement |
