@@ -292,7 +292,9 @@ le réseau interne (`next.config.ts`). Le backend n'est donc pas publié et n'a
 besoin ni de domaine ni d'exposition CORS.
 
 **Secrets GitHub requis :** aucun. Le déploiement ne passant plus par GitHub
-Actions, les secrets `VPS_*` et `COOLIFY_*` peuvent être supprimés du dépôt.
+Actions, les secrets `VPS_*` et `COOLIFY_*` peuvent être supprimés du dépôt. Le
+secret du webhook git n'est pas un secret Actions : il se saisit dans Coolify et
+dans le formulaire du webhook GitHub (voir plus bas).
 
 **Variables d'environnement à définir dans Coolify :**
 
@@ -310,6 +312,53 @@ Actions, les secrets `VPS_*` et `COOLIFY_*` peuvent être supprimés du dépôt.
 La paire de clés JWT est générée automatiquement au premier démarrage du
 conteneur backend et conservée dans le volume `backend_jwt`. Elle ne doit pas
 être régénérée : tous les tokens émis seraient invalidés.
+
+### Activation de l'auto-déploiement sur push
+
+La source est un **dépôt public** déclaré par son URL de clonage, et non
+l'application GitHub de Coolify : brancher un dépôt par URL ne crée aucun
+webhook. Il faut donc en déclarer un manuellement, en deux temps.
+
+**1. Côté Coolify**
+
+```bash
+- Ressource -> Advanced -> Deployment -> Auto deploy : "Deploy on push (webhooks)"
+- Ressource -> Webhooks -> Manual Git Webhooks -> section GitHub
+- Renseigner le champ "Webhook secret" (16 caractères minimum, générateur fourni)
+- Save changes, puis copier l'URL GitHub affichée, de la forme :
+  https://<instance-coolify>/webhooks/source/github/events/manual
+```
+
+**2. Côté GitHub** (dépôt -> Settings -> Webhooks -> Add webhook)
+
+| Champ | Valeur |
+|-------|--------|
+| Payload URL | L'URL copiée depuis Coolify |
+| Content type | `application/json` |
+| Secret | Le secret saisi à l'étape 1, à l'identique |
+| SSL verification | Laisser activée |
+| Which events | *Just the push event* |
+| Active | Coché |
+
+**Vérification :**
+
+```bash
+git commit --allow-empty -m "chore: test webhook"
+git push
+```
+
+Le déploiement doit apparaître dans Coolify -> Deployments. GitHub conserve le
+détail de chaque envoi dans Settings -> Webhooks -> Recent Deliveries : une
+réponse 401 signale un secret différent de part et d'autre, une 404 une URL
+erronée.
+
+**Branche suivie :** Coolify ignore les push qui ne portent pas sur la branche
+configurée pour la ressource. Sur la branche suivie, en revanche, tout push
+déclenche un build complet, y compris un commit de documentation. `Watch Paths`
+(General -> Build) permet de restreindre le déclenchement à certains chemins.
+
+Ce webhook reste indépendant de la CI : un push dont la CI échoue est déployé
+malgré tout, et la protection de branche décrite en 2.4.1 est le seul garde-fou.
 
 
 # 3. Gestion des Releases
