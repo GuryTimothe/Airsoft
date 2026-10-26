@@ -134,7 +134,7 @@ final class RegisterProcessorTest extends TestCase
         $entityManager->expects($this->exactly(2))->method('flush');
         $entityManager->expects($this->once())->method('persist');
         $repository = $this->createMock(UserRepository::class);
-        $repository->expects($this->once())->method('findOneBy')->with(['email' => 'jean@example.com'])->willReturn($existingUser);
+        $repository->expects($this->once())->method('findOneByEmailCaseInsensitive')->with('jean@example.com')->willReturn($existingUser);
 
         $processor = $this->createProcessor(
             $this->buildInput(),
@@ -154,7 +154,7 @@ final class RegisterProcessorTest extends TestCase
         $entityManager = $this->createMock(EntityManagerInterface::class);
         $entityManager->expects($this->never())->method('remove');
         $repository = $this->createMock(UserRepository::class);
-        $repository->method('findOneBy')->with(['email' => 'jean@example.com'])->willReturn($existingUser);
+        $repository->method('findOneByEmailCaseInsensitive')->with('jean@example.com')->willReturn($existingUser);
 
         $processor = $this->createProcessor(
             $this->buildInput(),

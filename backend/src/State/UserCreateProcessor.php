@@ -54,7 +54,7 @@ class UserCreateProcessor implements ProcessorInterface
         $data->setPassword($hashedPassword);
         $data->setEmailVerified(false);
 
-        $existingUser = $this->userRepository->findOneBy(['email' => $data->getEmail()]);
+        $existingUser = $this->userRepository->findOneByEmailCaseInsensitive($data->getEmail());
         if ($existingUser instanceof User && $existingUser->isEmailVerified()) {
             throw new ValidationException(new ConstraintViolationList([
                 new ConstraintViolation(
