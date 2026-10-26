@@ -154,7 +154,7 @@ final class TokenVersionSubscriber implements EventSubscriberInterface
 
         $tokenNonce = $payload['tok_nce'] ?? null;
 
-        $user = $this->userRepository->findOneBy(['email' => $identifier]);
+        $user = $this->userRepository->findOneByEmailCaseInsensitive($identifier);
         if (!$user instanceof User) {
             $this->markInvalid($event, 'UNKNOWN_USER', $payload);
 

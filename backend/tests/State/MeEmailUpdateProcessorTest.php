@@ -46,7 +46,7 @@ final class MeEmailUpdateProcessorTest extends TestCase
         $passwordHasher = $this->createMock(UserPasswordHasherInterface::class);
         $passwordHasher->expects($this->once())->method('isPasswordValid')->with($actor, 'good-password')->willReturn(true);
         $repository = $this->createMock(UserRepository::class);
-        $repository->expects($this->once())->method('findOneBy')->with(['email' => 'new@example.com'])->willReturn(null);
+        $repository->expects($this->once())->method('findOneByEmailCaseInsensitive')->with('new@example.com')->willReturn(null);
         $jwtManager = $this->createMock(JWTTokenManagerInterface::class);
         $jwtManager->expects($this->once())->method('create')->with($actor)->willReturn('renewed.jwt.token');
         $security = $this->createMock(Security::class);

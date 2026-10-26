@@ -123,7 +123,7 @@ final class TokenVersionSubscriberTest extends TestCase
     public function testOnJwtDecodedInvalidatesWhenUserNotFound(): void
     {
         $userRepository = $this->createMock(UserRepository::class);
-        $userRepository->method('findOneBy')->willReturn(null);
+        $userRepository->method('findOneByEmailCaseInsensitive')->willReturn(null);
 
         $revocationStore = $this->createMock(JwtRevocationStore::class);
         $revocationStore->method('isTokenIdRevoked')->willReturn(false);
@@ -147,7 +147,7 @@ final class TokenVersionSubscriberTest extends TestCase
         $user = (new User())->setEmail('test@example.com')->setPassword('hashed');
 
         $userRepository = $this->createMock(UserRepository::class);
-        $userRepository->method('findOneBy')->willReturn($user);
+        $userRepository->method('findOneByEmailCaseInsensitive')->willReturn($user);
 
         $revocationStore = $this->createMock(JwtRevocationStore::class);
         $revocationStore->method('isTokenIdRevoked')->willReturn(false);
@@ -171,7 +171,7 @@ final class TokenVersionSubscriberTest extends TestCase
         $user = (new User())->setEmail('test@example.com')->setPassword('hashed');
 
         $userRepository = $this->createMock(UserRepository::class);
-        $userRepository->method('findOneBy')->willReturn($user);
+        $userRepository->method('findOneByEmailCaseInsensitive')->willReturn($user);
 
         $revocationStore = $this->createMock(JwtRevocationStore::class);
         $revocationStore->method('isTokenIdRevoked')->willReturn(false);
@@ -199,7 +199,7 @@ final class TokenVersionSubscriberTest extends TestCase
         $nonce = 'correct-nonce';
 
         $userRepository = $this->createMock(UserRepository::class);
-        $userRepository->method('findOneBy')->willReturn($user);
+        $userRepository->method('findOneByEmailCaseInsensitive')->willReturn($user);
 
         $revocationStore = $this->createMock(JwtRevocationStore::class);
         $revocationStore->method('isTokenIdRevoked')->willReturn(false);
@@ -230,7 +230,7 @@ final class TokenVersionSubscriberTest extends TestCase
         $correctSignature = hash_hmac('sha256', 'hashed-password', self::SECRET);
 
         $userRepository = $this->createMock(UserRepository::class);
-        $userRepository->method('findOneBy')->willReturn($user);
+        $userRepository->method('findOneByEmailCaseInsensitive')->willReturn($user);
 
         $revocationStore = $this->createMock(JwtRevocationStore::class);
         $revocationStore->method('isTokenIdRevoked')->willReturn(false);
@@ -257,7 +257,7 @@ final class TokenVersionSubscriberTest extends TestCase
         $correctSignature = hash_hmac('sha256', 'hashed-password', self::SECRET);
 
         $userRepository = $this->createMock(UserRepository::class);
-        $userRepository->method('findOneBy')->willReturn($user);
+        $userRepository->method('findOneByEmailCaseInsensitive')->willReturn($user);
 
         $revocationStore = $this->createMock(JwtRevocationStore::class);
         $revocationStore->method('isTokenIdRevoked')->willReturn(false);

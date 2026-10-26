@@ -8,7 +8,10 @@ security:
     app_user_provider:
       entity:
         class: App\Entity\User
-        property: email
+        # No "property" on purpose: that would compare the submitted address to
+        # the stored one exactly. Without it Doctrine calls
+        # UserRepository::loadUserByIdentifier, which matches case-insensitively,
+        # the same way every other lookup on an address does.
 
   firewalls:
     dev:

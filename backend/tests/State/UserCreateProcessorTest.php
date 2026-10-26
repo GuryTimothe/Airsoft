@@ -58,7 +58,7 @@ final class UserCreateProcessorTest extends TestCase
             ->willReturn('hashed-password');
 
         $repository = $this->createMock(UserRepository::class);
-        $repository->expects($this->once())->method('findOneBy')->with(['email' => 'nina@example.com'])->willReturn(null);
+        $repository->expects($this->once())->method('findOneByEmailCaseInsensitive')->with('nina@example.com')->willReturn(null);
 
         $security = $this->createMock(Security::class);
         $security->expects($this->once())->method('getUser')->willReturn($admin);
@@ -98,7 +98,7 @@ final class UserCreateProcessorTest extends TestCase
         $passwordHasher = $this->createMock(UserPasswordHasherInterface::class);
         $passwordHasher->method('hashPassword')->willReturn('hashed-password');
         $repository = $this->createMock(UserRepository::class);
-        $repository->method('findOneBy')->willReturn(new User());
+        $repository->method('findOneByEmailCaseInsensitive')->willReturn(new User());
 
         $processor = new UserCreateProcessor(
             $entityManager,
@@ -137,7 +137,7 @@ final class UserCreateProcessorTest extends TestCase
         $passwordHasher = $this->createMock(UserPasswordHasherInterface::class);
         $passwordHasher->method('hashPassword')->willReturn('hashed-password');
         $repository = $this->createMock(UserRepository::class);
-        $repository->method('findOneBy')->willReturn($existingUser);
+        $repository->method('findOneByEmailCaseInsensitive')->willReturn($existingUser);
         $security = $this->createMock(Security::class);
         $security->method('getUser')->willReturn(null);
         $mailer = $this->createMock(MailerInterface::class);

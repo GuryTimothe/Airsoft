@@ -132,7 +132,7 @@ class RegisterProcessor implements ProcessorInterface
 
     private function replaceUnverifiedAccount(string $email): void
     {
-        $existingUser = $this->userRepository?->findOneBy(['email' => $email]);
+        $existingUser = $this->userRepository?->findOneByEmailCaseInsensitive($email);
         if (!$existingUser instanceof User) {
             return;
         }

@@ -26,7 +26,7 @@ final class EmailAvailabilityController extends AbstractController
             return new JsonResponse(['available' => true]);
         }
 
-        $existingUser = $this->userRepository->findOneBy(['email' => $email]);
+        $existingUser = $this->userRepository->findOneByEmailCaseInsensitive($email);
         $available    = !$existingUser || !$existingUser->isEmailVerified();
 
         return new JsonResponse(['available' => $available]);

@@ -50,7 +50,7 @@ final class PasswordResetController extends AbstractController
             return $this->genericRequestResponse();
         }
 
-        $user = $this->userRepository->findOneBy(['email' => strtolower(trim($email))]);
+        $user = $this->userRepository->findOneByEmailCaseInsensitive($email);
         if (!$user instanceof User) {
             return $this->genericRequestResponse();
         }
