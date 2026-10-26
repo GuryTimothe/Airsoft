@@ -71,7 +71,7 @@ final class AdminExportControllerTest extends WebTestCase
             sprintf('attachment; filename="parties_export_%s.csv"', (new \DateTimeImmutable())->format('dmY')),
         );
 
-        $content = (string) $client->getResponse()->getContent();
+        $content = $this->streamedContent($client);
         self::assertStringStartsWith("\xEF\xBB\xBF", $content);
         self::assertStringContainsString('Included export game', $content);
         self::assertStringContainsString('Nom;Prénom;Âge;Email;Tel;Présence', $content);
@@ -101,8 +101,9 @@ final class AdminExportControllerTest extends WebTestCase
 
         self::assertResponseIsSuccessful();
         self::assertResponseHeaderSame('content-type', 'text/csv; charset=UTF-8');
-        self::assertStringContainsString('Organizer export game', (string) $client->getResponse()->getContent());
-        self::assertStringContainsString((string) $game->getId(), (string) $client->getResponse()->getContent());
+        $content = $this->streamedContent($client);
+        self::assertStringContainsString('Organizer export game', $content);
+        self::assertStringContainsString((string) $game->getId(), $content);
     }
 
     public function testAdminCanExportUsersFilteredByAgeGroupAndRole(): void
@@ -141,7 +142,7 @@ final class AdminExportControllerTest extends WebTestCase
             sprintf('attachment; filename="utilisateurs_export_%s.csv"', (new \DateTimeImmutable())->format('dmY')),
         );
 
-        $content = (string) $client->getResponse()->getContent();
+        $content = $this->streamedContent($client);
         $header = strtok(substr($content, 3), "\n");
         self::assertSame('Nom,Prénom,Email,Pseudo,Tel,"Date de naissance",Âge,Rôle,"Accès parties privées","Contact d\'urgence : Nom","Contact d\'urgence : Prénom","Contact d\'urgence : Email","Contact d\'urgence : Tel","Création du compte le"', rtrim((string) $header, "\r"));
         self::assertStringContainsString($adultAdmin->getEmail(), $content);
@@ -198,7 +199,7 @@ final class AdminExportControllerTest extends WebTestCase
             sprintf('attachment; filename="partie_%d_inscriptions_export_%s.csv"', $game->getId(), (new \DateTimeImmutable())->format('dmY')),
         );
 
-        $content = (string) $client->getResponse()->getContent();
+        $content = $this->streamedContent($client);
         $header = strtok(substr($content, 3), "\n");
         self::assertSame('"Titre de la partie",Nom,Prénom,Email,Pseudo,Rôle,Présence,"Inscription le"', rtrim((string) $header, "\r"));
         self::assertStringContainsString($playerOne->getEmail(), $content);
@@ -281,5 +282,17 @@ final class AdminExportControllerTest extends WebTestCase
         self::assertIsString($payload['token']);
 
         return $payload['token'];
+    }
+/**
+     * The export controllers return a StreamedResponse, whose body is produced
+     * by a callback when the response is sent. getContent() on one returns an
+     * empty string, which is what these assertions were reading.
+     */
+    private function streamedContent(KernelBrowser $client): string
+    {
+        ob_start();
+        $client->getResponse()->sendContent();
+
+        return (string) ob_get_clean();
     }
 }
