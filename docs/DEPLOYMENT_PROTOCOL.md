@@ -51,8 +51,8 @@ Le pipeline est exécuté automatiquement lors de push sur GitHub.
 | `security-scanner.yml` | Analyse de sécurité, qualité du code et détection des vulnérabilités | Après `frontend-ci.yml` et `backend-ci.yml`|
 
 > La CI s'arrête après l'analyse de sécurité. Les audits Lighthouse et Pa11y
-> ainsi que l'automatisation des releases ont été retirés du pipeline, et le
-> déploiement ne passe plus par GitHub Actions.
+> ainsi que l'automatisation des releases ont été retirés du pipeline puis du
+> dépôt, et le déploiement ne passe plus par GitHub Actions.
 
 ### Résultat attendu
 
@@ -159,10 +159,10 @@ Le pipeline CD automatise la création des versions applicatives et prépare le 
 Le versioning suit le Semantic Versioning et s'appuie sur les Conventional
 Commits (section 2.2).
 
-L'automatisation `release-please` a été retirée du pipeline CI. Les fichiers de
-configuration (`.release-pleaserc.json`, `.release-please-manifest.json`) sont
-conservés, ce qui permet de la réactiver dans un workflow dédié si besoin. En
-attendant, les versions, le changelog et les tags sont gérés manuellement.
+L'automatisation `release-please` a été retirée du pipeline CI, et ses fichiers
+de configuration (`.release-pleaserc.json`, `.release-please-manifest.json`) ont
+été supprimés du dépôt. Les versions, le changelog et les tags sont donc gérés
+manuellement ; les fichiers `CHANGELOG.md` conservent l'historique déjà publié.
 
 ---
 
@@ -314,7 +314,8 @@ conteneur backend et conservée dans le volume `backend_jwt`. Elle ne doit pas
 
 # 3. Gestion des Releases
 
-Les releases sont générées automatiquement grâce au système de versioning configuré.
+Les releases sont créées manuellement depuis GitHub, en suivant le Semantic
+Versioning décrit en section 2.3.
 
 ## Contenu d'une release
 
