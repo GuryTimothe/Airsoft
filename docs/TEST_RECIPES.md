@@ -254,8 +254,8 @@ Si le résultat ≠ résultat attendu :
 | TC-PERF-001 | GET /api/games < 500ms | 100 games DB | Temps réponse | ❌ FAIL |
 | TC-PERF-002 | POST inscription < 200ms | DB normal | Temps création | ❌ FAIL |
 | TC-PERF-003 | Export CSV < 2s | 1000 users | Temps génération | ❌ FAIL |
-| TC-PERF-004 | Lighthouse Performance > 80 | Build prod | Score CI/CD | ✅ PASS |
-| TC-PERF-005 | Lighthouse Accessibilité > 90 | Build prod | Score CI/CD | ✅ PASS |
+| TC-PERF-004 | Lighthouse Performance > 80 | Build prod | Chrome DevTools, manuel | ✅ PASS |
+| TC-PERF-005 | Lighthouse Accessibilité > 90 | Build prod | Chrome DevTools, manuel | ✅ PASS |
 
 ---
 

@@ -1,8 +1,9 @@
 # Self-contained production stack for Coolify's Docker Compose build pack.
 #
-# Coolify deploys a single compose file, so this does not use the
-# docker-compose.yml + docker-compose.prod.yml override pair that start-prod.sh
-# relies on for local production testing.
+# Coolify deploys a single compose file, so this does not layer overrides the way
+# docker-compose.yml + docker-compose.dev.yml do for development. It is the only
+# production definition: the former docker-compose.prod.yml pair and its
+# start-prod scripts were the pre-Coolify deployment path and are gone.
 #
 # Only the frontend publishes a host port, on FRONTEND_PORT, for an external
 # reverse proxy to forward to. Coolify's built-in proxy is not used, so no
