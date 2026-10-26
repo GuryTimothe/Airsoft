@@ -195,11 +195,16 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         }
     }
 
-    #[ORM\Column(type: 'date')]
+    // Immutable for the same reason as Game::$startDateTime: the serializer
+    // builds a DateTimeImmutable for a DateTimeInterface-typed target, and
+    // DBAL 4's mutable DateType rejects it. RegisterProcessor used to convert
+    // back to a DateTime to get around it, but the PATCH paths, which copy a
+    // User the serializer built, had no such workaround.
+    #[ORM\Column(type: 'date_immutable')]
     #[Assert\NotNull(groups: ['user:create', 'user:admin:update', 'user:self:general'])]
     #[Assert\LessThanOrEqual('today', message: "La date de naissance ne peut pas \u00eatre dans le futur.", groups: ['user:create', 'user:admin:update', 'user:self:general'])]
     #[Groups(['user:read', 'user:write', 'user:self:write', 'user:me:read'])]
-    private \DateTimeInterface $dateOfBirth;
+    private \DateTimeImmutable $dateOfBirth;
 
     #[ORM\OneToOne(mappedBy: 'user', targetEntity: EmergencyContact::class, cascade: ['persist', 'remove'], orphanRemoval: true)]
     #[ApiProperty(readableLink: true, writableLink: true)]
@@ -318,12 +323,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    public function getDateOfBirth(): \DateTimeInterface
+    public function getDateOfBirth(): \DateTimeImmutable
     {
         return $this->dateOfBirth;
     }
 
-    public function setDateOfBirth(\DateTimeInterface $dateOfBirth): self
+    public function setDateOfBirth(\DateTimeImmutable $dateOfBirth): self
     {
         $this->dateOfBirth = $dateOfBirth;
 

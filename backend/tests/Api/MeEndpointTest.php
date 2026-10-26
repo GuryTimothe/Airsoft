@@ -11,6 +11,9 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 final class MeEndpointTest extends WebTestCase
 {
+    use RequiresIntegrationServices;
+    use AuthenticatesThroughTheApi;
+
     public function testGetMeDoesNotExposeCanSeePrivate(): void
     {
         $client = static::createClient();
@@ -19,11 +22,7 @@ final class MeEndpointTest extends WebTestCase
         $entityManager = $container->get(EntityManagerInterface::class);
         $passwordHasher = $container->get(UserPasswordHasherInterface::class);
 
-        try {
-            $entityManager->getConnection()->connect();
-        } catch (\Throwable $exception) {
-            self::markTestSkipped('Database is not available for API integration test: '.$exception->getMessage());
-        }
+        $this->skipIfDatabaseUnavailable($entityManager);
 
         $email = sprintf('me-read-%s@example.com', uniqid('', true));
         $plainPassword = 'ReadMe123!';
@@ -54,11 +53,7 @@ final class MeEndpointTest extends WebTestCase
         $passwordHasher = $container->get(UserPasswordHasherInterface::class);
         $userRepository = $container->get(UserRepository::class);
 
-        try {
-            $entityManager->getConnection()->connect();
-        } catch (\Throwable $exception) {
-            self::markTestSkipped('Database is not available for API integration test: '.$exception->getMessage());
-        }
+        $this->skipIfDatabaseUnavailable($entityManager);
 
         $email = sprintf('me-delete-%s@example.com', uniqid('', true));
         $plainPassword = 'DeleteMe123!';
@@ -74,9 +69,14 @@ final class MeEndpointTest extends WebTestCase
         self::assertResponseStatusCodeSame(204);
         self::assertNull($userRepository->find($user->getId()));
 
+        // Deliberately not loginAndGetToken: this login has to fail. It still
+        // needs a CSRF token, or LoginCsrfRequestSubscriber answers 403 before
+        // the credentials are ever checked.
         $client->jsonRequest('POST', '/api/login', [
             'email' => $email,
             'password' => $plainPassword,
+        ], [
+            'HTTP_X_CSRF_TOKEN' => $this->fetchCsrfToken($client),
         ]);
 
         self::assertResponseStatusCodeSame(401);
@@ -101,22 +101,5 @@ final class MeEndpointTest extends WebTestCase
         $entityManager->flush();
 
         return $user;
-    }
-
-    private function loginAndGetToken(KernelBrowser $client, string $email, string $plainPassword): string
-    {
-        $client->jsonRequest('POST', '/api/login', [
-            'email' => $email,
-            'password' => $plainPassword,
-        ]);
-
-        self::assertResponseStatusCodeSame(200);
-
-        $payload = json_decode($client->getResponse()->getContent(), true);
-        self::assertIsArray($payload);
-        self::assertArrayHasKey('token', $payload);
-        self::assertIsString($payload['token']);
-
-        return $payload['token'];
     }
 }

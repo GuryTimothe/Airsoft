@@ -10,6 +10,9 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 final class UsersEndpointTest extends WebTestCase
 {
+    use RequiresIntegrationServices;
+    use AuthenticatesThroughTheApi;
+
     public function testUsersCollectionExposesCanSeePrivate(): void
     {
         $client = static::createClient();
@@ -18,11 +21,7 @@ final class UsersEndpointTest extends WebTestCase
         $entityManager = $container->get(EntityManagerInterface::class);
         $passwordHasher = $container->get(UserPasswordHasherInterface::class);
 
-        try {
-            $entityManager->getConnection()->connect();
-        } catch (\Throwable $exception) {
-            self::markTestSkipped('Database is not available for API integration test: '.$exception->getMessage());
-        }
+        $this->skipIfDatabaseUnavailable($entityManager);
 
         $adminEmail = sprintf('users-collection-admin-%s@example.com', uniqid('', true));
         $adminPassword = 'AdminUsers123!';
@@ -41,11 +40,12 @@ final class UsersEndpointTest extends WebTestCase
 
         $payload = json_decode($client->getResponse()->getContent(), true);
         self::assertIsArray($payload);
-        self::assertArrayHasKey('hydra:member', $payload);
-        self::assertIsArray($payload['hydra:member']);
+        // API Platform 4 defaults hydra_prefix to false.
+        self::assertArrayHasKey('member', $payload);
+        self::assertIsArray($payload['member']);
 
         $targetUserPayload = null;
-        foreach ($payload['hydra:member'] as $userPayload) {
+        foreach ($payload['member'] as $userPayload) {
             if (is_array($userPayload) && ($userPayload['email'] ?? null) === $targetEmail) {
                 $targetUserPayload = $userPayload;
                 break;
@@ -78,22 +78,5 @@ final class UsersEndpointTest extends WebTestCase
         $entityManager->flush();
 
         return $user;
-    }
-
-    private function loginAndGetToken(KernelBrowser $client, string $email, string $plainPassword): string
-    {
-        $client->jsonRequest('POST', '/api/login', [
-            'email' => $email,
-            'password' => $plainPassword,
-        ]);
-
-        self::assertResponseStatusCodeSame(200);
-
-        $payload = json_decode($client->getResponse()->getContent(), true);
-        self::assertIsArray($payload);
-        self::assertArrayHasKey('token', $payload);
-        self::assertIsString($payload['token']);
-
-        return $payload['token'];
     }
 }

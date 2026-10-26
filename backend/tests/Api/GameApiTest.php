@@ -11,16 +11,15 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 final class GameApiTest extends WebTestCase
 {
+    use RequiresIntegrationServices;
+    use AuthenticatesThroughTheApi;
+
     public function testGamesCollectionIsPublicAndHidesPrivateGamesForAnonymous(): void
     {
         $client = static::createClient();
         $entityManager = static::getContainer()->get(EntityManagerInterface::class);
 
-        try {
-            $entityManager->getConnection()->connect();
-        } catch (\Throwable $exception) {
-            self::markTestSkipped('Database is not available for API integration test: '.$exception->getMessage());
-        }
+        $this->skipIfDatabaseUnavailable($entityManager);
 
         $publicGame = $this->createGame($entityManager, 'Public game for anonymous', true);
         $privateGame = $this->createGame($entityManager, 'Private game for anonymous', false);
@@ -42,11 +41,7 @@ final class GameApiTest extends WebTestCase
         $entityManager = $container->get(EntityManagerInterface::class);
         $passwordHasher = $container->get(UserPasswordHasherInterface::class);
 
-        try {
-            $entityManager->getConnection()->connect();
-        } catch (\Throwable $exception) {
-            self::markTestSkipped('Database is not available for API integration test: '.$exception->getMessage());
-        }
+        $this->skipIfDatabaseUnavailable($entityManager);
 
         $publicGame = $this->createGame($entityManager, 'Public game for regular user', true);
         $privateGame = $this->createGame($entityManager, 'Private game for regular user', false);
@@ -73,11 +68,7 @@ final class GameApiTest extends WebTestCase
         $entityManager = $container->get(EntityManagerInterface::class);
         $passwordHasher = $container->get(UserPasswordHasherInterface::class);
 
-        try {
-            $entityManager->getConnection()->connect();
-        } catch (\Throwable $exception) {
-            self::markTestSkipped('Database is not available for API integration test: '.$exception->getMessage());
-        }
+        $this->skipIfDatabaseUnavailable($entityManager);
 
         $publicGame = $this->createGame($entityManager, 'Public game for privileged user', true);
         $privateGame = $this->createGame($entityManager, 'Private game for privileged user', false);
@@ -139,23 +130,6 @@ final class GameApiTest extends WebTestCase
         return [$user, $plainPassword];
     }
 
-    private function loginAndGetToken(KernelBrowser $client, string $email, string $plainPassword): string
-    {
-        $client->jsonRequest('POST', '/api/login', [
-            'email' => $email,
-            'password' => $plainPassword,
-        ]);
-
-        self::assertResponseStatusCodeSame(200);
-
-        $payload = json_decode($client->getResponse()->getContent(), true);
-        self::assertIsArray($payload);
-        self::assertArrayHasKey('token', $payload);
-        self::assertIsString($payload['token']);
-
-        return $payload['token'];
-    }
-
     /**
      * @return list<int>
      */
@@ -163,11 +137,13 @@ final class GameApiTest extends WebTestCase
     {
         $payload = json_decode($client->getResponse()->getContent(), true);
         self::assertIsArray($payload);
-        self::assertArrayHasKey('hydra:member', $payload);
-        self::assertIsArray($payload['hydra:member']);
+        // API Platform 4 defaults hydra_prefix to false, so collections come
+        // back with "member" rather than "hydra:member".
+        self::assertArrayHasKey('member', $payload);
+        self::assertIsArray($payload['member']);
 
         $ids = [];
-        foreach ($payload['hydra:member'] as $member) {
+        foreach ($payload['member'] as $member) {
             if (!is_array($member)) {
                 continue;
             }

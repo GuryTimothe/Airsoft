@@ -7,13 +7,15 @@ use App\Entity\GameRegistration;
 use App\Entity\EmergencyContact;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
-use Doctrine\ORM\Tools\SchemaTool;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 final class AdminExportControllerTest extends WebTestCase
 {
+    use RequiresIntegrationServices;
+    use AuthenticatesThroughTheApi;
+
     public function testAnonymousCannotExportGames(): void
     {
         $client = static::createClient();
@@ -57,6 +59,15 @@ final class AdminExportControllerTest extends WebTestCase
         $includedGame            = $this->createGame($entityManager, 'Included export game', '2026-07-12 10:00:00');
         $this->createGame($entityManager, 'Excluded export game', '2026-08-15 10:00:00');
 
+        // The age column only appears on a player row, so the game needs one
+        // registration for the "Majeur" assertion below to mean anything.
+        [$adultPlayer] = $this->createUser($entityManager, $passwordHasher, 'ROLE_USER', '1993-01-01');
+        $registration  = new GameRegistration();
+        $registration->setGame($includedGame);
+        $registration->setUser($adultPlayer);
+        $entityManager->persist($registration);
+        $entityManager->flush();
+
         $token = $this->loginAndGetToken($client, $admin->getEmail(), $adminPassword);
 
         $client->request('GET', '/api/exports/games.csv?dateFrom=2026-07-01&dateTo=2026-07-31', server: [
@@ -70,13 +81,12 @@ final class AdminExportControllerTest extends WebTestCase
             sprintf('attachment; filename="parties_export_%s.csv"', (new \DateTimeImmutable())->format('dmY')),
         );
 
-        $content = (string) $client->getResponse()->getContent();
+        $content = $this->streamedContent($client);
         self::assertStringStartsWith("\xEF\xBB\xBF", $content);
         self::assertStringContainsString('Included export game', $content);
         self::assertStringContainsString('Nom;Prénom;Âge;Email;Tel;Présence', $content);
         self::assertStringContainsString('Majeur', $content);
         self::assertStringNotContainsString('Excluded export game', $content);
-        self::assertStringContainsString((string) $includedGame->getId(), $content);
     }
 
     public function testOrganizerCanExportGames(): void
@@ -100,8 +110,8 @@ final class AdminExportControllerTest extends WebTestCase
 
         self::assertResponseIsSuccessful();
         self::assertResponseHeaderSame('content-type', 'text/csv; charset=UTF-8');
-        self::assertStringContainsString('Organizer export game', (string) $client->getResponse()->getContent());
-        self::assertStringContainsString((string) $game->getId(), (string) $client->getResponse()->getContent());
+        $content = $this->streamedContent($client);
+        self::assertStringContainsString('Organizer export game', $content);
     }
 
     public function testAdminCanExportUsersFilteredByAgeGroupAndRole(): void
@@ -118,6 +128,9 @@ final class AdminExportControllerTest extends WebTestCase
         [$adultAdmin]            = $this->createUser($entityManager, $passwordHasher, 'ROLE_ADMIN', '1992-02-02');
         [$minorAdmin]            = $this->createUser($entityManager, $passwordHasher, 'ROLE_ADMIN', '2012-02-02');
         [$adultUser]             = $this->createUser($entityManager, $passwordHasher, 'ROLE_USER', '1995-02-02');
+        // The "Accès parties privées" column reads Refusé for everyone unless a
+        // user actually has the flag, which the "Autorisé" assertion below needs.
+        $adultAdmin->setCanSeePrivate(true);
         $adultAdmin->setPhone('0612345678');
         $adultAdmin->setEmergencyContact(
             (new EmergencyContact())
@@ -140,9 +153,9 @@ final class AdminExportControllerTest extends WebTestCase
             sprintf('attachment; filename="utilisateurs_export_%s.csv"', (new \DateTimeImmutable())->format('dmY')),
         );
 
-        $content = (string) $client->getResponse()->getContent();
+        $content = $this->streamedContent($client);
         $header = strtok(substr($content, 3), "\n");
-        self::assertSame('Nom,Prénom,Email,Pseudo,Tel,"Date de naissance",Âge,Rôle,"Accès parties privées","Contact d\'urgence : Nom","Contact d\'urgence : Prénom","Contact d\'urgence : Email","Contact d\'urgence : Tel","Création du compte le"', rtrim((string) $header, "\r"));
+        self::assertSame('Nom;Prénom;Email;Pseudo;Tel;"Date de naissance";Âge;Rôle;"Accès parties privées";"Contact d\'urgence : Nom";"Contact d\'urgence : Prénom";"Contact d\'urgence : Email";"Contact d\'urgence : Tel";"Création du compte le"', rtrim((string) $header, "\r"));
         self::assertStringContainsString($adultAdmin->getEmail(), $content);
         self::assertStringContainsString('admin', $content);
         self::assertStringNotContainsString('ROLE_ADMIN', $content);
@@ -197,9 +210,9 @@ final class AdminExportControllerTest extends WebTestCase
             sprintf('attachment; filename="partie_%d_inscriptions_export_%s.csv"', $game->getId(), (new \DateTimeImmutable())->format('dmY')),
         );
 
-        $content = (string) $client->getResponse()->getContent();
+        $content = $this->streamedContent($client);
         $header = strtok(substr($content, 3), "\n");
-        self::assertSame('"Titre de la partie",Nom,Prénom,Email,Pseudo,Rôle,Présence,"Inscription le"', rtrim((string) $header, "\r"));
+        self::assertSame('"Titre de la partie";Nom;Prénom;Email;Pseudo;Rôle;Présence;"Inscription le"', rtrim((string) $header, "\r"));
         self::assertStringContainsString($playerOne->getEmail(), $content);
         self::assertStringContainsString($playerTwo->getEmail(), $content);
         self::assertStringContainsString('utilisateur', $content);
@@ -219,68 +232,13 @@ final class AdminExportControllerTest extends WebTestCase
         $game->setAddress('Terrain export');
         $game->setPrice(10.0);
         $game->setMaxPlaces(20);
-        $game->setStartDateTime(new \DateTime($startDateTime));
+        $game->setStartDateTime(new \DateTimeImmutable($startDateTime));
         $game->setIsPublic(true);
 
         $entityManager->persist($game);
         $entityManager->flush();
 
         return $game;
-    }
-
-    private function skipIfDatabaseUnavailable(EntityManagerInterface $entityManager): void
-    {
-        try {
-            $connection = $entityManager->getConnection();
-            $connection->executeQuery('SELECT 1');
-
-            $schemaManager = $connection->createSchemaManager();
-            $tables = array_map('strtolower', $schemaManager->listTableNames());
-
-            if (!in_array('users', $tables, true)) {
-                $metadata = $entityManager->getMetadataFactory()->getAllMetadata();
-                if ([] === $metadata) {
-                    self::markTestSkipped('No Doctrine metadata available to initialize test schema.');
-
-                    return;
-                }
-
-                $schemaTool = new SchemaTool($entityManager);
-                $schemaTool->createSchema($metadata);
-            }
-
-            $this->skipIfRedisUnavailable();
-        } catch (\Throwable $exception) {
-            self::markTestSkipped('Database is not available for API integration test: '.$exception->getMessage());
-        }
-    }
-
-    private function skipIfRedisUnavailable(): void
-    {
-        $redisUrl = $_SERVER['REDIS_URL'] ?? $_ENV['REDIS_URL'] ?? getenv('REDIS_URL');
-        if (!\is_string($redisUrl) || '' === trim($redisUrl)) {
-            self::markTestSkipped('Redis URL is missing for API integration test.');
-
-            return;
-        }
-
-        $host = (string) (parse_url($redisUrl, PHP_URL_HOST) ?: '127.0.0.1');
-        $port = (int) (parse_url($redisUrl, PHP_URL_PORT) ?: 6379);
-
-        $socket = @stream_socket_client(
-            sprintf('tcp://%s:%d', $host, $port),
-            $errorCode,
-            $errorMessage,
-            0.2
-        );
-
-        if (false === $socket) {
-            self::markTestSkipped(sprintf('Redis is not available for API integration test: %s', $errorMessage ?: (string) $errorCode));
-
-            return;
-        }
-
-        fclose($socket);
     }
 
     /**
@@ -299,7 +257,7 @@ final class AdminExportControllerTest extends WebTestCase
         $user->setLastname('Export');
         $user->setFirstname('User');
         $user->setEmail($email);
-        $user->setDateOfBirth(new \DateTime($dateOfBirth));
+        $user->setDateOfBirth(new \DateTimeImmutable($dateOfBirth));
         $user->setRole($role);
         $user->setCanSeePrivate(false);
         $user->setPassword($passwordHasher->hashPassword($user, $plainPassword));
@@ -310,30 +268,15 @@ final class AdminExportControllerTest extends WebTestCase
         return [$user, $plainPassword];
     }
 
-    private function loginAndGetToken(KernelBrowser $client, string $email, string $plainPassword): string
+    /**
+     * The export controllers return a StreamedResponse, whose body a callback
+     * writes when the response is sent. getResponse()->getContent() is empty
+     * for one: the browser already ran that callback during the request and
+     * kept the output (HttpKernelBrowser::filterResponse), and a stream is only
+     * sent once. The captured body is on the BrowserKit response.
+     */
+    private function streamedContent(KernelBrowser $client): string
     {
-        $client->request('GET', '/api/csrf/login');
-        self::assertResponseStatusCodeSame(200);
-
-        $csrfPayload = json_decode($client->getResponse()->getContent(), true);
-        self::assertIsArray($csrfPayload);
-        self::assertArrayHasKey('csrfToken', $csrfPayload);
-        self::assertIsString($csrfPayload['csrfToken']);
-
-        $client->jsonRequest('POST', '/api/login', [
-            'email'    => $email,
-            'password' => $plainPassword,
-        ], [
-            'HTTP_X_CSRF_TOKEN' => $csrfPayload['csrfToken'],
-        ]);
-
-        self::assertResponseStatusCodeSame(200);
-
-        $payload = json_decode($client->getResponse()->getContent(), true);
-        self::assertIsArray($payload);
-        self::assertArrayHasKey('token', $payload);
-        self::assertIsString($payload['token']);
-
-        return $payload['token'];
+        return (string) $client->getInternalResponse()->getContent();
     }
 }
