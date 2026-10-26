@@ -13,6 +13,7 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 final class GameRegistrationApiTest extends WebTestCase
 {
     use RequiresIntegrationServices;
+    use AuthenticatesThroughTheApi;
 
     public function testRegistrationRequiresAuthentication(): void
     {
@@ -23,8 +24,13 @@ final class GameRegistrationApiTest extends WebTestCase
 
         $game = $this->createGame($entityManager, 'Game auth required', 10);
 
+        // Carries a CSRF token so the request reaches the firewall: without one
+        // LoginCsrfRequestSubscriber answers 403 before authentication runs,
+        // which says nothing about whether the endpoint requires a login.
         $client->jsonRequest('POST', '/api/game_registrations', [
             'game' => '/api/games/'.$game->getId(),
+        ], [
+            'HTTP_X_CSRF_TOKEN' => $this->fetchCsrfToken($client),
         ]);
 
         self::assertResponseStatusCodeSame(401);
@@ -358,22 +364,5 @@ final class GameRegistrationApiTest extends WebTestCase
         $entityManager->flush();
 
         return [$user, $plainPassword];
-    }
-
-    private function loginAndGetToken(KernelBrowser $client, string $email, string $plainPassword): string
-    {
-        $client->jsonRequest('POST', '/api/login', [
-            'email' => $email,
-            'password' => $plainPassword,
-        ]);
-
-        self::assertResponseStatusCodeSame(200);
-
-        $payload = json_decode($client->getResponse()->getContent(), true);
-        self::assertIsArray($payload);
-        self::assertArrayHasKey('token', $payload);
-        self::assertIsString($payload['token']);
-
-        return $payload['token'];
     }
 }

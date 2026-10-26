@@ -11,6 +11,7 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 final class UsersEndpointTest extends WebTestCase
 {
     use RequiresIntegrationServices;
+    use AuthenticatesThroughTheApi;
 
     public function testUsersCollectionExposesCanSeePrivate(): void
     {
@@ -76,22 +77,5 @@ final class UsersEndpointTest extends WebTestCase
         $entityManager->flush();
 
         return $user;
-    }
-
-    private function loginAndGetToken(KernelBrowser $client, string $email, string $plainPassword): string
-    {
-        $client->jsonRequest('POST', '/api/login', [
-            'email' => $email,
-            'password' => $plainPassword,
-        ]);
-
-        self::assertResponseStatusCodeSame(200);
-
-        $payload = json_decode($client->getResponse()->getContent(), true);
-        self::assertIsArray($payload);
-        self::assertArrayHasKey('token', $payload);
-        self::assertIsString($payload['token']);
-
-        return $payload['token'];
     }
 }

@@ -14,6 +14,7 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 final class AdminExportControllerTest extends WebTestCase
 {
     use RequiresIntegrationServices;
+    use AuthenticatesThroughTheApi;
 
     public function testAnonymousCannotExportGames(): void
     {
@@ -255,33 +256,6 @@ final class AdminExportControllerTest extends WebTestCase
         $entityManager->flush();
 
         return [$user, $plainPassword];
-    }
-
-    private function loginAndGetToken(KernelBrowser $client, string $email, string $plainPassword): string
-    {
-        $client->request('GET', '/api/csrf/login');
-        self::assertResponseStatusCodeSame(200);
-
-        $csrfPayload = json_decode($client->getResponse()->getContent(), true);
-        self::assertIsArray($csrfPayload);
-        self::assertArrayHasKey('csrfToken', $csrfPayload);
-        self::assertIsString($csrfPayload['csrfToken']);
-
-        $client->jsonRequest('POST', '/api/login', [
-            'email'    => $email,
-            'password' => $plainPassword,
-        ], [
-            'HTTP_X_CSRF_TOKEN' => $csrfPayload['csrfToken'],
-        ]);
-
-        self::assertResponseStatusCodeSame(200);
-
-        $payload = json_decode($client->getResponse()->getContent(), true);
-        self::assertIsArray($payload);
-        self::assertArrayHasKey('token', $payload);
-        self::assertIsString($payload['token']);
-
-        return $payload['token'];
     }
 
     /**
