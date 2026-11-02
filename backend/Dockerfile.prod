@@ -3,7 +3,7 @@
 # FrankenPHP (Caddy + PHP embedded in a single binary) replaces the PHP built-in
 # server, which is single-request-at-a-time and explicitly unsupported in production.
 # One process serves both static files and PHP, so no php-fpm + nginx + supervisor stack.
-FROM dunglas/frankenphp:1.13.3-php8.4-alpine AS base
+FROM dunglas/frankenphp:1.13.4-php8.4-alpine AS base
 
 # install-php-extensions ships with the FrankenPHP images.
 RUN install-php-extensions \
